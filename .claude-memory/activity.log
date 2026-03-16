@@ -108,3 +108,9 @@ feat: spawn villagers at player spawn z
 2026-03-16 19:37:04|Read|scripts/ui/SelectionManager.gd
 2026-03-16 19:37:20|Write|scripts/ui/SelectionManager.gd
 2026-03-16 19:37:25|Grep|var \w+ :=
+2026-03-16 19:37:35|Bash|git add -A && git commit -m "fix: explicit types in SelectionManager for strict Godot 4.5 inference"
+2026-03-16 19:38:22|Grep|var screen_pos :=
+2026-03-16 19:38:36|Write|scripts/main/Main.gd
+2026-03-16 19:38:41|Read|scripts/map/IsometricMap.gd
+2026-03-16 19:38:46|Grep|var \w+ :=
+2026-03-16 19:39:11|Write|scripts/map/IsometricMap.gd
