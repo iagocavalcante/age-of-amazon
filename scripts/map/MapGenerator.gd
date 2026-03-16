@@ -168,7 +168,8 @@ func _carve_rivers() -> void:
 
 		var path := _generate_meandering_path(start_x, start_y, end_x, end_y, 0.3)
 
-		for point in path:
+		for p in path:
+			var point: Vector2i = p as Vector2i
 			var width_var := 1.0 + detail_noise.get_noise_2d(point.x * 0.1, point.y * 0.1) * 0.5
 			var actual_width := int(river_width * width_var)
 
@@ -431,7 +432,8 @@ func _flood_fill(sx: int, sy: int) -> Dictionary:
 
 func _carve_path(x1: int, y1: int, x2: int, y2: int) -> void:
 	var path := _generate_meandering_path(x1, y1, x2, y2, 0.1)
-	for point in path:
+	for p in path:
+		var point: Vector2i = p as Vector2i
 		for dy in range(-1, 2):
 			for dx in range(-1, 2):
 				var nx: int = point.x + dx

@@ -92,3 +92,13 @@ feat: spawn villagers at player spawn z
 2026-03-16 19:33:33|Grep|var \w+ := \w+\.pop_
 2026-03-16 19:33:40|Grep|var \w+: \w+ = \w+\.pop_
 2026-03-16 19:33:47|Grep|var nx|var ny
+2026-03-16 19:33:53|Bash|git add -A && git commit -m "fix: explicit type annotations for Godot 4.5 strict inference"
+2026-03-16 19:34:43|Read|scripts/map/MapGenerator.gd
+2026-03-16 19:34:54|Edit|scripts/map/MapGenerator.gd
+2026-03-16 19:35:00|Grep|for \w+ in (path|queue|region|changes|spawn_zones|candidates)
+2026-03-16 19:35:06|Read|scripts/map/MapGenerator.gd
+2026-03-16 19:35:13|Read|scripts/map/MapGenerator.gd
+2026-03-16 19:35:23|Edit|scripts/map/MapGenerator.gd
+2026-03-16 19:35:32|Read|scripts/map/MapGenerator.gd
+2026-03-16 19:35:42|Bash|grep -n "var width_var\|var point\|for point\|for p in\|for zone\|for change\|for tile\|:= queue\|:=
+2026-03-16 19:35:48|Read|scripts/map/IsometricMap.gd
