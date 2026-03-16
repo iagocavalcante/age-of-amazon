@@ -102,3 +102,9 @@ feat: spawn villagers at player spawn z
 2026-03-16 19:35:32|Read|scripts/map/MapGenerator.gd
 2026-03-16 19:35:42|Bash|grep -n "var width_var\|var point\|for point\|for p in\|for zone\|for change\|for tile\|:= queue\|:=
 2026-03-16 19:35:48|Read|scripts/map/IsometricMap.gd
+2026-03-16 19:35:55|Bash|git add -A && git commit -m "fix: cast untyped Array elements to Vector2i in _carve_path"
+2026-03-16 19:36:49|Read|scripts/map/MapGenerator.gd
+2026-03-16 19:36:55|Grep|var dist :=
+2026-03-16 19:37:04|Read|scripts/ui/SelectionManager.gd
+2026-03-16 19:37:20|Write|scripts/ui/SelectionManager.gd
+2026-03-16 19:37:25|Grep|var \w+ :=

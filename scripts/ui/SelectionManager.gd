@@ -20,7 +20,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				_command_move(mb.position)
 
 	if event is InputEventMouseMotion and is_box_selecting:
-		_update_selection_box(event.position)
+		var mm := event as InputEventMouseMotion
+		_update_selection_box(mm.position)
 
 	if event is InputEventScreenTouch:
 		var st := event as InputEventScreenTouch
@@ -50,10 +51,13 @@ func _click_select(screen_pos: Vector2) -> void:
 
 	var world_pos := _screen_to_world(screen_pos)
 	var closest_unit: Node2D = null
-	var closest_dist := 20.0
+	var closest_dist: float = 20.0
 
-	for unit in get_tree().get_nodes_in_group("units"):
-		var dist := unit.global_position.distance_to(world_pos)
+	for node: Node in get_tree().get_nodes_in_group("units"):
+		var unit: Node2D = node as Node2D
+		if unit == null:
+			continue
+		var dist: float = unit.global_position.distance_to(world_pos)
 		if dist < closest_dist:
 			closest_dist = dist
 			closest_unit = unit
@@ -72,7 +76,10 @@ func _box_select(start: Vector2, end: Vector2) -> void:
 	var world_end := _screen_to_world(end)
 	var rect := Rect2(world_start, world_end - world_start).abs()
 
-	for unit in get_tree().get_nodes_in_group("units"):
+	for node: Node in get_tree().get_nodes_in_group("units"):
+		var unit: Node2D = node as Node2D
+		if unit == null:
+			continue
 		if rect.has_point(unit.global_position):
 			if unit.has_method("select"):
 				unit.select()
@@ -81,14 +88,14 @@ func _box_select(start: Vector2, end: Vector2) -> void:
 func _command_move(screen_pos: Vector2) -> void:
 	var world_pos := _screen_to_world(screen_pos)
 
-	for unit in selected_units:
+	for unit: Node2D in selected_units:
 		if unit.has_method("move_to"):
 			unit.move_to(world_pos)
 
 	EventBus.units_commanded_move.emit(selected_units, world_pos)
 
 func _deselect_all() -> void:
-	for unit in selected_units:
+	for unit: Node2D in selected_units:
 		if is_instance_valid(unit) and unit.has_method("deselect"):
 			unit.deselect()
 	selected_units.clear()
