@@ -80,3 +80,15 @@ feat: spawn villagers at player spawn z
 2026-03-16 19:31:42|Read|scripts/map/MapGenerator.gd
 2026-03-16 19:31:50|Edit|scripts/map/MapGenerator.gd
 2026-03-16 19:31:57|Read|scripts/units/Unit.gd
+2026-03-16 19:32:37|Bash|git add -A && git commit -m "fix: remove fake UIDs, switch to Compatibility renderer, optimize map r
+2026-03-16 19:32:45|Read|scripts/map/IsometricMap.gd
+2026-03-16 19:32:46|Read|scripts/map/MapGenerator.gd
+2026-03-16 19:32:55|Edit|scripts/map/IsometricMap.gd
+2026-03-16 19:32:57|Edit|scripts/map/MapGenerator.gd
+2026-03-16 19:33:04|Grep|var \w+ := point\.
+2026-03-16 19:33:11|Read|scripts/map/MapGenerator.gd
+2026-03-16 19:33:17|Edit|scripts/map/MapGenerator.gd
+2026-03-16 19:33:26|Grep|var \w+ := (queue|path|region)\.
+2026-03-16 19:33:33|Grep|var \w+ := \w+\.pop_
+2026-03-16 19:33:40|Grep|var \w+: \w+ = \w+\.pop_
+2026-03-16 19:33:47|Grep|var nx|var ny

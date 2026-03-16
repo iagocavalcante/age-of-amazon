@@ -176,8 +176,8 @@ func _carve_rivers() -> void:
 				for dx in range(-actual_width, actual_width + 1):
 					var dist := sqrt(float(dx * dx + dy * dy))
 					if dist <= actual_width:
-						var nx := point.x + dx
-						var ny := point.y + dy
+						var nx: int = point.x + dx
+						var ny: int = point.y + dy
 						if _is_in_bounds(nx, ny):
 							if dist <= actual_width * 0.6:
 								tiles[ny][nx] = Constants.Biome.WATER_DEEP
@@ -232,8 +232,8 @@ func _add_river_fords(path: Array, is_horizontal: bool) -> void:
 
 			for dy in range(-ford_w, ford_w + 1):
 				for dx in range(-ford_len, ford_len + 1):
-					var nx := point.x + dx
-					var ny := point.y + dy
+					var nx: int = point.x + dx
+					var ny: int = point.y + dy
 					if _is_in_bounds(nx, ny):
 						if tiles[ny][nx] == Constants.Biome.WATER_DEEP:
 							tiles[ny][nx] = Constants.Biome.WATER_SHALLOW

@@ -106,7 +106,7 @@ func _flood_fill_unwalkable(start_x: int, start_y: int, visited: Dictionary) -> 
 	var queue: Array[Vector2i] = [Vector2i(start_x, start_y)]
 
 	while queue.size() > 0:
-		var pos := queue.pop_back()
+		var pos: Vector2i = queue.pop_back()
 		if visited.has(pos):
 			continue
 		if not map_generator._is_in_bounds(pos.x, pos.y):
