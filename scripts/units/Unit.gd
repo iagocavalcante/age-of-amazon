@@ -40,6 +40,8 @@ func _ready() -> void:
 	nav_agent.target_desired_distance = 8.0
 	nav_agent.velocity_computed.connect(_on_velocity_computed)
 
+	sprite.texture = PlaceholderTextures.unit_texture
+	selection_indicator.texture = PlaceholderTextures.selection_circle
 	_update_color()
 	selection_indicator.visible = false
 	health_bar.visible = false
