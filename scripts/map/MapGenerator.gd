@@ -19,14 +19,14 @@ var detail_noise: FastNoiseLite
 var forest_threshold: float = 0.5
 var swamp_moisture_threshold: float = 0.65
 var cliff_elevation_threshold: float = 0.75
-var river_count: int = 4
-var river_width: int = 5
-var lake_count: int = 8
-var lake_max_radius: int = 12
+var river_count: int = 2
+var river_width: int = 3
+var lake_count: int = 4
+var lake_max_radius: int = 8
 var player_count: int = 2
-var spawn_zone_radius: int = 12
-var min_spawn_distance: int = 100
-var clearing_count: int = 12
+var spawn_zone_radius: int = 8
+var min_spawn_distance: int = 40
+var clearing_count: int = 6
 
 func _init(p_width: int = 128, p_height: int = 128, p_seed: int = 0) -> void:
 	width = p_width

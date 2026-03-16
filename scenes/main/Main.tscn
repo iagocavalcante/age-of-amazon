@@ -1,8 +1,8 @@
-[gd_scene load_steps=5 format=3 uid="uid://main_scene"]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/main/Main.gd" id="1"]
-[ext_resource type="PackedScene" uid="uid://iso_map" path="res://scenes/map/IsometricMap.tscn" id="2"]
-[ext_resource type="PackedScene" uid="uid://game_cam" path="res://scenes/camera/GameCamera.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://scenes/map/IsometricMap.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://scenes/camera/GameCamera.tscn" id="3"]
 [ext_resource type="Script" path="res://scripts/ui/SelectionBoxOverlay.gd" id="4"]
 
 [node name="Main" type="Node2D"]

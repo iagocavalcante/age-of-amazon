@@ -1,0 +1,82 @@
+2026-03-16 19:22:52|Bash|cd /Users/iagocavalcante/Workspaces/IagoCavalcante/age-of-amazon && git add scripts/camera/GameCamer
+2026-03-16 19:22:54|Bash|git add scripts/ui/SelectionManager.gd project.godot && git commit -m "$(cat <<'EOF'
+feat: selection
+2026-03-16 19:22:59|TaskUpdate|
+2026-03-16 19:23:15|Bash|git add scripts/map/MapGenerator.gd && git commit -m "feat: port procedural map generator from TS to
+2026-03-16 19:23:16|Bash|git add scripts/units/Unit.gd scenes/units/Unit.tscn && git commit -m "feat: base unit with navigati
+2026-03-16 19:23:19|TaskUpdate|
+2026-03-16 19:23:20|TaskUpdate|
+2026-03-16 19:23:20|TaskUpdate|
+2026-03-16 19:23:26|TaskUpdate|
+2026-03-16 19:23:27|TaskUpdate|
+2026-03-16 19:23:27|TaskUpdate|
+2026-03-16 19:23:44|Agent|
+2026-03-16 19:23:50|Bash|ls /Users/iagocavalcante/Workspaces/IagoCavalcante/age-of-amazon/scripts/map/ 2>/dev/null; ls /Users
+2026-03-16 19:23:51|Agent|
+2026-03-16 19:23:54|Bash|mkdir -p /Users/iagocavalcante/Workspaces/IagoCavalcante/age-of-amazon/scenes/map
+2026-03-16 19:23:54|Bash|ls /Users/iagocavalcante/Workspaces/IagoCavalcante/age-of-amazon/scripts/ui/ 2>/dev/null || echo "Di
+2026-03-16 19:23:58|Write|scripts/ui/SelectionBoxOverlay.gd
+2026-03-16 19:24:03|Agent|
+2026-03-16 19:24:03|Bash|git add scripts/ui/SelectionBoxOverlay.gd && git commit -m "$(cat <<'EOF'
+feat: selection box visual
+2026-03-16 19:24:04|Write|scripts/map/IsometricMap.gd
+2026-03-16 19:24:05|Write|scenes/map/IsometricMap.tscn
+2026-03-16 19:24:06|Read|project.godot
+2026-03-16 19:24:07|Read|scripts/units/Unit.gd
+2026-03-16 19:24:08|Bash|ls /Users/iagocavalcante/Workspaces/IagoCavalcante/age-of-amazon/scripts/utils/ 2>/dev/null || echo 
+2026-03-16 19:24:11|Bash|mkdir -p /Users/iagocavalcante/Workspaces/IagoCavalcante/age-of-amazon/scripts/utils
+2026-03-16 19:24:12|Bash|git add scripts/map/IsometricMap.gd scenes/map/IsometricMap.tscn && git commit -m "$(cat <<'EOF'
+fea
+2026-03-16 19:24:16|TaskUpdate|
+2026-03-16 19:24:18|Write|scripts/utils/PlaceholderTextures.gd
+2026-03-16 19:24:20|Edit|scripts/units/Unit.gd
+2026-03-16 19:24:21|Edit|project.godot
+2026-03-16 19:24:27|Bash|git add scripts/utils/PlaceholderTextures.gd scripts/units/Unit.gd project.godot && git commit -m "$
+2026-03-16 19:24:27|TaskUpdate|
+2026-03-16 19:24:38|TaskUpdate|
+2026-03-16 19:24:46|TaskUpdate|
+2026-03-16 19:25:06|Read|scenes/map/IsometricMap.tscn
+2026-03-16 19:25:06|Read|scenes/camera/GameCamera.tscn
+2026-03-16 19:25:07|Read|project.godot
+2026-03-16 19:25:07|Grep|SelectionBoxOverlay
+2026-03-16 19:26:11|Bash|ls /Users/iagocavalcante/Workspaces/IagoCavalcante/age-of-amazon/scripts/main 2>/dev/null; ls /Users
+2026-03-16 19:26:16|Bash|mkdir -p /Users/iagocavalcante/Workspaces/IagoCavalcante/age-of-amazon/scripts/main /Users/iagocaval
+2026-03-16 19:26:24|Write|scripts/main/Main.gd
+2026-03-16 19:26:26|Write|scenes/main/Main.tscn
+2026-03-16 19:26:31|Edit|project.godot
+2026-03-16 19:26:37|Bash|git add scripts/main/Main.gd scenes/main/Main.tscn project.godot && git commit -m "$(cat <<'EOF'
+fea
+2026-03-16 19:26:48|Agent|
+2026-03-16 19:26:53|TaskUpdate|
+2026-03-16 19:26:54|TaskUpdate|
+2026-03-16 19:27:13|Read|scripts/main/Main.gd
+2026-03-16 19:27:21|Write|scripts/main/Main.gd
+2026-03-16 19:27:26|Bash|git add scripts/main/Main.gd && git commit -m "$(cat <<'EOF'
+feat: spawn villagers at player spawn z
+2026-03-16 19:27:31|Agent|
+2026-03-16 19:27:47|TaskUpdate|
+2026-03-16 19:27:55|Bash|git log --oneline
+2026-03-16 19:27:56|Bash|find . -name "*.gd" -o -name "*.tscn" | sort
+2026-03-16 19:28:31|Bash|open /Users/iagocavalcante/Workspaces/IagoCavalcante/age-of-amazon/project.godot
+2026-03-16 19:29:35|Read|project.godot
+2026-03-16 19:29:35|Read|scenes/main/Main.tscn
+2026-03-16 19:29:36|Read|scenes/map/IsometricMap.tscn
+2026-03-16 19:29:36|Read|scenes/camera/GameCamera.tscn
+2026-03-16 19:29:43|Read|scripts/map/IsometricMap.gd
+2026-03-16 19:29:44|Read|scripts/main/Main.gd
+2026-03-16 19:29:44|Read|scripts/camera/GameCamera.gd
+2026-03-16 19:29:55|Edit|scenes/main/Main.tscn
+2026-03-16 19:29:56|Edit|scenes/map/IsometricMap.tscn
+2026-03-16 19:29:57|Edit|scenes/camera/GameCamera.tscn
+2026-03-16 19:30:03|Read|scenes/units/Unit.tscn
+2026-03-16 19:30:10|Edit|scenes/units/Unit.tscn
+2026-03-16 19:30:16|Read|scripts/autoloads/Constants.gd
+2026-03-16 19:30:29|Write|scripts/autoloads/Constants.gd
+2026-03-16 19:30:41|Edit|project.godot
+2026-03-16 19:31:19|Write|scripts/map/IsometricMap.gd
+2026-03-16 19:31:26|Write|scenes/map/IsometricMap.tscn
+2026-03-16 19:31:32|Read|scripts/autoloads/GameManager.gd
+2026-03-16 19:31:37|Edit|scripts/autoloads/GameManager.gd
+2026-03-16 19:31:42|Read|scripts/map/MapGenerator.gd
+2026-03-16 19:31:50|Edit|scripts/map/MapGenerator.gd
+2026-03-16 19:31:57|Read|scripts/units/Unit.gd

@@ -4,8 +4,8 @@ extends Node
 enum GameState { LOADING, RUNNING, PAUSED }
 
 var state: GameState = GameState.LOADING
-var map_width: int = 128
-var map_height: int = 128
+var map_width: int = 64
+var map_height: int = 64
 var map_seed: int = 0
 
 func _ready() -> void:
