@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scripts/main/Main.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/world/ChunkManager.gd" id="2"]
@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://scripts/ui/HUD.gd" id="5"]
 [ext_resource type="Script" path="res://scripts/ai/EnemyAI.gd" id="6"]
 [ext_resource type="Script" path="res://scripts/world/FogOfWar.gd" id="7"]
+[ext_resource type="Script" path="res://scripts/ui/HelpScreen.gd" id="8"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1")
@@ -55,3 +56,12 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("5")
+
+[node name="HelpScreen" type="Control" parent="UILayer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("8")

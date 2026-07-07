@@ -9,6 +9,10 @@ const PLAYER_COUNT: int = 2
 var state: GameState = GameState.LOADING
 var map_seed: int = 0
 
+# The "How to Play" overlay auto-opens once per session; this flag (an
+# autoload, so it survives scene reloads on restart) keeps it from reopening.
+var help_seen: bool = false
+
 # Set by ChunkManager once the world exists.
 var world: WorldData = null
 var pathfinder: Pathfinder = null

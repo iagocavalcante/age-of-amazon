@@ -92,6 +92,12 @@ func _build_top_bar() -> void:
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(spacer)
 
+	var help_button: Button = Button.new()
+	help_button.text = "Help"
+	help_button.focus_mode = Control.FOCUS_NONE
+	help_button.pressed.connect(func() -> void: EventBus.help_requested.emit())
+	row.add_child(help_button)
+
 	_pause_button = Button.new()
 	_pause_button.text = "Pause"
 	_pause_button.focus_mode = Control.FOCUS_NONE

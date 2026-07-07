@@ -38,6 +38,8 @@ func _ready() -> void:
 		_run_systems_test()
 	if "--test-scout" in args:
 		_run_scout_test()
+	if "--capture-help" in args:
+		_run_capture_help()
 
 func _place_building(type: String, player_id: int, base_cell: Vector2i) -> Building:
 	var building: Building = Building.new()
@@ -67,6 +69,7 @@ func _run_move_test() -> void:
 	await get_tree().create_timer(3.0).timeout
 	for u: Node2D in SelectionManager.selected_units:
 		print("[test-move] unit after 3s: ", u.global_position, " state=", u.current_state)
+	get_tree().quit()
 
 # Accelerated AI pacing: prove the AI scouts, discovers the player base
 # through its own fog, and then attacks it.
@@ -98,6 +101,23 @@ func _run_scout_test() -> void:
 	else:
 		print("[test-scout] player TC hp=", player_tc.current_hp, "/", player_tc.max_hp,
 			" (attack ", "OK" if player_tc.current_hp < player_tc.max_hp else "NOT YET", ")")
+	get_tree().quit()
+
+# Renders the help overlay and saves a screenshot so the layout can be
+# reviewed. Run windowed (or in movie mode) — not headless — so the frame
+# actually draws.
+func _run_capture_help() -> void:
+	var help: Control = $UILayer/HelpScreen
+	await get_tree().process_frame
+	help.open()
+	for _i in range(6):
+		await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var img: Image = get_viewport().get_texture().get_image()
+	var path: String = "user://help_capture.png"
+	img.save_png(path)
+	print("[capture-help] saved ", ProjectSettings.globalize_path(path), " size=", img.get_size())
+	get_tree().quit()
 
 func _find_tc(player_id: int) -> Building:
 	for node: Node in get_tree().get_nodes_in_group("buildings"):
@@ -171,3 +191,4 @@ func _run_systems_test() -> void:
 				hidden_enemies += 1
 	print("[test-systems] enemy units hidden=", hidden_enemies, " visible=", visible_enemies,
 		" (culling ", "OK" if hidden_enemies > 0 else "CHECK", ")")
+	get_tree().quit()

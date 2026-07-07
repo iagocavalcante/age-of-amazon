@@ -23,6 +23,9 @@ signal population_changed(player_id: int)
 # World signals
 signal world_ready()
 
+# UI signals
+signal help_requested()
+
 # Game signals
 signal game_state_changed(new_state: String)
 signal game_over(winner_player_id: int)
