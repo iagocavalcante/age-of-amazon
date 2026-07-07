@@ -1,25 +1,46 @@
 # scripts/main/Main.gd
 extends Node2D
 
-@onready var iso_map := $IsometricMap
+@onready var iso_map: Node2D = $IsometricMap
 @onready var camera: Camera2D = $GameCamera
+@onready var doodads: Node2D = $World/Doodads
+@onready var units: Node2D = $World/Units
 
 var unit_scene: PackedScene = preload("res://scenes/units/Unit.tscn")
 
 func _ready() -> void:
-	EventBus.map_generated.connect(_on_map_generated)
+	# Generation is triggered here — after every child (camera included) has
+	# run _ready and connected its signals — so map_generated can't be missed.
+	iso_map.generate()
+	iso_map.populate_doodads(doodads)
+
+	var spawn_zones: Array = iso_map.map_generator.spawn_zones
+	if spawn_zones.size() > 0:
+		var spawn: Dictionary = spawn_zones[0]
+		camera.center_on(Constants.grid_to_world(spawn["cx"], spawn["cy"]))
+
+	for zone: Dictionary in spawn_zones:
+		_spawn_villagers(zone, 3)
+
 	GameManager.change_state(GameManager.GameState.RUNNING)
 
-func _on_map_generated(_w: int, _h: int) -> void:
-	# Center camera on player spawn
-	if iso_map.map_generator.spawn_zones.size() > 0:
-		var spawn: Dictionary = iso_map.map_generator.spawn_zones[0]
-		var screen_pos: Vector2 = iso_map.grid_to_screen(spawn["cx"], spawn["cy"])
-		camera.center_on(screen_pos)
+	if "--test-move" in OS.get_cmdline_user_args():
+		_run_move_test()
 
-		# Spawn 3 villagers for each player
-		for zone: Dictionary in iso_map.map_generator.spawn_zones:
-			_spawn_villagers(zone, 3)
+# Temporary verification harness: command all player-0 units to walk 8 tiles
+# away and report their progress.
+func _run_move_test() -> void:
+	await get_tree().create_timer(0.5).timeout
+	var spawn: Dictionary = iso_map.map_generator.spawn_zones[0]
+	var target: Vector2 = Constants.grid_to_world(spawn["cx"] + 8, spawn["cy"] + 8)
+	var test_units: Array = get_tree().get_nodes_in_group("player_0")
+	print("[test-move] commanding ", test_units.size(), " units to ", target)
+	for u: Node2D in test_units:
+		print("[test-move] unit start: ", u.global_position)
+		u.move_to(target)
+	await get_tree().create_timer(3.0).timeout
+	for u: Node2D in test_units:
+		print("[test-move] unit after 3s: ", u.global_position, " state=", u.current_state)
 
 func _spawn_villagers(zone: Dictionary, count: int) -> void:
 	var cx: int = zone["cx"]
@@ -31,11 +52,8 @@ func _spawn_villagers(zone: Dictionary, count: int) -> void:
 		unit.set("player_id", pid)
 		unit.set("unit_name", "Villager")
 
-		# Offset each unit slightly
 		var offset_x: int = (i % 3 - 1) * 2
-		var offset_y: int = (i / 3) * 2
-		var grid_x: int = cx + offset_x
-		var grid_y: int = cy + offset_y
-
-		unit.global_position = iso_map.grid_to_screen(grid_x, grid_y) as Vector2
-		add_child(unit)
+		var offset_y: int = int(i / 3.0) * 2
+		var cell: Vector2i = Vector2i(cx + offset_x, cy + offset_y)
+		unit.position = Constants.grid_to_world(cell.x, cell.y)
+		units.add_child(unit)

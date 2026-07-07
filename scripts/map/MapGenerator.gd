@@ -185,7 +185,7 @@ func _carve_rivers() -> void:
 							else:
 								tiles[ny][nx] = Constants.Biome.WATER_SHALLOW
 
-		_add_river_fords(path, is_horizontal)
+		_add_river_fords(path, is_horizontal, rng)
 
 func _generate_meandering_path(sx: int, sy: int, ex: int, ey: int, meander: float) -> Array:
 	var path: Array = []
@@ -220,8 +220,9 @@ func _generate_meandering_path(sx: int, sy: int, ex: int, ey: int, meander: floa
 
 	return path
 
-func _add_river_fords(path: Array, is_horizontal: bool) -> void:
-	var ford_count := 2 + randi() % 3
+func _add_river_fords(path: Array, is_horizontal: bool, rng: RandomNumberGenerator) -> void:
+	var ford_count := 2 + rng.randi() % 3
+	@warning_ignore("integer_division")
 	var spacing := path.size() / (ford_count + 1)
 
 	for i in range(1, ford_count + 1):
@@ -281,7 +282,9 @@ func _create_organic_lake(cx: int, cy: int, radius: int) -> void:
 				var ny := cy + dy
 				if _is_in_bounds(nx, ny):
 					if tiles[ny][nx] != Constants.Biome.WATER_DEEP:
-						if dist <= (radius + noise_offset) * 0.6:
+						# Compact deep core (no per-tile noise) so the lake
+						# center doesn't come out speckled.
+						if dist <= radius * 0.55:
 							tiles[ny][nx] = Constants.Biome.WATER_DEEP
 						else:
 							tiles[ny][nx] = Constants.Biome.WATER_SHALLOW
@@ -295,10 +298,10 @@ func _place_spawn_zones() -> void:
 		Vector2i(width - r - 5, height - r - 5),
 		Vector2i(r + 5, height - r - 5),
 		Vector2i(width - r - 5, r + 5),
-		Vector2i(width / 2, r + 5),
-		Vector2i(width / 2, height - r - 5),
-		Vector2i(r + 5, height / 2),
-		Vector2i(width - r - 5, height / 2),
+		Vector2i(int(width / 2.0), r + 5),
+		Vector2i(int(width / 2.0), height - r - 5),
+		Vector2i(r + 5, int(height / 2.0)),
+		Vector2i(width - r - 5, int(height / 2.0)),
 	]
 
 	for player_id in range(player_count):
@@ -346,11 +349,13 @@ func _create_spawn_zone(cx: int, cy: int, radius: int, player_id: int) -> void:
 				var nx := cx + dx
 				var ny := cy + dy
 				if _is_in_bounds(nx, ny):
-					if tiles[ny][nx] != Constants.Biome.WATER_DEEP:
-						if dist <= radius * 0.6:
-							tiles[ny][nx] = Constants.Biome.GRASS
-						else:
-							tiles[ny][nx] = Constants.Biome.FOREST_LIGHT
+					if tiles[ny][nx] == Constants.Biome.WATER_DEEP:
+						# Keep rivers flowing through spawns, but fordable.
+						tiles[ny][nx] = Constants.Biome.WATER_SHALLOW
+					elif dist <= radius * 0.6:
+						tiles[ny][nx] = Constants.Biome.GRASS
+					else:
+						tiles[ny][nx] = Constants.Biome.FOREST_LIGHT
 
 	spawn_zones.append({
 		"cx": cx,
@@ -493,3 +498,8 @@ func is_walkable(x: int, y: int) -> bool:
 	if not _is_in_bounds(x, y):
 		return false
 	return tile_data[y][x]["is_walkable"]
+
+func get_movement_cost(x: int, y: int) -> float:
+	if not _is_in_bounds(x, y):
+		return INF
+	return tile_data[y][x]["movement_cost"]

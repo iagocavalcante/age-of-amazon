@@ -20,7 +20,18 @@ enum Biome {
 # Movement costs per biome (keyed by int)
 var MOVEMENT_COST: Dictionary = {}
 var WALKABLE: Dictionary = {}
+
+# Per-biome color ramps: [shadow, dark, base, light, highlight]
+# Painted with dithered noise by TerrainArtist for a hand-pixelled look.
+var BIOME_RAMPS: Dictionary = {}
+
+# Flat representative color per biome (minimap, fallbacks)
 var BIOME_COLORS: Dictionary = {}
+
+const PLAYER_COLORS: Array[Color] = [
+	Color(0.25, 0.55, 0.95),  # Player 0: Blue
+	Color(0.90, 0.30, 0.25),  # Player 1: Red
+]
 
 func _ready() -> void:
 	MOVEMENT_COST = {
@@ -45,13 +56,53 @@ func _ready() -> void:
 		Biome.HIGH_GROUND: true,
 	}
 
-	BIOME_COLORS = {
-		Biome.GRASS: Color(0.55, 0.76, 0.29),
-		Biome.FOREST_LIGHT: Color(0.33, 0.59, 0.24),
-		Biome.FOREST_DENSE: Color(0.18, 0.40, 0.14),
-		Biome.WATER_SHALLOW: Color(0.40, 0.70, 0.85),
-		Biome.WATER_DEEP: Color(0.15, 0.35, 0.60),
-		Biome.SWAMP: Color(0.45, 0.50, 0.30),
-		Biome.CLIFF: Color(0.50, 0.45, 0.40),
-		Biome.HIGH_GROUND: Color(0.60, 0.55, 0.45),
+	BIOME_RAMPS = {
+		Biome.GRASS: [
+			Color8(74, 120, 44), Color8(96, 148, 54),
+			Color8(118, 172, 62), Color8(138, 190, 74), Color8(160, 206, 92),
+		],
+		Biome.FOREST_LIGHT: [
+			Color8(44, 92, 38), Color8(60, 114, 44),
+			Color8(78, 134, 52), Color8(96, 152, 60), Color8(116, 168, 72),
+		],
+		Biome.FOREST_DENSE: [
+			Color8(22, 56, 28), Color8(32, 72, 34),
+			Color8(42, 88, 40), Color8(54, 102, 48), Color8(68, 116, 56),
+		],
+		Biome.WATER_SHALLOW: [
+			Color8(52, 128, 158), Color8(66, 148, 176),
+			Color8(84, 168, 192), Color8(104, 186, 204), Color8(130, 202, 214),
+		],
+		Biome.WATER_DEEP: [
+			Color8(18, 54, 96), Color8(24, 68, 114),
+			Color8(30, 82, 130), Color8(38, 96, 144), Color8(48, 110, 156),
+		],
+		Biome.SWAMP: [
+			Color8(58, 66, 36), Color8(74, 84, 44),
+			Color8(90, 100, 52), Color8(106, 116, 62), Color8(120, 130, 74),
+		],
+		Biome.CLIFF: [
+			Color8(74, 66, 60), Color8(94, 84, 76),
+			Color8(114, 102, 92), Color8(134, 121, 108), Color8(154, 140, 126),
+		],
+		Biome.HIGH_GROUND: [
+			Color8(112, 100, 64), Color8(132, 118, 76),
+			Color8(150, 136, 88), Color8(166, 152, 102), Color8(182, 168, 118),
+		],
 	}
+
+	for biome: int in BIOME_RAMPS:
+		var ramp: Array = BIOME_RAMPS[biome]
+		BIOME_COLORS[biome] = ramp[2]
+
+# --- Isometric grid <-> world conversion (single source of truth) ---
+
+func grid_to_world(grid_x: int, grid_y: int) -> Vector2:
+	var wx: float = (grid_x - grid_y) * TILE_WIDTH / 2.0
+	var wy: float = (grid_x + grid_y) * TILE_HEIGHT / 2.0
+	return Vector2(wx, wy)
+
+func world_to_grid(world_pos: Vector2) -> Vector2i:
+	var gx: float = (world_pos.x / (TILE_WIDTH / 2.0) + world_pos.y / (TILE_HEIGHT / 2.0)) / 2.0
+	var gy: float = (world_pos.y / (TILE_HEIGHT / 2.0) - world_pos.x / (TILE_WIDTH / 2.0)) / 2.0
+	return Vector2i(int(round(gx)), int(round(gy)))
