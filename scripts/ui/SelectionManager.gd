@@ -125,12 +125,14 @@ func _pick_own_unit(screen_pos: Vector2) -> Node2D:
 func _pick_enemy(screen_pos: Vector2) -> Node2D:
 	var world_pos: Vector2 = _screen_to_world(screen_pos)
 
-	# Enemy unit near the click?
+	# Enemy unit near the click? (fog-hidden enemies can't be targeted)
 	var closest: Node2D = null
 	var closest_dist: float = CLICK_PICK_RADIUS
 	for node: Node in get_tree().get_nodes_in_group("units"):
 		var unit: Node2D = node as Node2D
 		if unit == null or unit.get("player_id") == GameManager.LOCAL_PLAYER_ID:
+			continue
+		if not unit.visible:
 			continue
 		var dist: float = unit.global_position.distance_to(world_pos)
 		if dist < closest_dist:
@@ -139,9 +141,9 @@ func _pick_enemy(screen_pos: Vector2) -> Node2D:
 	if closest != null:
 		return closest
 
-	# Enemy building on the clicked tile?
+	# Enemy building on the clicked tile? (only if remembered/visible)
 	var building: Node2D = GameManager.world.building_at(Constants.world_to_grid(world_pos))
-	if building != null and building.get("player_id") != GameManager.LOCAL_PLAYER_ID:
+	if building != null and building.get("player_id") != GameManager.LOCAL_PLAYER_ID and building.visible:
 		return building
 	return null
 

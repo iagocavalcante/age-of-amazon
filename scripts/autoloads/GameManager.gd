@@ -12,6 +12,8 @@ var map_seed: int = 0
 # Set by ChunkManager once the world exists.
 var world: WorldData = null
 var pathfinder: Pathfinder = null
+# Set by FogOfWar.setup().
+var fog: FogOfWar = null
 
 # Per-player resource stockpiles: player_id -> {ResourceType -> int}
 var stockpiles: Array[Dictionary] = []

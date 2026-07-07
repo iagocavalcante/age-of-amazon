@@ -10,6 +10,11 @@ var biomes: PackedInt32Array = PackedInt32Array()
 var resources: Dictionary = {}  # Vector2i cell -> {type, amount}
 var decor: Dictionary = {}      # Vector2i cell -> decor id (String)
 
+# Fog of war: 1 = the local player has seen this tile (persists forever).
+var explored: PackedByteArray = PackedByteArray()
+# Per-chunk fog texture data, rebuilt by FogOfWar when this chunk changes.
+var fog_image: Image = null
+
 # Visual nodes currently in the scene tree, or null when unloaded.
 var visual: Node2D = null          # ground + water sprites
 var doodad_visual: Node2D = null   # y-sorted trees/bushes/rocks
@@ -20,6 +25,7 @@ func _init(p_coords: Vector2i, gen: WorldGen) -> void:
 	coords = p_coords
 	var size: int = Constants.CHUNK_SIZE
 	biomes.resize(size * size)
+	explored.resize(size * size)
 
 	var base_x: int = coords.x * size
 	var base_y: int = coords.y * size

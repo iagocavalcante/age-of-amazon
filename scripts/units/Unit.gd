@@ -279,7 +279,8 @@ func _find_next_resource_node() -> void:
 		current_state = State.IDLE
 		return
 	var result: Dictionary = GameManager.world.find_nearest_resource(_gather_cell, _gather_type)
-	if result["found"]:
+	# Only auto-retarget nodes the player has scouted — no gathering in fog.
+	if result["found"] and (GameManager.fog == null or GameManager.fog.is_explored(result["cell"])):
 		_gather_cell = result["cell"]
 		_go_to_gather_site()
 	else:

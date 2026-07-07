@@ -238,7 +238,10 @@ func _redraw_minimap() -> void:
 
 	_minimap_image.fill(Color(0.03, 0.05, 0.04))
 
-	# Terrain from already-generated chunks only (never force generation).
+	var fog: FogOfWar = GameManager.fog
+
+	# Terrain from already-generated chunks only (never force generation);
+	# unexplored tiles stay dark, explored-but-unwatched tiles are dimmed.
 	for py in range(MINIMAP_TILES):
 		for px in range(MINIMAP_TILES):
 			var cell: Vector2i = center + Vector2i(px - half, py - half)
@@ -246,14 +249,24 @@ func _redraw_minimap() -> void:
 			var chunk: ChunkData = world.chunks.get(cc)
 			if chunk == null:
 				continue
+			var idx: int = (cell.y - cc.y * size) * size + (cell.x - cc.x * size)
+			if fog != null and chunk.explored[idx] == 0:
+				continue
 			var biome: int = chunk.get_biome_local(cell.x - cc.x * size, cell.y - cc.y * size)
-			_minimap_image.set_pixel(px, py, Constants.BIOME_COLORS[biome])
+			var color: Color = Constants.BIOME_COLORS[biome]
+			if fog != null and not fog.is_cell_visible(cell):
+				color = color.darkened(0.45)
+			_minimap_image.set_pixel(px, py, color)
 
-	# Buildings and units as dots.
+	# Buildings and units as dots. Enemies only when fog allows.
 	for node: Node in get_tree().get_nodes_in_group("buildings"):
-		_plot(node as Node2D, center, half, 2)
+		var building: Node2D = node as Node2D
+		if building != null and building.visible:
+			_plot(building, center, half, 2)
 	for node: Node in get_tree().get_nodes_in_group("units"):
-		_plot(node as Node2D, center, half, 1)
+		var unit: Node2D = node as Node2D
+		if unit != null and unit.visible:
+			_plot(unit, center, half, 1)
 
 	_minimap_rect.texture = ImageTexture.create_from_image(_minimap_image)
 
@@ -346,6 +359,7 @@ func _on_restart_pressed() -> void:
 	GameManager.map_seed = randi()
 	GameManager.world = null
 	GameManager.pathfinder = null
+	GameManager.fog = null
 	GameManager.reset_players()
 	GameManager.change_state(GameManager.GameState.LOADING)
 	get_tree().reload_current_scene()

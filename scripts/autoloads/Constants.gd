@@ -70,6 +70,7 @@ const BUILDING_DEFS: Dictionary = {
 		"max_hp": 600,
 		"footprint": Vector2i(2, 2),
 		"trains": ["villager", "warrior"],
+		"vision_tiles": 9,
 	},
 }
 

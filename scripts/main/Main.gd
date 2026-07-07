@@ -2,6 +2,7 @@
 extends Node2D
 
 @onready var chunk_manager: Node2D = $ChunkManager
+@onready var fog: FogOfWar = $FogOfWar
 @onready var camera: Camera2D = $GameCamera
 @onready var doodads: Node2D = $World/Doodads
 @onready var buildings: Node2D = $World/Buildings
@@ -23,6 +24,9 @@ func _ready() -> void:
 
 	camera.center_on(Constants.grid_to_world(0, 0))
 	chunk_manager.load_now()
+
+	fog.setup(camera)
+	fog.force_update()
 
 	EventBus.world_ready.emit()
 	GameManager.change_state(GameManager.GameState.RUNNING)
@@ -101,3 +105,19 @@ func _run_systems_test() -> void:
 	await get_tree().create_timer(3.0).timeout
 	var chunks_after: int = GameManager.world.chunks.size()
 	print("[test-systems] chunks before=", chunks_before, " after far pan=", chunks_after, " (streaming ", "OK" if chunks_after > chunks_before else "FAILED", ")")
+
+	# 5. Fog of war: home is explored, far land is not, distant enemies hidden.
+	var home_explored: bool = fog.is_explored(Vector2i(0, 0))
+	var far_explored: bool = fog.is_explored(Vector2i(200, 200))
+	print("[test-systems] fog home explored=", home_explored, " far explored=", far_explored,
+		" (fog ", "OK" if home_explored and not far_explored else "FAILED", ")")
+	var hidden_enemies: int = 0
+	var visible_enemies: int = 0
+	for node: Node in get_tree().get_nodes_in_group("player_1"):
+		if node is UnitBase:
+			if (node as Node2D).visible:
+				visible_enemies += 1
+			else:
+				hidden_enemies += 1
+	print("[test-systems] enemy units hidden=", hidden_enemies, " visible=", visible_enemies,
+		" (culling ", "OK" if hidden_enemies > 0 else "CHECK", ")")
