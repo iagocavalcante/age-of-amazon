@@ -2,32 +2,60 @@
 class_name UnitBase
 extends CharacterBody2D
 
-# State machine
-enum State { IDLE, MOVING, ATTACKING, GATHERING, BUILDING }
-var current_state: State = State.IDLE
-
-# Stats
-@export var unit_name: String = "Unit"
-@export var max_hp: int = 40
-@export var current_hp: int = 40
-@export var move_speed: float = 100.0
-@export var attack_power: int = 3
-@export var armor: int = 0
-@export var attack_range: float = 32.0
-@export var vision_range: float = 128.0
-@export var player_id: int = 0
+# State machine:
+#   IDLE       — stands, auto-acquires enemies if aggressive
+#   MOVING     — follows a path; on arrival resolves `_intent`
+#   GATHERING  — works a resource node on a timer
+#   ATTACKING  — strikes a target in range on a cooldown
+#
+# `_intent` describes what MOVING should do on arrival:
+#   {} | {kind:"gather", cell} | {kind:"deposit"} | {kind:"attack", target}
+enum State { IDLE, MOVING, GATHERING, ATTACKING }
 
 const WAYPOINT_REACHED_DISTANCE: float = 4.0
 const WALK_FRAME_TIME: float = 0.18
+const AGGRO_SCAN_INTERVAL: float = 0.6
+const REPATH_INTERVAL: float = 0.5
+const BODY_RADIUS: float = 10.0
 
-# Selection
+@export var unit_type: String = "villager"
+@export var player_id: int = 0
+
+var unit_name: String = "Unit"
+var max_hp: int = 40
+var current_hp: int = 40
+var move_speed: float = 100.0
+var attack_power: int = 2
+var armor: int = 0
+var attack_range: float = 26.0
+var attack_cooldown: float = 1.0
+var vision_range: float = 200.0
+var aggressive: bool = false
+var can_gather: bool = false
+
+var current_state: State = State.IDLE
 var is_selected: bool = false
 
-# Path following (grid A*; see Pathfinder)
+# Path following
 var _path: PackedVector2Array = PackedVector2Array()
 var _path_index: int = 0
 
-# Walk animation
+# Task intent
+var _intent: Dictionary = {}
+
+# Gathering
+var _gather_cell: Vector2i = Vector2i.ZERO
+var _gather_type: int = -1
+var _carrying: int = 0
+var _gather_timer: float = 0.0
+
+# Combat
+var _attack_target: Node2D = null
+var _cooldown_left: float = 0.0
+var _repath_timer: float = 0.0
+var _aggro_timer: float = 0.0
+
+# Animation
 var _frames: Array = []
 var _anim_time: float = 0.0
 
@@ -37,42 +65,116 @@ var _anim_time: float = 0.0
 @onready var health_bar: ProgressBar = $HealthBar
 
 func _ready() -> void:
+	var def: Dictionary = Constants.UNIT_DEFS[unit_type]
+	unit_name = unit_type.capitalize()
+	max_hp = def["max_hp"]
+	current_hp = max_hp
+	move_speed = def["move_speed"]
+	attack_power = def["attack_power"]
+	armor = def["armor"]
+	attack_range = def["attack_range"]
+	attack_cooldown = def["attack_cooldown"]
+	vision_range = def["vision_range"]
+	aggressive = def["aggressive"]
+	can_gather = def["can_gather"]
+
 	add_to_group("units")
 	add_to_group("player_%d" % player_id)
 
-	_frames = AssetLibrary.get_villager_frames(player_id)
+	_frames = AssetLibrary.get_unit_frames(player_id, unit_type)
 	sprite.texture = _frames[0]
-	# Anchor the sprite at the feet so y-sort works against doodads.
 	sprite.offset = Vector2(0, -sprite.texture.get_height() / 2.0 + 1.0)
 	shadow.texture = AssetLibrary.unit_shadow
 	selection_ring.texture = AssetLibrary.selection_ring
 	selection_ring.visible = false
 
-	health_bar.visible = false
 	health_bar.max_value = max_hp
 	health_bar.value = current_hp
 	health_bar.add_theme_stylebox_override("background", AssetLibrary.health_bar_bg)
 	health_bar.add_theme_stylebox_override("fill", AssetLibrary.health_bar_fill)
+	_update_health_bar()
+
+	EventBus.population_changed.emit(player_id)
 
 func _physics_process(delta: float) -> void:
-	match current_state:
-		State.MOVING:
-			_process_movement(delta)
-		_:
-			if sprite.texture != _frames[0]:
-				sprite.texture = _frames[0]
+	_cooldown_left = maxf(0.0, _cooldown_left - delta)
 
-func _process_movement(delta: float) -> void:
-	if _path_index >= _path.size():
-		_stop_moving()
+	match current_state:
+		State.IDLE:
+			_set_idle_frame()
+			if aggressive:
+				_aggro_timer -= delta
+				if _aggro_timer <= 0.0:
+					_aggro_timer = AGGRO_SCAN_INTERVAL
+					var enemy: Node2D = _find_enemy_in_range(vision_range)
+					if enemy != null:
+						command_attack(enemy)
+		State.MOVING:
+			if _follow_path(delta):
+				_on_arrival()
+		State.GATHERING:
+			_set_idle_frame()
+			_process_gathering(delta)
+		State.ATTACKING:
+			_process_attacking(delta)
+
+# --- Commands (issued by SelectionManager / AI) ---
+
+func move_to(target: Vector2) -> void:
+	_intent = {}
+	_attack_target = null
+	if _start_path_to(target):
+		current_state = State.MOVING
+	else:
+		current_state = State.IDLE
+
+func command_gather(cell: Vector2i) -> void:
+	if not can_gather:
+		move_to(Constants.grid_to_world(cell.x, cell.y))
 		return
+	var node: Dictionary = GameManager.world.get_resource_at(cell)
+	if node.is_empty():
+		return
+	_gather_cell = cell
+	_gather_type = node["type"]
+	_attack_target = null
+	_go_to_gather_site()
+
+func command_attack(target: Node2D) -> void:
+	if target == null or not is_instance_valid(target):
+		return
+	_attack_target = target
+	_intent = { "kind": "attack" }
+	if _in_attack_range(target):
+		current_state = State.ATTACKING
+	elif _start_path_to(target.global_position):
+		current_state = State.MOVING
+	else:
+		current_state = State.IDLE
+
+# --- Movement ---
+
+func _start_path_to(target: Vector2) -> bool:
+	if GameManager.pathfinder == null:
+		return false
+	var path: PackedVector2Array = GameManager.pathfinder.find_path_world(global_position, target)
+	if path.is_empty():
+		return false
+	_path = path
+	_path_index = 0
+	return true
+
+# Returns true when the path is finished.
+func _follow_path(delta: float) -> bool:
+	if _path_index >= _path.size():
+		velocity = Vector2.ZERO
+		return true
 
 	var target: Vector2 = _path[_path_index]
 	var to_target: Vector2 = target - global_position
-
 	if to_target.length() <= WAYPOINT_REACHED_DISTANCE:
 		_path_index += 1
-		return
+		return _path_index >= _path.size()
 
 	var direction: Vector2 = to_target.normalized()
 	velocity = direction * move_speed / _terrain_cost()
@@ -84,50 +186,220 @@ func _process_movement(delta: float) -> void:
 	_anim_time += delta
 	var frame: int = 1 + (int(_anim_time / WALK_FRAME_TIME) % 2)
 	sprite.texture = _frames[frame]
+	return false
 
 func _terrain_cost() -> float:
-	if GameManager.map_generator == null:
+	if GameManager.world == null:
 		return 1.0
-	var cell: Vector2i = Constants.world_to_grid(global_position)
-	var cost: float = GameManager.map_generator.get_movement_cost(cell.x, cell.y)
+	var cost: float = GameManager.world.movement_cost(Constants.world_to_grid(global_position))
 	if is_inf(cost) or cost <= 0.0:
 		return 1.0
 	return cost
 
-func _stop_moving() -> void:
-	current_state = State.IDLE
-	velocity = Vector2.ZERO
-	_anim_time = 0.0
-	sprite.texture = _frames[0]
+func _on_arrival() -> void:
+	match _intent.get("kind", ""):
+		"gather":
+			if GameManager.world.get_resource_at(_gather_cell).is_empty():
+				_find_next_resource_node()
+			else:
+				current_state = State.GATHERING
+				_gather_timer = 0.0
+		"deposit":
+			_deposit()
+		"attack":
+			if _attack_target != null and is_instance_valid(_attack_target):
+				if _in_attack_range(_attack_target):
+					current_state = State.ATTACKING
+				else:
+					# Target moved while we walked; chase again.
+					command_attack(_attack_target)
+			else:
+				current_state = State.IDLE
+		_:
+			current_state = State.IDLE
 
-func move_to(target: Vector2) -> void:
-	if GameManager.pathfinder == null:
+# --- Gathering ---
+
+func _go_to_gather_site() -> void:
+	var spot: Dictionary = GameManager.pathfinder.adjacent_walkable([_gather_cell], Constants.world_to_grid(global_position))
+	if not spot["found"]:
+		current_state = State.IDLE
 		return
-	var path: PackedVector2Array = GameManager.pathfinder.find_path_world(global_position, target)
-	if path.is_empty():
+	_intent = { "kind": "gather" }
+	var cell: Vector2i = spot["cell"]
+	if _start_path_to(Constants.grid_to_world(cell.x, cell.y)):
+		current_state = State.MOVING
+	else:
+		current_state = State.IDLE
+
+func _process_gathering(delta: float) -> void:
+	_gather_timer += delta
+	if _gather_timer < Constants.GATHER_INTERVAL:
 		return
-	_path = path
-	_path_index = 0
-	current_state = State.MOVING
+	_gather_timer = 0.0
+
+	var taken: int = GameManager.world.take_resource(_gather_cell, 1)
+	if taken > 0:
+		_carrying += taken
+
+	var node_gone: bool = GameManager.world.get_resource_at(_gather_cell).is_empty()
+	if _carrying >= Constants.CARRY_CAPACITY or (node_gone and _carrying > 0):
+		_go_deposit()
+	elif node_gone:
+		_find_next_resource_node()
+
+func _go_deposit() -> void:
+	var tc: Node2D = _nearest_own_town_center()
+	if tc == null:
+		current_state = State.IDLE
+		return
+	var spot: Dictionary = GameManager.pathfinder.adjacent_walkable(tc.footprint_cells, Constants.world_to_grid(global_position))
+	if not spot["found"]:
+		current_state = State.IDLE
+		return
+	_intent = { "kind": "deposit" }
+	var cell: Vector2i = spot["cell"]
+	if _start_path_to(Constants.grid_to_world(cell.x, cell.y)):
+		current_state = State.MOVING
+	else:
+		current_state = State.IDLE
+
+func _deposit() -> void:
+	if _carrying > 0 and _gather_type >= 0:
+		GameManager.add_resource(player_id, _gather_type, _carrying)
+		_carrying = 0
+	# Resume the cycle: same node if alive, otherwise a nearby one.
+	if not GameManager.world.get_resource_at(_gather_cell).is_empty():
+		_go_to_gather_site()
+	else:
+		_find_next_resource_node()
+
+func _find_next_resource_node() -> void:
+	if _gather_type < 0:
+		current_state = State.IDLE
+		return
+	var result: Dictionary = GameManager.world.find_nearest_resource(_gather_cell, _gather_type)
+	if result["found"]:
+		_gather_cell = result["cell"]
+		_go_to_gather_site()
+	else:
+		current_state = State.IDLE
+
+func _nearest_own_town_center() -> Node2D:
+	var best: Node2D = null
+	var best_dist: float = INF
+	for node: Node in get_tree().get_nodes_in_group("buildings"):
+		var building: Node2D = node as Node2D
+		if building == null or building.get("player_id") != player_id:
+			continue
+		if building.get("building_type") != "town_center":
+			continue
+		var dist: float = building.global_position.distance_to(global_position)
+		if dist < best_dist:
+			best_dist = dist
+			best = building
+	return best
+
+# --- Combat ---
+
+func _process_attacking(delta: float) -> void:
+	if _attack_target == null or not is_instance_valid(_attack_target):
+		_attack_target = null
+		current_state = State.IDLE
+		return
+
+	if not _in_attack_range(_attack_target):
+		_repath_timer -= delta
+		if _repath_timer <= 0.0:
+			_repath_timer = REPATH_INTERVAL
+			command_attack(_attack_target)
+		return
+
+	_set_idle_frame()
+	sprite.flip_h = _attack_target.global_position.x < global_position.x
+
+	if _cooldown_left <= 0.0:
+		_cooldown_left = attack_cooldown
+		_strike(_attack_target)
+
+func _strike(target: Node2D) -> void:
+	# Lunge toward the victim for readability.
+	var toward: Vector2 = (target.global_position - global_position).normalized() * 4.0
+	var tween: Tween = create_tween()
+	tween.tween_property(sprite, "position", Vector2(toward), 0.08)
+	tween.tween_property(sprite, "position", Vector2.ZERO, 0.10)
+
+	if target.has_method("take_damage"):
+		target.take_damage(attack_power, self)
+
+func _in_attack_range(target: Node2D) -> bool:
+	var target_radius: float = BODY_RADIUS
+	if target.has_method("body_radius"):
+		target_radius = target.body_radius()
+	return global_position.distance_to(target.global_position) <= attack_range + target_radius
+
+func _find_enemy_in_range(radius: float) -> Node2D:
+	var best: Node2D = null
+	var best_dist: float = INF
+	for group: String in ["units", "buildings"]:
+		for node: Node in get_tree().get_nodes_in_group(group):
+			var other: Node2D = node as Node2D
+			if other == null or other == self:
+				continue
+			if other.get("player_id") == player_id:
+				continue
+			var dist: float = other.global_position.distance_to(global_position)
+			if dist <= radius and dist < best_dist:
+				best_dist = dist
+				best = other
+	return best
+
+func take_damage(amount: int, attacker: Node2D = null) -> void:
+	var actual: int = maxi(1, amount - armor)
+	current_hp = maxi(0, current_hp - actual)
+	_update_health_bar()
+	_flash_hit()
+
+	if current_hp <= 0:
+		_die()
+		return
+
+	# Retaliate if not already busy fighting.
+	if attacker != null and is_instance_valid(attacker) and current_state != State.ATTACKING:
+		if aggressive or current_state == State.IDLE:
+			command_attack(attacker)
+
+func _flash_hit() -> void:
+	sprite.modulate = Color(1.6, 1.2, 1.2)
+	var tween: Tween = create_tween()
+	tween.tween_property(sprite, "modulate", Color.WHITE, 0.18)
+
+func _die() -> void:
+	EventBus.unit_died.emit(self)
+	EventBus.population_changed.emit(player_id)
+	queue_free()
+
+# --- Selection / misc ---
+
+func body_radius() -> float:
+	return BODY_RADIUS
 
 func select() -> void:
 	is_selected = true
 	selection_ring.visible = true
-	health_bar.visible = true
+	_update_health_bar()
 	EventBus.unit_selected.emit(self)
 
 func deselect() -> void:
 	is_selected = false
 	selection_ring.visible = false
-	health_bar.visible = false
+	_update_health_bar()
 	EventBus.unit_deselected.emit(self)
 
-func take_damage(amount: int) -> void:
-	var actual: int = maxi(0, amount - armor)
-	current_hp = maxi(0, current_hp - actual)
+func _update_health_bar() -> void:
 	health_bar.value = current_hp
-	if current_hp <= 0:
-		_die()
+	health_bar.visible = is_selected or current_hp < max_hp
 
-func _die() -> void:
-	queue_free()
+func _set_idle_frame() -> void:
+	if sprite.texture != _frames[0]:
+		sprite.texture = _frames[0]

@@ -79,6 +79,66 @@ func build_rock() -> ImageTexture:
 				img.set_pixel(x, y, PixelArt.ramp_shade([dark, mid, light], 1.0 - value, x, y))
 	return ImageTexture.create_from_image(img)
 
+func build_berry_bush() -> ImageTexture:
+	var w: int = 22
+	var h: int = 18
+	var img: Image = Image.create(w, h, false, Image.FORMAT_RGBA8)
+	var leaf_dark: Color = Color8(38, 84, 40)
+	var leaf_mid: Color = Color8(56, 108, 50)
+	var leaf_light: Color = Color8(76, 128, 60)
+	var berry: Color = Color8(196, 48, 72)
+	var berry_light: Color = Color8(228, 88, 108)
+
+	PixelArt.draw_ellipse(img, w / 2.0, h - 3.0, 9.0, 3.0, Color(0.0, 0.0, 0.0, 0.25), true)
+	PixelArt.draw_ellipse(img, w / 2.0, h - 8.0, 9.0, 6.0, leaf_dark)
+	for y in range(h):
+		for x in range(w):
+			if img.get_pixel(x, y).is_equal_approx(leaf_dark):
+				var lit: float = clampf(1.0 - (Vector2(x, y).distance_to(Vector2(w / 2.0 - 3.0, h - 12.0)) / 12.0), 0.0, 1.0)
+				var speckle: float = PixelArt.hash2(x, y, 777)
+				var value: float = clampf(lit * 0.7 + speckle * 0.4, 0.0, 1.0)
+				img.set_pixel(x, y, PixelArt.ramp_shade([leaf_dark, leaf_mid, leaf_light], value, x, y))
+
+	# Berries sprinkled over the canopy.
+	for i in range(7):
+		var bx: int = 4 + int(PixelArt.hash2(i, 3, 555) * (w - 8))
+		var by: int = h - 12 + int(PixelArt.hash2(i, 9, 556) * 6.0)
+		if img.get_pixel(bx, by).a > 0.0:
+			img.set_pixel(bx, by, berry)
+			if bx + 1 < w and img.get_pixel(bx + 1, by).a > 0.0:
+				img.set_pixel(bx + 1, by, berry_light)
+
+	return ImageTexture.create_from_image(img)
+
+func build_jade_deposit() -> ImageTexture:
+	var w: int = 20
+	var h: int = 16
+	var img: Image = Image.create(w, h, false, Image.FORMAT_RGBA8)
+	var stone_dark: Color = Color8(84, 78, 70)
+	var stone_mid: Color = Color8(112, 104, 92)
+	var jade_dark: Color = Color8(24, 128, 92)
+	var jade_light: Color = Color8(64, 190, 140)
+
+	PixelArt.draw_ellipse(img, w / 2.0, h - 3.0, 8.5, 3.0, Color(0.0, 0.0, 0.0, 0.25), true)
+	PixelArt.draw_ellipse(img, w / 2.0, h - 7.0, 8.0, 5.5, stone_mid)
+	for y in range(h):
+		for x in range(w):
+			if img.get_pixel(x, y).is_equal_approx(stone_mid):
+				var value: float = clampf(0.5 + (PixelArt.hash2(x, y, 888) - 0.5) * 0.8, 0.0, 1.0)
+				img.set_pixel(x, y, PixelArt.ramp_shade([stone_dark, stone_mid], value, x, y))
+
+	# Jade crystal veins poking out of the rock.
+	var veins: Array = [[7, 6], [12, 5], [10, 9], [14, 8]]
+	for vein: Array in veins:
+		var vx: int = vein[0]
+		var vy: int = vein[1]
+		img.set_pixel(vx, vy, jade_light)
+		img.set_pixel(vx, vy + 1, jade_dark)
+		if vx + 1 < w:
+			img.set_pixel(vx + 1, vy + 1, jade_dark)
+
+	return ImageTexture.create_from_image(img)
+
 func build_reeds() -> ImageTexture:
 	var w: int = 16
 	var h: int = 18

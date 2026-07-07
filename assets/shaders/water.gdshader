@@ -6,6 +6,9 @@ shader_type canvas_item;
 
 uniform float wave_strength : hint_range(0.0, 0.5) = 0.10;
 uniform float sparkle_strength : hint_range(0.0, 1.0) = 0.55;
+// World position of the sprite's top-left pixel; keeps the wave pattern
+// continuous across independently-rendered chunk sprites.
+uniform vec2 world_origin = vec2(0.0);
 
 float hash21(vec2 p) {
 	p = fract(p * vec2(123.34, 456.21));
@@ -19,9 +22,9 @@ void fragment() {
 		discard;
 	}
 
-	// Work in texture pixel space, quantized to 2px blocks to stay pixel-art.
+	// Work in world pixel space, quantized to 2px blocks to stay pixel-art.
 	vec2 tex_size = vec2(textureSize(TEXTURE, 0));
-	vec2 p = floor(UV * tex_size / 2.0);
+	vec2 p = floor((world_origin + UV * tex_size) / 2.0);
 
 	// Two drifting diagonal wave bands.
 	float band_a = sin(p.x * 0.18 + p.y * 0.36 + TIME * 1.4);

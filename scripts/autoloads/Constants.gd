@@ -5,7 +5,9 @@ extends Node
 const TILE_WIDTH: int = 64
 const TILE_HEIGHT: int = 32
 
-# Biome types matching the TS version
+# Chunk streaming
+const CHUNK_SIZE: int = 16  # tiles per chunk side
+
 enum Biome {
 	GRASS,
 	FOREST_DENSE,
@@ -17,12 +19,65 @@ enum Biome {
 	HIGH_GROUND
 }
 
+enum ResourceType { FOOD, WOOD, JADE }
+
+const RESOURCE_NAMES: Dictionary = {
+	ResourceType.FOOD: "food",
+	ResourceType.WOOD: "wood",
+	ResourceType.JADE: "jade",
+}
+
+# Gathering
+const GATHER_INTERVAL: float = 1.2  # seconds per resource unit
+const CARRY_CAPACITY: int = 10
+
+# Population
+const POPULATION_CAP: int = 20
+
+# Unit definitions
+const UNIT_DEFS: Dictionary = {
+	"villager": {
+		"max_hp": 40,
+		"move_speed": 100.0,
+		"attack_power": 2,
+		"armor": 0,
+		"attack_range": 26.0,
+		"attack_cooldown": 1.2,
+		"vision_range": 200.0,
+		"aggressive": false,
+		"can_gather": true,
+		"cost": { ResourceType.FOOD: 50 },
+		"train_time": 6.0,
+	},
+	"warrior": {
+		"max_hp": 70,
+		"move_speed": 90.0,
+		"attack_power": 7,
+		"armor": 1,
+		"attack_range": 28.0,
+		"attack_cooldown": 1.0,
+		"vision_range": 260.0,
+		"aggressive": true,
+		"can_gather": false,
+		"cost": { ResourceType.FOOD: 40, ResourceType.WOOD: 20 },
+		"train_time": 9.0,
+	},
+}
+
+# Building definitions (footprint in tiles)
+const BUILDING_DEFS: Dictionary = {
+	"town_center": {
+		"max_hp": 600,
+		"footprint": Vector2i(2, 2),
+		"trains": ["villager", "warrior"],
+	},
+}
+
 # Movement costs per biome (keyed by int)
 var MOVEMENT_COST: Dictionary = {}
 var WALKABLE: Dictionary = {}
 
 # Per-biome color ramps: [shadow, dark, base, light, highlight]
-# Painted with dithered noise by TerrainArtist for a hand-pixelled look.
 var BIOME_RAMPS: Dictionary = {}
 
 # Flat representative color per biome (minimap, fallbacks)
@@ -106,3 +161,10 @@ func world_to_grid(world_pos: Vector2) -> Vector2i:
 	var gx: float = (world_pos.x / (TILE_WIDTH / 2.0) + world_pos.y / (TILE_HEIGHT / 2.0)) / 2.0
 	var gy: float = (world_pos.y / (TILE_HEIGHT / 2.0) - world_pos.x / (TILE_WIDTH / 2.0)) / 2.0
 	return Vector2i(int(round(gx)), int(round(gy)))
+
+# Chunk coordinate for a tile (floor division, correct for negatives)
+func tile_to_chunk(cell: Vector2i) -> Vector2i:
+	return Vector2i(
+		int(floor(float(cell.x) / CHUNK_SIZE)),
+		int(floor(float(cell.y) / CHUNK_SIZE))
+	)

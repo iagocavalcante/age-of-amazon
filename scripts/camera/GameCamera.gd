@@ -19,9 +19,6 @@ var touch_points: Dictionary = {}
 var pinch_start_distance: float = 0.0
 var pinch_start_zoom: float = 0.0
 
-# Bounds
-var map_bounds: Rect2 = Rect2(-5000, -5000, 10000, 10000)
-
 # Mobile detection
 var is_mobile: bool = false
 
@@ -32,18 +29,6 @@ var _mouse_seen: bool = false
 func _ready() -> void:
 	zoom = Vector2(target_zoom, target_zoom)
 	is_mobile = OS.has_feature("mobile")
-	EventBus.map_generated.connect(_on_map_generated)
-
-func _on_map_generated(w: int, h: int) -> void:
-	# Isometric extents: x spans [-(h*TW/2), w*TW/2], y spans [0, (w+h)*TH/2].
-	var left: float = -h * Constants.TILE_WIDTH / 2.0
-	var right: float = w * Constants.TILE_WIDTH / 2.0
-	var bottom: float = (w + h) * Constants.TILE_HEIGHT / 2.0
-	var margin: float = 200.0
-	map_bounds = Rect2(
-		left - margin, -margin,
-		(right - left) + margin * 2.0, bottom + margin * 2.0
-	)
 
 func _process(delta: float) -> void:
 	var direction: Vector2 = Vector2.ZERO
@@ -67,12 +52,8 @@ func _process(delta: float) -> void:
 	if direction != Vector2.ZERO:
 		position += direction.limit_length(1.0) * pan_speed * delta / zoom.x
 
-	# Smooth zoom
+	# Smooth zoom (the world is infinite — no positional clamping)
 	zoom = zoom.lerp(Vector2(target_zoom, target_zoom), 10.0 * delta)
-
-	# Clamp to bounds
-	position.x = clampf(position.x, map_bounds.position.x, map_bounds.end.x)
-	position.y = clampf(position.y, map_bounds.position.y, map_bounds.end.y)
 
 # Edge scrolling requires: desktop, no active drag, the mouse has actually
 # moved since launch, the window is focused, and the cursor is inside the

@@ -116,3 +116,72 @@ Array.filter() re
 2026-07-07 09:36:14|Edit|scripts/units/Unit.gd
 2026-07-07 09:36:17|Edit|scripts/units/Unit.gd
 2026-07-07 09:36:19|Edit|scripts/units/Unit.gd
+2026-07-07 09:36:36|Bash|pkill -f "http.server 8765"; rm -rf build/webdebug; /Applications/Godot.app/Contents/MacOS/Godot --h
+2026-07-07 09:37:11|Bash|DEPLOY=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/9562c2e
+2026-07-07 09:37:20|Bash|osascript -e 'tell application "Google Chrome" to activate' && echo activated
+2026-07-07 09:37:30|mcp__claude-in-chrome__navigate|
+2026-07-07 09:37:49|mcp__claude-in-chrome__computer|
+2026-07-07 09:37:50|mcp__claude-in-chrome__computer|
+2026-07-07 09:38:04|mcp__claude-in-chrome__computer|
+2026-07-07 09:38:05|mcp__claude-in-chrome__computer|
+2026-07-07 09:38:12|mcp__claude-in-chrome__computer|
+2026-07-07 09:38:13|mcp__claude-in-chrome__computer|
+2026-07-07 09:38:31|mcp__claude-in-chrome__javascript_tool|
+2026-07-07 09:38:53|TaskUpdate|
+2026-07-07 09:38:58|Write|/Users/iagocavalcante/.claude/projects/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/memory/age-of-amazon-tooling.md
+2026-07-07 09:39:06|Write|/Users/iagocavalcante/.claude/projects/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/memory/MEMORY.md
+2026-07-07 09:44:50|TaskCreate|
+2026-07-07 09:44:53|TaskCreate|
+2026-07-07 09:44:55|TaskCreate|
+2026-07-07 09:44:57|TaskCreate|
+2026-07-07 09:44:59|TaskCreate|
+2026-07-07 09:45:06|TaskUpdate|
+2026-07-07 09:45:24|Write|docs/plans/2026-07-07-phase2-design.md
+2026-07-07 09:45:57|Write|scripts/autoloads/Constants.gd
+2026-07-07 09:46:07|Write|scripts/autoloads/EventBus.gd
+2026-07-07 09:46:20|Write|scripts/autoloads/GameManager.gd
+2026-07-07 09:48:09|Write|scripts/world/WorldGen.gd
+2026-07-07 09:48:25|Write|scripts/world/ChunkData.gd
+2026-07-07 09:48:39|Write|scripts/world/WorldData.gd
+2026-07-07 09:49:13|Write|scripts/map/Pathfinder.gd
+2026-07-07 09:49:51|Write|scripts/art/TerrainArtist.gd
+2026-07-07 09:50:21|Edit|scripts/world/ChunkData.gd
+2026-07-07 09:50:43|Write|scripts/world/ChunkManager.gd
+2026-07-07 09:51:06|Edit|scripts/art/DoodadArtist.gd
+2026-07-07 09:51:44|Edit|scripts/art/UnitArtist.gd
+2026-07-07 09:51:59|Edit|scripts/art/UnitArtist.gd
+2026-07-07 09:52:27|Write|scripts/art/BuildingArtist.gd
+2026-07-07 09:52:58|Write|scripts/autoloads/AssetLibrary.gd
+2026-07-07 09:53:06|TaskUpdate|
+2026-07-07 10:06:45|Write|scripts/units/Unit.gd
+2026-07-07 10:07:13|Write|scripts/buildings/Building.gd
+2026-07-07 10:07:32|Write|scripts/ai/EnemyAI.gd
+2026-07-07 10:08:07|Write|scripts/ui/SelectionManager.gd
+2026-07-07 10:09:25|Write|scripts/ui/HUD.gd
+2026-07-07 10:09:35|Edit|scripts/ui/SelectionManager.gd
+2026-07-07 10:09:49|Edit|scripts/camera/GameCamera.gd
+2026-07-07 10:09:51|Edit|scripts/camera/GameCamera.gd
+2026-07-07 10:10:31|Write|scripts/main/Main.gd
+2026-07-07 10:10:48|Write|scenes/main/Main.tscn
+2026-07-07 10:10:59|Edit|scenes/main/Main.tscn
+2026-07-07 10:11:01|Edit|scenes/main/Main.tscn
+2026-07-07 10:11:02|Bash|rm /Users/iagocavalcante/Workspaces/IagoCavalcante/age-of-amazon/scripts/map/MapGenerator.gd* /Users
+2026-07-07 10:11:13|Bash|/Applications/Godot.app/Contents/MacOS/Godot --path /Users/iagocavalcante/Workspaces/IagoCavalcante/
+2026-07-07 10:11:27|Bash|/Applications/Godot.app/Contents/MacOS/Godot --path /Users/iagocavalcante/Workspaces/IagoCavalcante/
+2026-07-07 10:12:16|Bash|rm -f /private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/9562c2e8
+2026-07-07 10:12:28|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/9562c2e8-6487-48c8-8541-c12418d70c58/scratchpad/frames/f00000200.png
+2026-07-07 10:12:44|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/9562c2e8-6487-48c8-8541-c12418d70c58/scratchpad/frames/f00000299.png
+2026-07-07 10:12:46|Bash|cd /private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/9562c2e8-64
+2026-07-07 10:13:16|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/9562c2e8-6487-48c8-8541-c12418d70c58/scratchpad/crop_tc_2x.png
+2026-07-07 10:14:33|Edit|scripts/art/TerrainArtist.gd
+2026-07-07 10:14:37|Edit|scripts/art/TerrainArtist.gd
+2026-07-07 10:14:50|Edit|assets/shaders/water.gdshader
+2026-07-07 10:14:53|Edit|assets/shaders/water.gdshader
+2026-07-07 10:14:56|Edit|scripts/world/ChunkManager.gd
+2026-07-07 10:15:42|Bash|rm -f /private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/9562c2e8
+2026-07-07 10:15:50|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/9562c2e8-6487-48c8-8541-c12418d70c58/scratchpad/frames/f00000299.png
+2026-07-07 10:16:13|TaskUpdate|
+2026-07-07 10:16:13|TaskUpdate|
+2026-07-07 10:16:14|TaskUpdate|
+2026-07-07 10:16:14|TaskUpdate|
+2026-07-07 10:16:14|TaskUpdate|

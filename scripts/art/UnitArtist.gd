@@ -72,6 +72,69 @@ const WALK_B_ROWS: Array[String] = [
 	"............",
 ]
 
+const WARRIOR_IDLE_ROWS: Array[String] = [
+	"....OOOO......",
+	"...OEEEEO..V..",
+	"..OHHHHHHO.P..",
+	"..OHSSSSHO.P..",
+	"..OSSsSSsO.P..",
+	"...OSSSsO..P..",
+	"..OOTTTTOOsP..",
+	".OGGOTTTTOsP..",
+	".OGGOTTTTOOP..",
+	".OGGOtTTtO.P..",
+	".OGGOttttO.P..",
+	"..OOttttOO.P..",
+	"...OTtTtO..P..",
+	"...OL.OLO.....",
+	"...OL.OLO.....",
+	"...OL.OLO.....",
+	"..OFF.OFFO....",
+	"..............",
+]
+
+const WARRIOR_WALK_A_ROWS: Array[String] = [
+	"....OOOO......",
+	"...OEEEEO..V..",
+	"..OHHHHHHO.P..",
+	"..OHSSSSHO.P..",
+	"..OSSsSSsO.P..",
+	"...OSSSsO..P..",
+	"..OOTTTTOOsP..",
+	".OGGOTTTTOsP..",
+	".OGGOTTTTOOP..",
+	".OGGOtTTtO.P..",
+	"..OOttttOO.P..",
+	"...OTtTtO..P..",
+	"..OL..OLO.....",
+	"..OL...OLO....",
+	".OFF...OLO....",
+	".......OFFO...",
+	"..............",
+	"..............",
+]
+
+const WARRIOR_WALK_B_ROWS: Array[String] = [
+	"....OOOO......",
+	"...OEEEEO..V..",
+	"..OHHHHHHO.P..",
+	"..OHSSSSHO.P..",
+	"..OSSsSSsO.P..",
+	"...OSSSsO..P..",
+	"..OOTTTTOOsP..",
+	".OGGOTTTTOsP..",
+	".OGGOTTTTOOP..",
+	".OGGOtTTtO.P..",
+	"..OOttttOO.P..",
+	"...OTtTtO..P..",
+	"...OLO..LO....",
+	"..OLO...LO....",
+	"..OLO...FFO...",
+	".OFFO.........",
+	"..............",
+	"..............",
+]
+
 func build_villager_frames(player_color: Color) -> Array[ImageTexture]:
 	var palette: Dictionary = {
 		"O": Color8(24, 18, 14),
@@ -85,6 +148,27 @@ func build_villager_frames(player_color: Color) -> Array[ImageTexture]:
 	}
 	var frames: Array[ImageTexture] = []
 	var sources: Array = [IDLE_ROWS, WALK_A_ROWS, WALK_B_ROWS]
+	for source in sources:
+		frames.append(PixelArt.sprite_from_rows(source, palette))
+	return frames
+
+func build_warrior_frames(player_color: Color) -> Array[ImageTexture]:
+	var palette: Dictionary = {
+		"O": Color8(24, 18, 14),
+		"H": Color8(38, 28, 20),
+		"S": Color8(196, 144, 100),
+		"s": Color8(164, 116, 78),
+		"L": Color8(150, 106, 72),
+		"T": player_color,
+		"t": player_color.darkened(0.35),
+		"F": Color8(70, 48, 30),
+		"E": Color8(230, 186, 66),            # feather crest
+		"V": Color8(190, 195, 200),           # spear tip
+		"P": Color8(122, 86, 48),             # spear shaft
+		"G": player_color.darkened(0.15),     # shield
+	}
+	var frames: Array[ImageTexture] = []
+	var sources: Array = [WARRIOR_IDLE_ROWS, WARRIOR_WALK_A_ROWS, WARRIOR_WALK_B_ROWS]
 	for source in sources:
 		frames.append(PixelArt.sprite_from_rows(source, palette))
 	return frames
