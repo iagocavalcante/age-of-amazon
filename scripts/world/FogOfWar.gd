@@ -2,31 +2,31 @@
 class_name FogOfWar
 extends CanvasLayer
 
-# Age-of-Empires-style fog of war for the local player.
+# Age-of-Empires-style fog-of-war RENDERER for the local player.
 #
 # Three tile states:
 #   unexplored — never seen: opaque black
 #   explored   — seen before, nobody watching now: dimmed (terrain remembered)
 #   visible    — inside the vision radius of an own unit/building: clear
 #
-# Explored bits persist per chunk (ChunkData.explored). Every UPDATE_INTERVAL
-# the visible set is recomputed from own units/buildings, dirty chunks get
-# their 16x16 fog images rebuilt, and the images are blitted into one window
-# texture that a full-screen shader maps back onto the isometric grid.
-# Enemy units are hidden unless currently visible; enemy buildings stay
-# visible once their ground has been explored (they can't move).
+# The knowledge itself lives in a PlayerVision (the enemy AI keeps its own
+# instance — fog is symmetric). Every UPDATE_INTERVAL the vision recomputes,
+# changed chunks get their 16x16 fog images rebuilt, and the images are
+# blitted into one window texture that a full-screen shader maps back onto
+# the isometric grid. Enemy units are hidden unless currently visible;
+# enemy buildings stay visible once their ground has been explored.
 
 const UPDATE_INTERVAL: float = 0.25
 const VISIBLE_VALUE: int = 255
 const EXPLORED_VALUE: int = 140  # -> ~45% black in the shader
 
 var camera: Camera2D
+var vision: PlayerVision = PlayerVision.new(GameManager.LOCAL_PLAYER_ID)
 
 var _rect: ColorRect
 var _material: ShaderMaterial
 var _accum: float = 0.0
-var _visible_cells: Dictionary = {}  # Vector2i -> true
-var _dirty_chunks: Dictionary = {}   # Vector2i chunk coords -> true
+var _fog_images: Dictionary = {}  # Vector2i chunk coords -> Image
 
 func _ready() -> void:
 	layer = 5  # above the world, below the HUD (layer 10)
@@ -38,8 +38,6 @@ func _ready() -> void:
 	_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_rect.material = _material
-	# Fully hidden until the first fog update runs.
-	_rect.color = Color.WHITE
 	add_child(_rect)
 
 func setup(p_camera: Camera2D) -> void:
@@ -60,18 +58,13 @@ func _process(delta: float) -> void:
 		_accum = 0.0
 		force_update()
 
-# --- Queries ---
+# --- Queries (local player's knowledge) ---
 
 func is_cell_visible(cell: Vector2i) -> bool:
-	return _visible_cells.has(cell)
+	return vision.is_visible(cell)
 
 func is_explored(cell: Vector2i) -> bool:
-	var cc: Vector2i = Constants.tile_to_chunk(cell)
-	var chunk: ChunkData = GameManager.world.chunks.get(cc)
-	if chunk == null:
-		return false
-	var size: int = Constants.CHUNK_SIZE
-	return chunk.explored[(cell.y - cc.y * size) * size + (cell.x - cc.x * size)] == 1
+	return vision.is_explored(cell)
 
 # --- Update pass ---
 
@@ -80,67 +73,35 @@ func force_update() -> void:
 	if world == null:
 		return
 
-	# Chunks that HAD visible cells must be repainted (visibility receding).
-	for cell: Vector2i in _visible_cells:
-		_dirty_chunks[Constants.tile_to_chunk(cell)] = true
-	_visible_cells.clear()
+	vision.update(get_tree(), world)
 
-	# Vision circles of own units and buildings.
-	for node: Node in get_tree().get_nodes_in_group("player_%d" % GameManager.LOCAL_PLAYER_ID):
-		var entity: Node2D = node as Node2D
-		if entity == null or not is_instance_valid(entity):
-			continue
-		var radius: int = 6
-		if entity is UnitBase:
-			# vision_range is world px; ~32 px per tile step in grid space.
-			radius = maxi(4, int(round((entity as UnitBase).vision_range / 32.0)))
-		elif entity is Building:
-			radius = Constants.BUILDING_DEFS[(entity as Building).building_type]["vision_tiles"]
-		_reveal_circle(world, Constants.world_to_grid(entity.global_position), radius)
-
-	# Rebuild fog images for every dirty chunk (they're all near own units,
-	# so this stays small regardless of how much world exists).
-	for cc: Vector2i in _dirty_chunks:
-		var chunk: ChunkData = world.chunks.get(cc)
-		if chunk != null:
-			_rebuild_chunk_fog(chunk)
-	_dirty_chunks.clear()
+	# Rebuild fog images for chunks whose knowledge changed (all near own
+	# units, so this stays small no matter how much world exists).
+	for cc: Vector2i in vision.changed_chunks:
+		_rebuild_chunk_fog(cc)
+	vision.changed_chunks.clear()
 
 	_compose_window(world)
 	_cull_entities()
 
-func _reveal_circle(world: WorldData, center: Vector2i, radius: int) -> void:
+func _rebuild_chunk_fog(cc: Vector2i) -> void:
 	var size: int = Constants.CHUNK_SIZE
-	var r2: int = radius * radius
-	for dy in range(-radius, radius + 1):
-		for dx in range(-radius, radius + 1):
-			if dx * dx + dy * dy > r2:
-				continue
-			var cell: Vector2i = center + Vector2i(dx, dy)
-			_visible_cells[cell] = true
+	var img: Image = _fog_images.get(cc)
+	if img == null:
+		img = Image.create(size, size, false, Image.FORMAT_R8)
+		_fog_images[cc] = img
 
-			var cc: Vector2i = Constants.tile_to_chunk(cell)
-			var chunk: ChunkData = world.get_chunk(cc)
-			var idx: int = (cell.y - cc.y * size) * size + (cell.x - cc.x * size)
-			if chunk.explored[idx] == 0:
-				chunk.explored[idx] = 1
-			_dirty_chunks[cc] = true
-
-func _rebuild_chunk_fog(chunk: ChunkData) -> void:
-	var size: int = Constants.CHUNK_SIZE
-	if chunk.fog_image == null:
-		chunk.fog_image = Image.create(size, size, false, Image.FORMAT_R8)
-
-	var base_x: int = chunk.coords.x * size
-	var base_y: int = chunk.coords.y * size
+	var base_x: int = cc.x * size
+	var base_y: int = cc.y * size
 	for ly in range(size):
 		for lx in range(size):
+			var cell: Vector2i = Vector2i(base_x + lx, base_y + ly)
 			var value: int = 0
-			if _visible_cells.has(Vector2i(base_x + lx, base_y + ly)):
+			if vision.visible_cells.has(cell):
 				value = VISIBLE_VALUE
-			elif chunk.explored[ly * size + lx] == 1:
+			elif vision.explored.has(cell):
 				value = EXPLORED_VALUE
-			chunk.fog_image.set_pixel(lx, ly, Color8(value, 0, 0))
+			img.set_pixel(lx, ly, Color8(value, 0, 0))
 
 func _compose_window(world: WorldData) -> void:
 	var size: int = Constants.CHUNK_SIZE
@@ -166,9 +127,9 @@ func _compose_window(world: WorldData) -> void:
 	var src_rect: Rect2i = Rect2i(0, 0, size, size)
 	for cy in range(cc_min.y, cc_max.y + 1):
 		for cx in range(cc_min.x, cc_max.x + 1):
-			var chunk: ChunkData = world.chunks.get(Vector2i(cx, cy))
-			if chunk != null and chunk.fog_image != null:
-				img.blit_rect(chunk.fog_image, src_rect, Vector2i((cx - cc_min.x) * size, (cy - cc_min.y) * size))
+			var fog_img: Image = _fog_images.get(Vector2i(cx, cy))
+			if fog_img != null:
+				img.blit_rect(fog_img, src_rect, Vector2i((cx - cc_min.x) * size, (cy - cc_min.y) * size))
 
 	_material.set_shader_parameter("fog_tex", ImageTexture.create_from_image(img))
 	_material.set_shader_parameter("window_origin", Vector2(cc_min * size))
@@ -179,16 +140,11 @@ func _cull_entities() -> void:
 		var unit: Node2D = node as Node2D
 		if unit == null or unit.get("player_id") == GameManager.LOCAL_PLAYER_ID:
 			continue
-		unit.visible = _visible_cells.has(Constants.world_to_grid(unit.global_position))
+		unit.visible = vision.can_see_entity(unit)
 
 	for node: Node in get_tree().get_nodes_in_group("buildings"):
 		var building: Building = node as Building
 		if building == null or building.player_id == GameManager.LOCAL_PLAYER_ID:
 			continue
 		# Buildings can't move: once their ground is explored, remember them.
-		var seen: bool = false
-		for cell: Vector2i in building.footprint_cells:
-			if is_explored(cell):
-				seen = true
-				break
-		building.visible = seen
+		building.visible = vision.has_discovered_building(building)

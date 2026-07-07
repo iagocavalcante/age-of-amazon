@@ -249,8 +249,7 @@ func _redraw_minimap() -> void:
 			var chunk: ChunkData = world.chunks.get(cc)
 			if chunk == null:
 				continue
-			var idx: int = (cell.y - cc.y * size) * size + (cell.x - cc.x * size)
-			if fog != null and chunk.explored[idx] == 0:
+			if fog != null and not fog.is_explored(cell):
 				continue
 			var biome: int = chunk.get_biome_local(cell.x - cc.x * size, cell.y - cc.y * size)
 			var color: Color = Constants.BIOME_COLORS[biome]

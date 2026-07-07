@@ -36,6 +36,8 @@ func _ready() -> void:
 		_run_move_test()
 	if "--test-systems" in args:
 		_run_systems_test()
+	if "--test-scout" in args:
+		_run_scout_test()
 
 func _place_building(type: String, player_id: int, base_cell: Vector2i) -> Building:
 	var building: Building = Building.new()
@@ -66,6 +68,44 @@ func _run_move_test() -> void:
 	for u: Node2D in SelectionManager.selected_units:
 		print("[test-move] unit after 3s: ", u.global_position, " state=", u.current_state)
 
+# Accelerated AI pacing: prove the AI scouts, discovers the player base
+# through its own fog, and then attacks it.
+func _run_scout_test() -> void:
+	var ai: Node = $EnemyAI
+	ai.scout_interval = 2.0
+	ai.wave_interval = 8.0
+	print("[test-scout] accelerated AI; waiting for discovery")
+
+	var elapsed: int = 0
+	var discovered: bool = false
+	while elapsed < 180:
+		await get_tree().create_timer(10.0).timeout
+		elapsed += 10
+		var enemy_tc: Building = _find_tc(1)
+		if enemy_tc == null:
+			break
+		var known: Node2D = ai._known_player_target(enemy_tc)
+		print("[test-scout] t=", elapsed, "s known_target=", known)
+		if known != null:
+			discovered = true
+			break
+	print("[test-scout] discovery ", "OK" if discovered else "FAILED")
+
+	await get_tree().create_timer(45.0).timeout
+	var player_tc: Building = _find_tc(0)
+	if player_tc == null:
+		print("[test-scout] player TC destroyed (attack OK)")
+	else:
+		print("[test-scout] player TC hp=", player_tc.current_hp, "/", player_tc.max_hp,
+			" (attack ", "OK" if player_tc.current_hp < player_tc.max_hp else "NOT YET", ")")
+
+func _find_tc(player_id: int) -> Building:
+	for node: Node in get_tree().get_nodes_in_group("buildings"):
+		var building: Building = node as Building
+		if building != null and building.player_id == player_id and building.building_type == "town_center":
+			return building
+	return null
+
 func _run_systems_test() -> void:
 	await get_tree().create_timer(0.5).timeout
 
@@ -77,6 +117,16 @@ func _run_systems_test() -> void:
 	print("[test-systems] tree found=", tree_node["found"], " cell=", tree_node.get("cell"))
 	if tree_node["found"] and villagers.size() > 0:
 		(villagers[0] as UnitBase).command_gather(tree_node["cell"])
+
+	# Symmetric fog: after the AI's first vision tick it must know its own
+	# base but NOT ours (checked before the hostile test warrior spawns
+	# beside our base, which would legitimately reveal it).
+	await get_tree().create_timer(1.5).timeout
+	var ai: Node = $EnemyAI
+	var ai_knows_own: bool = ai.vision.is_explored(WorldGen.PLAYER_ORIGINS[1])
+	var ai_knows_player: bool = ai.vision.is_explored(Vector2i.ZERO)
+	print("[test-systems] AI explored own base=", ai_knows_own, " player base=", ai_knows_player,
+		" (symmetric fog ", "OK" if ai_knows_own and not ai_knows_player else "FAILED", ")")
 
 	# 2. Combat: spawn a hostile warrior next to our town center.
 	var enemy_warrior: UnitBase = _spawn_unit("warrior", 1, Vector2i(3, 3))

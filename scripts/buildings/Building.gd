@@ -109,9 +109,10 @@ func _spawn_unit(unit_type: String) -> void:
 	unit.position = Constants.grid_to_world(cell.x, cell.y)
 	containers[0].add_child(unit)
 
-func take_damage(amount: int, _attacker: Node2D = null) -> void:
+func take_damage(amount: int, attacker: Node2D = null) -> void:
 	current_hp = maxi(0, current_hp - amount)
 	_update_health_bar()
+	EventBus.building_damaged.emit(self, attacker)
 
 	_sprite.modulate = Color(1.6, 1.1, 1.1)
 	var tween: Tween = create_tween()

@@ -1,23 +1,44 @@
 # scripts/ai/EnemyAI.gd
 extends Node
 
-# Minimal but functional opponent: receives a trickle income (a standard
-# "cheating AI" — it fields no economy of its own), keeps training warriors
-# at its Town Center, and periodically throws an attack wave at the player.
+# Opponent that plays under the SAME fog-of-war rules as the player: it keeps
+# its own PlayerVision and only acts on what its units have scouted.
+#
+# Behavior loop:
+#  - trickle income (it fields no economy — the one remaining concession)
+#  - keeps training warriors at its Town Center
+#  - while the player is undiscovered, a scout sweeps compass directions
+#  - once a player building is discovered (or a unit is spotted), attack
+#    waves target it
+#  - attacks on its own buildings are answered by idle warriors (being hit
+#    reveals the attacker — same rule the player enjoys)
 
 const ENEMY_ID: int = 1
 const TICK_INTERVAL: float = 1.0
-const WAVE_INTERVAL: float = 75.0
 const WAVE_MIN_WARRIORS: int = 3
 const MAX_WARRIORS: int = 8
+const SCOUT_DISTANCE_STEP: int = 12
+const SCOUT_DISTANCE_MAX: int = 80
+
+# Tunable pacing (the test harness shortens these).
+@export var wave_interval: float = 75.0
+@export var scout_interval: float = 18.0
 
 const TRICKLE: Dictionary = {
 	Constants.ResourceType.FOOD: 3,
 	Constants.ResourceType.WOOD: 2,
 }
 
+var vision: PlayerVision = PlayerVision.new(ENEMY_ID)
+
 var _tick_accum: float = 0.0
 var _wave_accum: float = 0.0
+var _scout_accum: float = 0.0
+var _scout_direction: int = 0
+var _scout_distance: int = 34
+
+func _ready() -> void:
+	EventBus.building_damaged.connect(_on_building_damaged)
 
 func _process(delta: float) -> void:
 	if GameManager.state != GameManager.GameState.RUNNING:
@@ -27,9 +48,15 @@ func _process(delta: float) -> void:
 		return
 	_tick_accum = 0.0
 	_wave_accum += TICK_INTERVAL
+	_scout_accum += TICK_INTERVAL
 	_tick()
 
 func _tick() -> void:
+	if GameManager.world == null:
+		return
+	vision.update(get_tree(), GameManager.world)
+	vision.changed_chunks.clear()  # only the fog renderer needs these
+
 	for type: int in TRICKLE:
 		GameManager.add_resource(ENEMY_ID, type, TRICKLE[type])
 
@@ -43,17 +70,79 @@ func _tick() -> void:
 		if GameManager.can_afford(ENEMY_ID, Constants.UNIT_DEFS["warrior"]["cost"]):
 			tc.queue_train("warrior")
 
-	if _wave_accum >= WAVE_INTERVAL:
-		var idle: Array[UnitBase] = []
-		for warrior: UnitBase in warriors:
-			if warrior.current_state == UnitBase.State.IDLE:
-				idle.append(warrior)
+	var target: Node2D = _known_player_target(tc)
+
+	if target == null:
+		# Nothing discovered yet: sweep scouts through the compass directions.
+		if _scout_accum >= scout_interval:
+			_scout_accum = 0.0
+			_send_scout(tc, warriors)
+		return
+
+	if _wave_accum >= wave_interval:
+		var idle: Array[UnitBase] = _idle_of(warriors)
 		if idle.size() >= WAVE_MIN_WARRIORS:
 			_wave_accum = 0.0
-			var target: Node2D = _player_target()
-			if target != null:
-				for warrior: UnitBase in idle:
-					warrior.command_attack(target)
+			for warrior: UnitBase in idle:
+				warrior.command_attack(target)
+
+# Only targets this AI has legitimately discovered through its own vision.
+func _known_player_target(tc: Building) -> Node2D:
+	# Discovered player buildings (remembered once seen — they can't move).
+	for node: Node in get_tree().get_nodes_in_group("buildings"):
+		var building: Building = node as Building
+		if building == null or building.player_id != GameManager.LOCAL_PLAYER_ID:
+			continue
+		if vision.has_discovered_building(building):
+			return building
+
+	# Player units currently inside the AI's vision; nearest to home.
+	var best: Node2D = null
+	var best_dist: float = INF
+	for node: Node in get_tree().get_nodes_in_group("player_%d" % GameManager.LOCAL_PLAYER_ID):
+		var unit: UnitBase = node as UnitBase
+		if unit == null or not vision.can_see_entity(unit):
+			continue
+		var dist: float = unit.global_position.distance_to(tc.global_position)
+		if dist < best_dist:
+			best_dist = dist
+			best = unit
+	return best
+
+func _send_scout(tc: Building, warriors: Array[UnitBase]) -> void:
+	var idle: Array[UnitBase] = _idle_of(warriors)
+	if idle.is_empty():
+		return
+	var home: Vector2i = Constants.world_to_grid(tc.global_position)
+	var directions: Array[Vector2i] = [
+		Vector2i(-1, -1), Vector2i(0, -1), Vector2i(1, -1), Vector2i(-1, 0),
+		Vector2i(1, 0), Vector2i(-1, 1), Vector2i(0, 1), Vector2i(1, 1),
+	]
+	var dir: Vector2i = directions[_scout_direction % directions.size()]
+	_scout_direction += 1
+	# Each completed compass round pushes the sweep farther out, so any base
+	# is eventually found no matter the distance.
+	if _scout_direction % directions.size() == 0:
+		_scout_distance = mini(_scout_distance + SCOUT_DISTANCE_STEP, SCOUT_DISTANCE_MAX)
+	var target_cell: Vector2i = home + dir * _scout_distance
+	idle[0].move_to(Constants.grid_to_world(target_cell.x, target_cell.y))
+
+# Being attacked reveals the attacker: rally idle warriors to defend.
+func _on_building_damaged(building: Node2D, attacker: Node2D) -> void:
+	var mine: Building = building as Building
+	if mine == null or mine.player_id != ENEMY_ID:
+		return
+	if attacker == null or not is_instance_valid(attacker):
+		return
+	for warrior: UnitBase in _idle_of(_own_warriors()):
+		warrior.command_attack(attacker)
+
+func _idle_of(warriors: Array[UnitBase]) -> Array[UnitBase]:
+	var idle: Array[UnitBase] = []
+	for warrior: UnitBase in warriors:
+		if warrior.current_state == UnitBase.State.IDLE:
+			idle.append(warrior)
+	return idle
 
 func _own_town_center() -> Building:
 	for node: Node in get_tree().get_nodes_in_group("buildings"):
@@ -69,14 +158,3 @@ func _own_warriors() -> Array[UnitBase]:
 		if unit != null and unit.unit_type == "warrior":
 			result.append(unit)
 	return result
-
-func _player_target() -> Node2D:
-	# Prefer the player's Town Center; fall back to any player unit.
-	for node: Node in get_tree().get_nodes_in_group("buildings"):
-		var building: Building = node as Building
-		if building != null and building.player_id == GameManager.LOCAL_PLAYER_ID:
-			return building
-	for node: Node in get_tree().get_nodes_in_group("player_%d" % GameManager.LOCAL_PLAYER_ID):
-		if node is UnitBase:
-			return node as Node2D
-	return null
