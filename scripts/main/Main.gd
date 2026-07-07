@@ -27,17 +27,19 @@ func _ready() -> void:
 	if "--test-move" in OS.get_cmdline_user_args():
 		_run_move_test()
 
-# Temporary verification harness: command all player-0 units to walk 8 tiles
-# away and report their progress.
+# Verification harness (run with `++ --test-move`): selects all player-0
+# units and issues a move command through the real SelectionManager pipeline.
 func _run_move_test() -> void:
 	await get_tree().create_timer(0.5).timeout
 	var spawn: Dictionary = iso_map.map_generator.spawn_zones[0]
-	var target: Vector2 = Constants.grid_to_world(spawn["cx"] + 8, spawn["cy"] + 8)
+	var target_world: Vector2 = Constants.grid_to_world(spawn["cx"] + 8, spawn["cy"] + 8)
+	var target_screen: Vector2 = get_viewport().get_canvas_transform() * target_world
 	var test_units: Array = get_tree().get_nodes_in_group("player_0")
-	print("[test-move] commanding ", test_units.size(), " units to ", target)
+	print("[test-move] commanding ", test_units.size(), " units via SelectionManager to ", target_world)
 	for u: Node2D in test_units:
 		print("[test-move] unit start: ", u.global_position)
-		u.move_to(target)
+		SelectionManager.selected_units.assign(test_units)
+	SelectionManager._command_move(target_screen)
 	await get_tree().create_timer(3.0).timeout
 	for u: Node2D in test_units:
 		print("[test-move] unit after 3s: ", u.global_position, " state=", u.current_state)

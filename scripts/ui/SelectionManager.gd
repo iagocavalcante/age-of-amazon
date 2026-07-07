@@ -131,7 +131,9 @@ func _select_unit(unit: Node2D) -> void:
 	selected_units.append(unit)
 
 func _command_move(screen_pos: Vector2) -> void:
-	selected_units = selected_units.filter(is_instance_valid)
+	# filter() returns an untyped Array; assign() converts it back into the
+	# typed Array[Node2D] (a plain `=` would fail at runtime).
+	selected_units.assign(selected_units.filter(is_instance_valid))
 	if selected_units.is_empty():
 		return
 
