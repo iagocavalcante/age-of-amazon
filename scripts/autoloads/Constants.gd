@@ -64,6 +64,36 @@ const UNIT_DEFS: Dictionary = {
 	},
 }
 
+# Neutral wildlife. `food` is the one-time bounty paid to whoever lands the
+# killing blow (see ADR 14). Prey flee; predators attack units of any player.
+const ANIMAL_NEUTRAL_ID: int = -1
+const WILDLIFE_COLOR: Color = Color(0.88, 0.80, 0.44)  # minimap dot
+
+const ANIMAL_DEFS: Dictionary = {
+	"capybara": {
+		"max_hp": 40,
+		"armor": 0,
+		"move_speed": 50.0,        # relaxed wander
+		"flee_speed": 74.0,        # panicked sprint — slower than a unit, so a
+		                           # hunter catches it after a short chase
+		"predator": false,
+		"flee_radius": 150.0,      # bolts when a unit comes this close
+		"food": 100,
+	},
+	"jaguar": {
+		"max_hp": 95,
+		"armor": 1,
+		"move_speed": 74.0,
+		"flee_speed": 74.0,        # predators don't flee
+		"predator": true,
+		"aggro_radius": 176.0,     # hunts units within this range
+		"attack_power": 9,
+		"attack_range": 30.0,
+		"attack_cooldown": 1.1,
+		"food": 200,
+	},
+}
+
 # Building definitions (footprint in tiles)
 const BUILDING_DEFS: Dictionary = {
 	"town_center": {

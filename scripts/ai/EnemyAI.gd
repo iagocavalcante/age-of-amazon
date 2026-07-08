@@ -19,10 +19,12 @@ const WAVE_MIN_WARRIORS: int = 3
 const MAX_WARRIORS: int = 8
 const SCOUT_DISTANCE_STEP: int = 12
 const SCOUT_DISTANCE_MAX: int = 80
+const HUNT_RANGE_TILES: int = 26
 
 # Tunable pacing (the test harness shortens these).
 @export var wave_interval: float = 75.0
 @export var scout_interval: float = 18.0
+@export var hunt_interval: float = 22.0
 
 const TRICKLE: Dictionary = {
 	Constants.ResourceType.FOOD: 3,
@@ -36,6 +38,7 @@ var _wave_accum: float = 0.0
 var _scout_accum: float = 0.0
 var _scout_direction: int = 0
 var _scout_distance: int = 34
+var _hunt_accum: float = 0.0
 
 func _ready() -> void:
 	EventBus.building_damaged.connect(_on_building_damaged)
@@ -49,6 +52,7 @@ func _process(delta: float) -> void:
 	_tick_accum = 0.0
 	_wave_accum += TICK_INTERVAL
 	_scout_accum += TICK_INTERVAL
+	_hunt_accum += TICK_INTERVAL
 	_tick()
 
 func _tick() -> void:
@@ -69,6 +73,9 @@ func _tick() -> void:
 	if warriors.size() + tc.train_queue.size() < MAX_WARRIORS:
 		if GameManager.can_afford(ENEMY_ID, Constants.UNIT_DEFS["warrior"]["cost"]):
 			tc.queue_train("warrior")
+
+	# Opportunistic hunting for extra food, under the AI's own fog.
+	_maybe_hunt(tc, warriors)
 
 	var target: Node2D = _known_player_target(tc)
 
@@ -126,6 +133,33 @@ func _send_scout(tc: Building, warriors: Array[UnitBase]) -> void:
 		_scout_distance = mini(_scout_distance + SCOUT_DISTANCE_STEP, SCOUT_DISTANCE_MAX)
 	var target_cell: Vector2i = home + dir * _scout_distance
 	idle[0].move_to(Constants.grid_to_world(target_cell.x, target_cell.y))
+
+# Send one idle warrior after an animal the AI can currently see near home.
+func _maybe_hunt(tc: Building, warriors: Array[UnitBase]) -> void:
+	if _hunt_accum < hunt_interval:
+		return
+	var animal: Node2D = _visible_animal_near(tc)
+	if animal == null:
+		return
+	var idle: Array[UnitBase] = _idle_of(warriors)
+	if idle.is_empty():
+		return
+	_hunt_accum = 0.0
+	idle[0].command_attack(animal)
+
+func _visible_animal_near(tc: Building) -> Node2D:
+	var home: Vector2 = tc.global_position
+	var best: Node2D = null
+	var best_dist: float = float(HUNT_RANGE_TILES * Constants.TILE_WIDTH)
+	for node: Node in get_tree().get_nodes_in_group("animals"):
+		var animal: Node2D = node as Node2D
+		if animal == null or not vision.can_see_entity(animal):
+			continue
+		var dist: float = animal.global_position.distance_to(home)
+		if dist < best_dist:
+			best_dist = dist
+			best = animal
+	return best
 
 # Being attacked reveals the attacker: rally idle warriors to defend.
 func _on_building_damaged(building: Node2D, attacker: Node2D) -> void:

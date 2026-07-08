@@ -148,3 +148,9 @@ func _cull_entities() -> void:
 			continue
 		# Buildings can't move: once their ground is explored, remember them.
 		building.visible = vision.has_discovered_building(building)
+
+	# Neutral wildlife hides in the fog just like enemy units.
+	for node: Node in get_tree().get_nodes_in_group("animals"):
+		var animal: Node2D = node as Node2D
+		if animal != null:
+			animal.visible = vision.can_see_entity(animal)

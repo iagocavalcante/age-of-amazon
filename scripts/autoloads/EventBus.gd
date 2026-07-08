@@ -20,6 +20,10 @@ signal training_completed(building: Node2D, unit_type: String)
 signal resources_changed(player_id: int)
 signal population_changed(player_id: int)
 
+# Wildlife signals
+signal animal_died(animal: Node2D)
+signal animal_hunted(animal: Node2D, hunter: Node2D, food: int)
+
 # World signals
 signal world_ready()
 

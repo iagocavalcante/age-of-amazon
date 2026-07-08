@@ -187,10 +187,10 @@ func _build_left(col: VBoxContainer) -> void:
 	_add_control(col, "Shift-click", "Add units to the selection")
 
 	_add_section(col, "Command")
-	_add_body(col, "With units selected, right-click a destination:")
 	_add_control(col, "Right-click ground", "March there in formation")
 	_add_control(col, "Right-click a resource", "Send villagers to gather it")
 	_add_control(col, "Right-click an enemy", "Attack it")
+	_add_control(col, "Right-click an animal", "Hunt it for food")
 
 func _build_right(col: VBoxContainer) -> void:
 	_add_section(col, "Your people")
@@ -208,7 +208,7 @@ func _build_right(col: VBoxContainer) -> void:
 
 	_add_section(col, "Tips")
 	_add_body(col, "•  Keep every villager gathering — idle villagers lose games.")
-	_add_body(col, "•  Warriors can't gather; pair them with villagers.")
+	_add_body(col, "•  Hunt capybaras for food — but beware prowling jaguars.")
 	_add_body(col, "•  Scout before you strike — you can't hit what you can't see.")
 
 # --- Builders ---
@@ -352,6 +352,6 @@ func _button_style(color: Color) -> StyleBoxFlat:
 
 func _is_test_run() -> bool:
 	for arg: String in OS.get_cmdline_user_args():
-		if arg.begins_with("--test") or arg == "--capture-help":
+		if arg.begins_with("--test") or arg.begins_with("--capture"):
 			return true
 	return false

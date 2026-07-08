@@ -125,19 +125,22 @@ func _pick_own_unit(screen_pos: Vector2) -> Node2D:
 func _pick_enemy(screen_pos: Vector2) -> Node2D:
 	var world_pos: Vector2 = _screen_to_world(screen_pos)
 
-	# Enemy unit near the click? (fog-hidden enemies can't be targeted)
+	# Enemy unit or huntable animal near the click. Fog-hidden targets can't be
+	# picked (a neutral animal is never the local player's, so it's always fair
+	# game once visible).
 	var closest: Node2D = null
 	var closest_dist: float = CLICK_PICK_RADIUS
-	for node: Node in get_tree().get_nodes_in_group("units"):
-		var unit: Node2D = node as Node2D
-		if unit == null or unit.get("player_id") == GameManager.LOCAL_PLAYER_ID:
-			continue
-		if not unit.visible:
-			continue
-		var dist: float = unit.global_position.distance_to(world_pos)
-		if dist < closest_dist:
-			closest_dist = dist
-			closest = unit
+	for group: String in ["units", "animals"]:
+		for node: Node in get_tree().get_nodes_in_group(group):
+			var target: Node2D = node as Node2D
+			if target == null or not target.visible:
+				continue
+			if group == "units" and target.get("player_id") == GameManager.LOCAL_PLAYER_ID:
+				continue
+			var dist: float = target.global_position.distance_to(world_pos)
+			if dist < closest_dist:
+				closest_dist = dist
+				closest = target
 	if closest != null:
 		return closest
 

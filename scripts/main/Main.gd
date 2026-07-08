@@ -7,6 +7,7 @@ extends Node2D
 @onready var doodads: Node2D = $World/Doodads
 @onready var buildings: Node2D = $World/Buildings
 @onready var units: Node2D = $World/Units
+@onready var animals: Node2D = $World/Animals
 
 var unit_scene: PackedScene = preload("res://scenes/units/Unit.tscn")
 
@@ -32,14 +33,30 @@ func _ready() -> void:
 	GameManager.change_state(GameManager.GameState.RUNNING)
 
 	var args: PackedStringArray = OS.get_cmdline_user_args()
+
+	# Ambient wildlife runs in normal play; harnesses seed their own animals
+	# (or none) so the simulation stays deterministic.
+	if not _is_harness(args):
+		animals.setup(camera)
+
 	if "--test-move" in args:
 		_run_move_test()
 	if "--test-systems" in args:
 		_run_systems_test()
 	if "--test-scout" in args:
 		_run_scout_test()
+	if "--test-hunt" in args:
+		_run_hunt_test()
 	if "--capture-help" in args:
 		_run_capture_help()
+	if "--capture-animals" in args:
+		_run_capture_animals()
+
+func _is_harness(args: PackedStringArray) -> bool:
+	for arg: String in args:
+		if arg.begins_with("--test") or arg.begins_with("--capture"):
+			return true
+	return false
 
 func _place_building(type: String, player_id: int, base_cell: Vector2i) -> Building:
 	var building: Building = Building.new()
@@ -117,6 +134,54 @@ func _run_capture_help() -> void:
 	var path: String = "user://help_capture.png"
 	img.save_png(path)
 	print("[capture-help] saved ", ProjectSettings.globalize_path(path), " size=", img.get_size())
+	get_tree().quit()
+
+# Prove hunting: a warrior kills a capybara for food, and a jaguar preys on a
+# lone villager.
+func _run_hunt_test() -> void:
+	await get_tree().create_timer(0.5).timeout
+	var food_before: int = GameManager.get_resource(0, Constants.ResourceType.FOOD)
+
+	var prey: Animal = animals.spawn_at("capybara", Vector2i(4, 4))
+	var hunter: UnitBase = _spawn_unit("warrior", 0, Vector2i(2, 2))
+	await get_tree().process_frame
+	hunter.command_attack(prey)
+
+	var elapsed: float = 0.0
+	while is_instance_valid(prey) and elapsed < 28.0:
+		await get_tree().create_timer(0.5).timeout
+		elapsed += 0.5
+	var killed: bool = not is_instance_valid(prey)
+	var food_after: int = GameManager.get_resource(0, Constants.ResourceType.FOOD)
+	print("[test-hunt] capybara killed=", killed, " food ", food_before, "->", food_after,
+		" (hunt ", "OK" if killed and food_after > food_before else "FAILED", ")")
+
+	var victim: UnitBase = _spawn_unit("villager", 0, Vector2i(-3, -3))
+	var vhp_before: int = victim.current_hp
+	animals.spawn_at("jaguar", Vector2i(-1, -3))
+	await get_tree().create_timer(6.0).timeout
+	var vhp_after: int = victim.current_hp if is_instance_valid(victim) else 0
+	print("[test-hunt] villager hp ", vhp_before, "->", vhp_after,
+		" (predator ", "OK" if vhp_after < vhp_before else "FAILED", ")")
+	get_tree().quit()
+
+# Renders a couple of animals up close so the procedural art can be reviewed.
+func _run_capture_animals() -> void:
+	await get_tree().process_frame
+	animals.spawn_at("capybara", Vector2i(2, 2))
+	animals.spawn_at("capybara", Vector2i(4, 1))
+	animals.spawn_at("jaguar", Vector2i(3, 4))
+	camera.global_position = Constants.grid_to_world(3, 3)
+	camera.target_zoom = 1.9
+	camera.zoom = Vector2(1.9, 1.9)
+	fog.force_update()
+	for _i in range(10):
+		await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var img: Image = get_viewport().get_texture().get_image()
+	var path: String = "user://animals_capture.png"
+	img.save_png(path)
+	print("[capture-animals] saved ", ProjectSettings.globalize_path(path), " size=", img.get_size())
 	get_tree().quit()
 
 func _find_tc(player_id: int) -> Building:

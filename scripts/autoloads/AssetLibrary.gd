@@ -6,6 +6,8 @@ extends Node
 
 # Per player: {"villager": frames, "warrior": frames} (idle, walk A, walk B)
 var unit_frames: Array = []
+# Neutral wildlife: species -> frames (idle, walk A, walk B)
+var animal_frames: Dictionary = {}
 var town_center_textures: Array[ImageTexture] = []
 var selection_ring: ImageTexture
 var unit_shadow: ImageTexture
@@ -81,6 +83,10 @@ func _ready() -> void:
 	berry_texture = doodad_artist.build_berry_bush()
 	jade_texture = doodad_artist.build_jade_deposit()
 
+	var animal_artist: AnimalArtist = AnimalArtist.new()
+	animal_frames["capybara"] = animal_artist.build_capybara_frames()
+	animal_frames["jaguar"] = animal_artist.build_jaguar_frames()
+
 	_build_icons()
 
 	health_bar_bg = StyleBoxFlat.new()
@@ -112,6 +118,9 @@ func get_unit_frames(player_id: int, unit_type: String) -> Array:
 
 func get_town_center_texture(player_id: int) -> ImageTexture:
 	return town_center_textures[clampi(player_id, 0, town_center_textures.size() - 1)]
+
+func get_animal_frames(species: String) -> Array:
+	return animal_frames.get(species, [])
 
 func resource_icon(type: int) -> ImageTexture:
 	return icons[Constants.RESOURCE_NAMES[type]]

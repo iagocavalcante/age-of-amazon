@@ -273,16 +273,24 @@ func _redraw_minimap() -> void:
 		if unit != null and unit.visible:
 			_plot(unit, center, half, 1)
 
+	# Wildlife dots, only where the player can currently see them.
+	for node: Node in get_tree().get_nodes_in_group("animals"):
+		var animal: Node2D = node as Node2D
+		if animal != null and animal.visible:
+			_plot(animal, center, half, 1, Constants.WILDLIFE_COLOR)
+
 	_minimap_rect.texture = ImageTexture.create_from_image(_minimap_image)
 
-func _plot(entity: Node2D, center: Vector2i, half: int, radius: int) -> void:
+func _plot(entity: Node2D, center: Vector2i, half: int, radius: int, color_override: Color = Color(0, 0, 0, 0)) -> void:
 	if entity == null or not is_instance_valid(entity):
 		return
 	var cell: Vector2i = Constants.world_to_grid(entity.global_position)
 	var px: int = cell.x - center.x + half
 	var py: int = cell.y - center.y + half
-	var pid: int = entity.get("player_id")
-	var color: Color = Constants.PLAYER_COLORS[clampi(pid, 0, Constants.PLAYER_COLORS.size() - 1)]
+	var color: Color = color_override
+	if color.a <= 0.0:
+		var pid: int = entity.get("player_id")
+		color = Constants.PLAYER_COLORS[clampi(pid, 0, Constants.PLAYER_COLORS.size() - 1)]
 	for dy in range(-radius, radius + 1):
 		for dx in range(-radius, radius + 1):
 			var x: int = px + dx
