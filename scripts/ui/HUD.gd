@@ -166,7 +166,10 @@ func _train(unit_type: String) -> void:
 	var building: Node2D = SelectionManager.selected_building
 	if building == null or not is_instance_valid(building):
 		return
-	building.queue_train(unit_type)
+	CommandRouter.submit({
+		"type": "train", "player_id": GameManager.LOCAL_PLAYER_ID,
+		"building_name": String(building.name), "unit_type": unit_type,
+	})
 	_refresh_selection_panel()
 
 func _refresh_selection_panel() -> void:

@@ -72,7 +72,10 @@ func _tick() -> void:
 
 	if warriors.size() + tc.train_queue.size() < MAX_WARRIORS:
 		if GameManager.can_afford(ENEMY_ID, Constants.UNIT_DEFS["warrior"]["cost"]):
-			tc.queue_train("warrior")
+			CommandRouter.submit({
+				"type": "train", "player_id": ENEMY_ID,
+				"building_name": String(tc.name), "unit_type": "warrior",
+			})
 
 	# Opportunistic hunting for extra food, under the AI's own fog.
 	_maybe_hunt(tc, warriors)
@@ -90,8 +93,10 @@ func _tick() -> void:
 		var idle: Array[UnitBase] = _idle_of(warriors)
 		if idle.size() >= WAVE_MIN_WARRIORS:
 			_wave_accum = 0.0
-			for warrior: UnitBase in idle:
-				warrior.command_attack(target)
+			CommandRouter.submit({
+				"type": "attack", "player_id": ENEMY_ID,
+				"actor_names": _names_of(idle), "target_name": String(target.name),
+			})
 
 # Only targets this AI has legitimately discovered through its own vision.
 func _known_player_target(tc: Building) -> Node2D:
@@ -132,7 +137,11 @@ func _send_scout(tc: Building, warriors: Array[UnitBase]) -> void:
 	if _scout_direction % directions.size() == 0:
 		_scout_distance = mini(_scout_distance + SCOUT_DISTANCE_STEP, SCOUT_DISTANCE_MAX)
 	var target_cell: Vector2i = home + dir * _scout_distance
-	idle[0].move_to(Constants.grid_to_world(target_cell.x, target_cell.y))
+	CommandRouter.submit({
+		"type": "move", "player_id": ENEMY_ID,
+		"actor_names": [String(idle[0].name)],
+		"target": Constants.grid_to_world(target_cell.x, target_cell.y),
+	})
 
 # Send one idle warrior after an animal the AI can currently see near home.
 func _maybe_hunt(tc: Building, warriors: Array[UnitBase]) -> void:
@@ -145,7 +154,10 @@ func _maybe_hunt(tc: Building, warriors: Array[UnitBase]) -> void:
 	if idle.is_empty():
 		return
 	_hunt_accum = 0.0
-	idle[0].command_attack(animal)
+	CommandRouter.submit({
+		"type": "attack", "player_id": ENEMY_ID,
+		"actor_names": [String(idle[0].name)], "target_name": String(animal.name),
+	})
 
 func _visible_animal_near(tc: Building) -> Node2D:
 	var home: Vector2 = tc.global_position
@@ -168,8 +180,16 @@ func _on_building_damaged(building: Node2D, attacker: Node2D) -> void:
 		return
 	if attacker == null or not is_instance_valid(attacker):
 		return
-	for warrior: UnitBase in _idle_of(_own_warriors()):
-		warrior.command_attack(attacker)
+	var idle: Array[UnitBase] = _idle_of(_own_warriors())
+	if idle.is_empty():
+		return
+	CommandRouter.submit({
+		"type": "attack", "player_id": ENEMY_ID,
+		"actor_names": _names_of(idle), "target_name": String(attacker.name),
+	})
+
+func _names_of(units: Array[UnitBase]) -> Array:
+	return units.map(func(u: UnitBase) -> String: return String(u.name))
 
 func _idle_of(warriors: Array[UnitBase]) -> Array[UnitBase]:
 	var idle: Array[UnitBase] = []
