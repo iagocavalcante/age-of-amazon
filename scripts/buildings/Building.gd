@@ -125,9 +125,17 @@ func take_damage(amount: int, attacker: Node2D = null) -> void:
 func _die() -> void:
 	GameManager.world.vacate(footprint_cells)
 	EventBus.building_destroyed.emit(self)
+	# Last tribe with a town center standing wins. An eliminated tribe's
+	# remaining units stay alive (accepted v1 simplification).
 	if building_type == "town_center":
-		var winner: int = 1 - player_id
-		GameManager.end_game(winner)
+		var alive: Array[int] = []
+		for node: Node in get_tree().get_nodes_in_group("buildings"):
+			var other: Building = node as Building
+			if other != null and other != self and other.building_type == "town_center" \
+					and not alive.has(other.player_id):
+				alive.append(other.player_id)
+		if alive.size() == 1:
+			GameManager.end_game(alive[0])
 	queue_free()
 
 func body_radius() -> float:

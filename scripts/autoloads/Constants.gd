@@ -117,6 +117,8 @@ var BIOME_COLORS: Dictionary = {}
 const PLAYER_COLORS: Array[Color] = [
 	Color(0.25, 0.55, 0.95),  # Player 0: Blue
 	Color(0.90, 0.30, 0.25),  # Player 1: Red
+	Color(0.95, 0.80, 0.20),  # Player 2: Yellow
+	Color(0.60, 0.35, 0.85),  # Player 3: Purple
 ]
 
 func _ready() -> void:

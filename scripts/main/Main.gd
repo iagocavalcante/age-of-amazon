@@ -43,6 +43,8 @@ func _ready() -> void:
 		_run_move_test()
 	if "--test-commands" in args:
 		_run_commands_test()
+	if "--test-victory" in args:
+		_run_victory_test()
 	if "--test-systems" in args:
 		_run_systems_test()
 	if "--test-scout" in args:
@@ -90,6 +92,29 @@ func _run_move_test() -> void:
 	await get_tree().create_timer(3.0).timeout
 	for u: Node2D in SelectionManager.selected_units:
 		print("[test-move] unit after 3s: ", u.global_position, " state=", u.current_state)
+	get_tree().quit()
+
+# Prove N-player victory: with three tribes, losing one town center does NOT
+# end the game; the game ends when a single tribe's TC remains.
+func _run_victory_test() -> void:
+	await get_tree().create_timer(0.5).timeout
+	GameManager.reset_players(3)
+	var tc2: Building = _place_building(
+		"town_center", 2, WorldGen.PLAYER_ORIGINS[2] + Vector2i(-1, -1))
+	var winner_seen: Array[int] = [-1]
+	EventBus.game_over.connect(func(w: int) -> void: winner_seen[0] = w)
+
+	_find_tc(1).take_damage(999999)
+	await get_tree().process_frame
+	var still_running: bool = GameManager.state != GameManager.GameState.GAME_OVER
+	print("[test-victory] three-way continues ", "OK" if still_running else "FAILED")
+
+	tc2.take_damage(999999)
+	await get_tree().process_frame
+	var over: bool = GameManager.state == GameManager.GameState.GAME_OVER
+	print("[test-victory] last-standing ",
+		"OK" if over and winner_seen[0] == 0 else "FAILED",
+		" winner=", winner_seen[0])
 	get_tree().quit()
 
 # Prove commands flow through CommandRouter: a move command relocates units,

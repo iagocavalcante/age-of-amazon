@@ -6,8 +6,11 @@ extends RefCounted
 # coordinate, which is what makes the world infinite: chunks can be generated
 # lazily in any order and always agree with their neighbors (no global passes).
 
-# Fixed player bases. Spawn clearings are carved around these.
-const PLAYER_ORIGINS: Array[Vector2i] = [Vector2i(0, 0), Vector2i(44, 44)]
+# Fixed player bases (up to 4 tribes). Spawn clearings are carved around
+# these; matches use the first N origins.
+const PLAYER_ORIGINS: Array[Vector2i] = [
+	Vector2i(0, 0), Vector2i(44, 44), Vector2i(44, 0), Vector2i(0, 44),
+]
 const CLEARING_RADIUS: float = 9.0
 const CLEARING_CORE_RADIUS: float = 5.0
 

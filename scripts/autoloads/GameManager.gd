@@ -4,7 +4,9 @@ extends Node
 enum GameState { LOADING, RUNNING, PAUSED, GAME_OVER }
 
 const LOCAL_PLAYER_ID: int = 0
-const PLAYER_COUNT: int = 2
+
+# How many tribes are in the current match (2-4). Set via reset_players().
+var player_count: int = 2
 
 var state: GameState = GameState.LOADING
 var map_seed: int = 0
@@ -34,9 +36,10 @@ func claim_entity_name(prefix: String) -> String:
 	_next_entity_id += 1
 	return "%s%d" % [prefix, _next_entity_id]
 
-func reset_players() -> void:
+func reset_players(count: int = 2) -> void:
+	player_count = count
 	stockpiles.clear()
-	for _i in range(PLAYER_COUNT):
+	for _i in range(player_count):
 		stockpiles.append({
 			Constants.ResourceType.FOOD: 100,
 			Constants.ResourceType.WOOD: 50,
