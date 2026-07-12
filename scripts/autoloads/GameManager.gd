@@ -8,6 +8,7 @@ const PLAYER_COUNT: int = 2
 
 var state: GameState = GameState.LOADING
 var map_seed: int = 0
+var _next_entity_id: int = 0
 
 # The "How to Play" overlay auto-opens once per session; this flag (an
 # autoload, so it survives scene reloads on restart) keeps it from reopening.
@@ -26,6 +27,12 @@ func _ready() -> void:
 	if map_seed == 0:
 		map_seed = randi()
 	reset_players()
+
+# Deterministic, authority-issued entity names ("U1", "B2", "A3"). Node names
+# double as network ids once multiplayer replicates them.
+func claim_entity_name(prefix: String) -> String:
+	_next_entity_id += 1
+	return "%s%d" % [prefix, _next_entity_id]
 
 func reset_players() -> void:
 	stockpiles.clear()

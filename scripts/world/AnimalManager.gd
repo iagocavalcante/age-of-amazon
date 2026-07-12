@@ -73,6 +73,7 @@ func _try_spawn() -> bool:
 # Public: deterministic spawn used by the test harness.
 func spawn_at(species: String, cell: Vector2i) -> Animal:
 	var animal: Animal = Animal.new()
+	animal.name = GameManager.claim_entity_name("A")
 	animal.setup(species)
 	animal.position = Constants.grid_to_world(cell.x, cell.y)
 	add_child(animal)

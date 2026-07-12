@@ -103,6 +103,7 @@ func _spawn_unit(unit_type: String) -> void:
 
 	var unit_scene: PackedScene = load("res://scenes/units/Unit.tscn")
 	var unit: UnitBase = unit_scene.instantiate() as UnitBase
+	unit.name = GameManager.claim_entity_name("U")
 	unit.unit_type = unit_type
 	unit.player_id = player_id
 	var cell: Vector2i = spot["cell"]

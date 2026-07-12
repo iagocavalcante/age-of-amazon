@@ -60,12 +60,14 @@ func _is_harness(args: PackedStringArray) -> bool:
 
 func _place_building(type: String, player_id: int, base_cell: Vector2i) -> Building:
 	var building: Building = Building.new()
+	building.name = GameManager.claim_entity_name("B")
 	building.setup(type, player_id, base_cell)
 	buildings.add_child(building)
 	return building
 
 func _spawn_unit(unit_type: String, player_id: int, cell: Vector2i) -> UnitBase:
 	var unit: UnitBase = unit_scene.instantiate() as UnitBase
+	unit.name = GameManager.claim_entity_name("U")
 	unit.unit_type = unit_type
 	unit.player_id = player_id
 	unit.position = Constants.grid_to_world(cell.x, cell.y)
