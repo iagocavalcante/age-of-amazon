@@ -81,27 +81,37 @@ func _ready() -> void:
 	add_to_group("units")
 	add_to_group("player_%d" % player_id)
 
-	_frames = AssetLibrary.get_unit_frames(player_id, unit_type)
-	sprite.texture = _frames[0]
-	sprite.offset = Vector2(0, -sprite.texture.get_height() / 2.0 + 1.0)
-	shadow.texture = AssetLibrary.unit_shadow
-	selection_ring.texture = AssetLibrary.selection_ring
-	selection_ring.visible = false
+	# Presentation lives client-side only; the headless server never touches
+	# textures, styleboxes, or the AssetLibrary.
+	if not Net.is_headless_server():
+		_frames = AssetLibrary.get_unit_frames(player_id, unit_type)
+		sprite.texture = _frames[0]
+		sprite.offset = Vector2(0, -sprite.texture.get_height() / 2.0 + 1.0)
+		shadow.texture = AssetLibrary.unit_shadow
+		selection_ring.texture = AssetLibrary.selection_ring
+		selection_ring.visible = false
 
-	health_bar.max_value = max_hp
-	health_bar.value = current_hp
-	health_bar.add_theme_stylebox_override("background", AssetLibrary.health_bar_bg)
-	health_bar.add_theme_stylebox_override("fill", AssetLibrary.health_bar_fill)
-	_update_health_bar()
+		health_bar.max_value = max_hp
+		health_bar.value = current_hp
+		health_bar.add_theme_stylebox_override("background", AssetLibrary.health_bar_bg)
+		health_bar.add_theme_stylebox_override("fill", AssetLibrary.health_bar_fill)
+		_update_health_bar()
 
 	EventBus.population_changed.emit(player_id)
 
 func _physics_process(delta: float) -> void:
+	if Net.is_authority():
+		_sim_step(delta)
+	if not Net.is_headless_server():
+		_view_step(delta)
+
+# Simulation: runs only where authority lives (offline client / match server).
+func _sim_step(delta: float) -> void:
 	_cooldown_left = maxf(0.0, _cooldown_left - delta)
 
 	match current_state:
 		State.IDLE:
-			_set_idle_frame()
+			velocity = Vector2.ZERO
 			if aggressive:
 				_aggro_timer -= delta
 				if _aggro_timer <= 0.0:
@@ -113,10 +123,25 @@ func _physics_process(delta: float) -> void:
 			if _follow_path(delta):
 				_on_arrival()
 		State.GATHERING:
-			_set_idle_frame()
+			velocity = Vector2.ZERO
 			_process_gathering(delta)
 		State.ATTACKING:
 			_process_attacking(delta)
+
+# Presentation: derives animation purely from replicable state (velocity,
+# current_state), so a multiplayer client renders correctly from sync alone.
+func _view_step(delta: float) -> void:
+	if velocity.length() > 1.0:
+		if absf(velocity.x) > 0.1:
+			sprite.flip_h = velocity.x < 0.0
+		_anim_time += delta
+		var frame: int = 1 + (int(_anim_time / WALK_FRAME_TIME) % 2)
+		sprite.texture = _frames[frame]
+		return
+	if current_state == State.ATTACKING \
+			and _attack_target != null and is_instance_valid(_attack_target):
+		sprite.flip_h = _attack_target.global_position.x < global_position.x
+	_set_idle_frame()
 
 # --- Commands (issued by SelectionManager / AI) ---
 
@@ -164,8 +189,9 @@ func _start_path_to(target: Vector2) -> bool:
 	_path_index = 0
 	return true
 
-# Returns true when the path is finished.
-func _follow_path(delta: float) -> bool:
+# Returns true when the path is finished. Pure simulation — animation is
+# derived from `velocity` in _view_step.
+func _follow_path(_delta: float) -> bool:
 	if _path_index >= _path.size():
 		velocity = Vector2.ZERO
 		return true
@@ -174,18 +200,14 @@ func _follow_path(delta: float) -> bool:
 	var to_target: Vector2 = target - global_position
 	if to_target.length() <= WAYPOINT_REACHED_DISTANCE:
 		_path_index += 1
-		return _path_index >= _path.size()
+		if _path_index >= _path.size():
+			velocity = Vector2.ZERO
+			return true
+		return false
 
 	var direction: Vector2 = to_target.normalized()
 	velocity = direction * move_speed / _terrain_cost()
 	move_and_slide()
-
-	if absf(direction.x) > 0.1:
-		sprite.flip_h = direction.x < 0.0
-
-	_anim_time += delta
-	var frame: int = 1 + (int(_anim_time / WALK_FRAME_TIME) % 2)
-	sprite.texture = _frames[frame]
 	return false
 
 func _terrain_cost() -> float:
@@ -316,19 +338,19 @@ func _process_attacking(delta: float) -> void:
 			command_attack(_attack_target)
 		return
 
-	_set_idle_frame()
-	sprite.flip_h = _attack_target.global_position.x < global_position.x
+	velocity = Vector2.ZERO
 
 	if _cooldown_left <= 0.0:
 		_cooldown_left = attack_cooldown
 		_strike(_attack_target)
 
 func _strike(target: Node2D) -> void:
-	# Lunge toward the victim for readability.
-	var toward: Vector2 = (target.global_position - global_position).normalized() * 4.0
-	var tween: Tween = create_tween()
-	tween.tween_property(sprite, "position", Vector2(toward), 0.08)
-	tween.tween_property(sprite, "position", Vector2.ZERO, 0.10)
+	if not Net.is_headless_server():
+		# Lunge toward the victim for readability.
+		var toward: Vector2 = (target.global_position - global_position).normalized() * 4.0
+		var tween: Tween = create_tween()
+		tween.tween_property(sprite, "position", Vector2(toward), 0.08)
+		tween.tween_property(sprite, "position", Vector2.ZERO, 0.10)
 
 	if target.has_method("take_damage"):
 		target.take_damage(attack_power, self)
@@ -371,6 +393,8 @@ func take_damage(amount: int, attacker: Node2D = null) -> void:
 			command_attack(attacker)
 
 func _flash_hit() -> void:
+	if Net.is_headless_server():
+		return
 	sprite.modulate = Color(1.6, 1.2, 1.2)
 	var tween: Tween = create_tween()
 	tween.tween_property(sprite, "modulate", Color.WHITE, 0.18)
@@ -398,6 +422,8 @@ func deselect() -> void:
 	EventBus.unit_deselected.emit(self)
 
 func _update_health_bar() -> void:
+	if Net.is_headless_server():
+		return
 	health_bar.value = current_hp
 	health_bar.visible = is_selected or current_hp < max_hp
 

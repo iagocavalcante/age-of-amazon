@@ -49,6 +49,10 @@ func setup(p_type: String, p_player_id: int, base_cell: Vector2i) -> void:
 	add_to_group("player_%d" % player_id)
 
 func _ready() -> void:
+	# Presentation is client-side only; the headless server keeps _sprite and
+	# _health_bar null and every visual path checks for that.
+	if Net.is_headless_server():
+		return
 	_sprite = Sprite2D.new()
 	_sprite.texture = AssetLibrary.get_town_center_texture(player_id)
 	_sprite.offset = Vector2(0, -_sprite.texture.get_height() / 2.0 + 24.0)
@@ -66,6 +70,9 @@ func _ready() -> void:
 	_update_health_bar()
 
 func _process(delta: float) -> void:
+	# Training is simulation — authority only.
+	if not Net.is_authority():
+		return
 	if train_queue.is_empty():
 		return
 	train_progress += delta
@@ -115,9 +122,10 @@ func take_damage(amount: int, attacker: Node2D = null) -> void:
 	_update_health_bar()
 	EventBus.building_damaged.emit(self, attacker)
 
-	_sprite.modulate = Color(1.6, 1.1, 1.1)
-	var tween: Tween = create_tween()
-	tween.tween_property(_sprite, "modulate", Color.WHITE, HIT_FLASH_TIME)
+	if _sprite != null:
+		_sprite.modulate = Color(1.6, 1.1, 1.1)
+		var tween: Tween = create_tween()
+		tween.tween_property(_sprite, "modulate", Color.WHITE, HIT_FLASH_TIME)
 
 	if current_hp <= 0:
 		_die()
@@ -143,15 +151,19 @@ func body_radius() -> float:
 
 func select() -> void:
 	is_selected = true
-	_sprite.modulate = Color(1.15, 1.15, 1.05)
+	if _sprite != null:
+		_sprite.modulate = Color(1.15, 1.15, 1.05)
 	_update_health_bar()
 	EventBus.building_selected.emit(self)
 
 func deselect() -> void:
 	is_selected = false
-	_sprite.modulate = Color.WHITE
+	if _sprite != null:
+		_sprite.modulate = Color.WHITE
 	_update_health_bar()
 
 func _update_health_bar() -> void:
+	if _health_bar == null:
+		return
 	_health_bar.value = current_hp
 	_health_bar.visible = is_selected or current_hp < max_hp
