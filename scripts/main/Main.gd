@@ -41,6 +41,8 @@ func _ready() -> void:
 
 	if "--test-move" in args:
 		_run_move_test()
+	if "--test-commands" in args:
+		_run_commands_test()
 	if "--test-systems" in args:
 		_run_systems_test()
 	if "--test-scout" in args:
@@ -88,6 +90,55 @@ func _run_move_test() -> void:
 	await get_tree().create_timer(3.0).timeout
 	for u: Node2D in SelectionManager.selected_units:
 		print("[test-move] unit after 3s: ", u.global_position, " state=", u.current_state)
+	get_tree().quit()
+
+# Prove commands flow through CommandRouter: a move command relocates units,
+# a spoofed player_id is rejected, training queues via command.
+func _run_commands_test() -> void:
+	await get_tree().create_timer(0.5).timeout
+	var villagers: Array = get_tree().get_nodes_in_group("player_0").filter(
+		func(n: Node) -> bool: return n is UnitBase)
+	var mover: UnitBase = villagers[0]
+	var start: Vector2 = mover.global_position
+	CommandRouter.submit({
+		"type": "move", "player_id": 0,
+		"actor_names": [String(mover.name)],
+		"target": Constants.grid_to_world(8, 8),
+	})
+	await get_tree().create_timer(3.0).timeout
+	var moved: bool = mover.global_position.distance_to(start) > 40.0
+	print("[test-commands] move ", "OK" if moved else "FAILED")
+
+	# Ownership: player 1 may not command player 0's unit away.
+	CommandRouter.submit({
+		"type": "move", "player_id": 1,
+		"actor_names": [String(mover.name)],
+		"target": Constants.grid_to_world(-8, -8),
+	})
+	await get_tree().create_timer(1.5).timeout
+	var rejected: bool = mover.global_position.distance_to(
+		Constants.grid_to_world(-8, -8)) > 200.0
+	print("[test-commands] ownership ", "OK" if rejected else "FAILED")
+
+	# Training through the router (player TC is named at spawn).
+	var tc: Building = _find_tc(0)
+	var queue_before: int = tc.train_queue.size()
+	CommandRouter.submit({
+		"type": "train", "player_id": 0,
+		"building_name": String(tc.name), "unit_type": "villager",
+	})
+	await get_tree().process_frame
+	var queued: bool = tc.train_queue.size() == queue_before + 1
+	print("[test-commands] train ", "OK" if queued else "FAILED")
+
+	# Foreign training rejected.
+	CommandRouter.submit({
+		"type": "train", "player_id": 1,
+		"building_name": String(tc.name), "unit_type": "villager",
+	})
+	await get_tree().process_frame
+	var foreign_rejected: bool = tc.train_queue.size() == queue_before + 1
+	print("[test-commands] foreign-train ", "OK" if foreign_rejected else "FAILED")
 	get_tree().quit()
 
 # Accelerated AI pacing: prove the AI scouts, discovers the player base

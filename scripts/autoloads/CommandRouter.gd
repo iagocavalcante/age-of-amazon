@@ -1,0 +1,91 @@
+# scripts/autoloads/CommandRouter.gd
+extends Node
+
+# The single seam every gameplay order flows through, as plain data:
+#   {type:"move",   player_id, actor_names: Array, target: Vector2}
+#   {type:"gather", player_id, actor_names: Array, cell: Vector2i}
+#   {type:"attack", player_id, actor_names: Array, target_name: String}
+#   {type:"train",  player_id, building_name: String, unit_type: String}
+# Offline the router is its own authority. In multiplayer, clients forward
+# commands to the server, which validates and executes the same way.
+
+func submit(command: Dictionary) -> void:
+	_validate_and_execute(command)
+
+func _validate_and_execute(command: Dictionary) -> void:
+	match command.get("type", ""):
+		"move":
+			_exec_move(command)
+		"gather":
+			_exec_gather(command)
+		"attack":
+			_exec_attack(command)
+		"train":
+			_exec_train(command)
+		_:
+			push_warning("CommandRouter: unknown command %s" % [command])
+
+# Actors resolve by name from the issuing player's group — ownership check
+# and dangling-reference filtering in one step.
+func _resolve_actors(command: Dictionary) -> Array[UnitBase]:
+	var owned: Array[UnitBase] = []
+	var wanted: Array = command.get("actor_names", [])
+	for node: Node in get_tree().get_nodes_in_group("player_%d" % int(command["player_id"])):
+		var unit: UnitBase = node as UnitBase
+		if unit != null and String(unit.name) in wanted:
+			owned.append(unit)
+	return owned
+
+func _resolve_target(target_name: String) -> Node2D:
+	for group: String in ["units", "buildings", "animals"]:
+		for node: Node in get_tree().get_nodes_in_group(group):
+			if String(node.name) == target_name:
+				return node as Node2D
+	return null
+
+func _exec_move(command: Dictionary) -> void:
+	var actors: Array[UnitBase] = _resolve_actors(command)
+	if actors.is_empty():
+		return
+	var target: Vector2 = command["target"]
+	var cells: Array[Vector2i] = []
+	if GameManager.pathfinder != null:
+		cells = GameManager.pathfinder.formation_cells(target, actors.size())
+	for i in range(actors.size()):
+		var spot: Vector2 = target
+		if i < cells.size():
+			spot = Constants.grid_to_world(cells[i].x, cells[i].y)
+		actors[i].move_to(spot)
+
+func _exec_gather(command: Dictionary) -> void:
+	var mover_names: Array = []
+	for unit: UnitBase in _resolve_actors(command):
+		if unit.can_gather:
+			unit.command_gather(command["cell"])
+		else:
+			mover_names.append(String(unit.name))
+	if not mover_names.is_empty():
+		var cell: Vector2i = command["cell"]
+		_exec_move({
+			"type": "move", "player_id": command["player_id"],
+			"actor_names": mover_names,
+			"target": Constants.grid_to_world(cell.x, cell.y),
+		})
+
+func _exec_attack(command: Dictionary) -> void:
+	var target: Node2D = _resolve_target(command["target_name"])
+	if target == null:
+		return
+	# You cannot attack your own things (animals carry no player_id and stay
+	# attackable — `get()` returns null for them).
+	var target_owner: Variant = target.get("player_id")
+	if target_owner != null and int(target_owner) == int(command["player_id"]):
+		return
+	for unit: UnitBase in _resolve_actors(command):
+		unit.command_attack(target)
+
+func _exec_train(command: Dictionary) -> void:
+	var building: Building = _resolve_target(command["building_name"]) as Building
+	if building == null or building.player_id != int(command["player_id"]):
+		return
+	building.queue_train(command["unit_type"])
