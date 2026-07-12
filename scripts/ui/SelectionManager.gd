@@ -174,6 +174,8 @@ func _select_unit(unit: Node2D) -> void:
 	EventBus.selection_changed.emit()
 
 # Right-click / command tap: attack enemies, gather resources, else move.
+# Selection is purely local; only the resulting ORDER goes through the
+# CommandRouter (which is the multiplayer seam).
 func _command_at(screen_pos: Vector2) -> void:
 	# filter() returns an untyped Array; assign() converts it back into the
 	# typed Array[Node2D] (a plain `=` would fail at runtime).
@@ -182,43 +184,30 @@ func _command_at(screen_pos: Vector2) -> void:
 		return
 
 	var world_pos: Vector2 = _screen_to_world(screen_pos)
+	var names: Array = selected_units.map(
+		func(u: Node2D) -> String: return String(u.name))
 
 	var enemy: Node2D = _pick_enemy(screen_pos)
 	if enemy != null:
-		for unit: Node2D in selected_units:
-			if unit.has_method("command_attack"):
-				unit.command_attack(enemy)
+		CommandRouter.submit({
+			"type": "attack", "player_id": GameManager.LOCAL_PLAYER_ID,
+			"actor_names": names, "target_name": String(enemy.name),
+		})
 		return
 
 	var cell: Vector2i = Constants.world_to_grid(world_pos)
 	if not GameManager.world.get_resource_at(cell).is_empty():
-		var movers: Array[Node2D] = []
-		for unit: Node2D in selected_units:
-			if unit.get("can_gather") and unit.has_method("command_gather"):
-				unit.command_gather(cell)
-			else:
-				movers.append(unit)
-		if movers.is_empty():
-			return
-		_move_in_formation(movers, world_pos)
+		CommandRouter.submit({
+			"type": "gather", "player_id": GameManager.LOCAL_PLAYER_ID,
+			"actor_names": names, "cell": cell,
+		})
 		return
 
-	_move_in_formation(selected_units, world_pos)
+	CommandRouter.submit({
+		"type": "move", "player_id": GameManager.LOCAL_PLAYER_ID,
+		"actor_names": names, "target": world_pos,
+	})
 	EventBus.units_commanded_move.emit(selected_units, world_pos)
-
-func _move_in_formation(units: Array[Node2D], world_pos: Vector2) -> void:
-	var cells: Array[Vector2i] = []
-	if GameManager.pathfinder != null:
-		cells = GameManager.pathfinder.formation_cells(world_pos, units.size())
-
-	for i in range(units.size()):
-		var unit: Node2D = units[i]
-		if not unit.has_method("move_to"):
-			continue
-		var target: Vector2 = world_pos
-		if i < cells.size():
-			target = Constants.grid_to_world(cells[i].x, cells[i].y)
-		unit.move_to(target)
 
 func clear_selection() -> void:
 	_deselect_all()
