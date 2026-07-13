@@ -53,10 +53,10 @@ func connect_to_gateway(url: String) -> Error:
 	return OK
 
 func create_room() -> void:
-	_create_room.rpc_id(1)
+	_create_room.rpc_id(1, Net.PROTOCOL_VERSION)
 
 func join_room(code: String) -> void:
-	_join_room.rpc_id(1, code.strip_edges().to_upper())
+	_join_room.rpc_id(1, code.strip_edges().to_upper(), Net.PROTOCOL_VERSION)
 
 func start_match() -> void:
 	_start_match.rpc_id(1)
@@ -64,10 +64,12 @@ func start_match() -> void:
 # --- Gateway side ---
 
 @rpc("any_peer", "call_remote", "reliable")
-func _create_room() -> void:
+func _create_room(proto_version: int = 0) -> void:
 	if Net.mode != Net.Mode.GATEWAY:
 		return
 	var sender: int = multiplayer.get_remote_sender_id()
+	if not _version_ok(sender, proto_version):
+		return
 	_leave_current_room(sender)
 	var code: String = _new_code()
 	_rooms[code] = {"peers": [sender], "started": false}
@@ -76,10 +78,12 @@ func _create_room() -> void:
 	_broadcast_room(code)
 
 @rpc("any_peer", "call_remote", "reliable")
-func _join_room(code: String) -> void:
+func _join_room(code: String, proto_version: int = 0) -> void:
 	if Net.mode != Net.Mode.GATEWAY:
 		return
 	var sender: int = multiplayer.get_remote_sender_id()
+	if not _version_ok(sender, proto_version):
+		return
 	if not _rooms.has(code):
 		_error.rpc_id(sender, "room %s not found" % code)
 		return
@@ -145,6 +149,12 @@ func _spawn_match(port: int, match_seed: int, tokens: PackedStringArray) -> int:
 		"--players=%d" % tokens.size(), "--seed=%d" % match_seed,
 		"--tokens=%s" % ",".join(tokens)])
 	return OS.create_process(exe, args)
+
+func _version_ok(sender: int, proto_version: int) -> bool:
+	if proto_version == Net.PROTOCOL_VERSION:
+		return true
+	_error.rpc_id(sender, "version mismatch - please refresh the page")
+	return false
 
 func _on_peer_disconnected(peer_id: int) -> void:
 	_leave_current_room(peer_id)

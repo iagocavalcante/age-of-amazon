@@ -11,9 +11,11 @@ extends Node
 # servers (no game world at all).
 enum Mode { OFFLINE, SERVER, CLIENT, GATEWAY }
 
-# Bump whenever the command schema or replication contract changes; clients
-# with a stale build get a clear "refresh" error instead of silent desyncs.
-const PROTOCOL_VERSION: int = 1
+# Bump whenever the command schema or any RPC signature changes; peers with
+# a stale build get a clear "refresh" error instead of silently dropped RPCs
+# (an argument-count mismatch makes Godot discard the call without a trace —
+# this bit us in production between two builds of the lobby protocol).
+const PROTOCOL_VERSION: int = 2
 
 signal match_config_received
 signal join_refused(reason: String)
@@ -24,12 +26,11 @@ var mode: Mode = Mode.OFFLINE
 var peer_players: Dictionary = {}
 var expected_players: int = 2
 
-# Match servers tear themselves down so the gateway never tracks pids:
-# quit after EMPTY_SHUTDOWN_SECS with no peers (once somebody had joined),
-# or GAME_OVER_SHUTDOWN_SECS after the match ends.
+# Match servers tear themselves down so the gateway never tracks pids: quit
+# after EMPTY_SHUTDOWN_SECS with no peers connected (which also reaps matches
+# nobody ever joined), or GAME_OVER_SHUTDOWN_SECS after the match ends.
 const EMPTY_SHUTDOWN_SECS: float = 60.0
 const GAME_OVER_SHUTDOWN_SECS: float = 30.0
-var _had_peers: bool = false
 var _shutdown_accum: float = 0.0
 
 # Set by the lobby flow before switching to the match scene; Main's client
@@ -98,7 +99,6 @@ func reset(status: String = "") -> void:
 	pending_match_url = ""
 	pending_token = ""
 	peer_players.clear()
-	_had_peers = false
 	_shutdown_accum = 0.0
 	GameManager.world = null
 	GameManager.pathfinder = null
@@ -128,7 +128,7 @@ func _on_connection_failed() -> void:
 func _process(delta: float) -> void:
 	if mode != Mode.SERVER:
 		return
-	var idle: bool = (_had_peers and peer_players.is_empty()) \
+	var idle: bool = peer_players.is_empty() \
 		or GameManager.state == GameManager.GameState.GAME_OVER
 	if not idle:
 		_shutdown_accum = 0.0
@@ -221,7 +221,6 @@ func _client_hello(proto_version: int, token: String = "") -> void:
 				if multiplayer.get_peers().has(old_peer):
 					multiplayer.multiplayer_peer.disconnect_peer(old_peer)
 	peer_players[sender] = slot
-	_had_peers = true
 	print("[net] player %d joined (peer %d)" % [slot, sender])
 	_match_config.rpc_id(sender, GameManager.map_seed, expected_players, slot)
 
