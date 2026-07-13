@@ -36,6 +36,12 @@ func _ready() -> void:
 	multiplayer.connected_to_server.connect(_on_gateway_connected)
 	multiplayer.connection_failed.connect(
 		func() -> void: _set_status("Could not reach the gateway."))
+	multiplayer.server_disconnected.connect(_on_gateway_lost)
+
+	# Why the previous session ended (disconnect, refusal, ...).
+	if Net.last_status != "":
+		_set_status(Net.last_status)
+		Net.last_status = ""
 
 func _should_skip_menu(args: PackedStringArray) -> bool:
 	for arg: String in args:
@@ -160,12 +166,18 @@ func _on_room_updated(code: String, player_count: int, my_slot: int) -> void:
 	_start_button.disabled = player_count < Gateway.MIN_PLAYERS
 	_set_status("Waiting for players…" if my_slot == 0 else "Waiting for the host to start…")
 
-func _on_match_ready(port: int) -> void:
+func _on_match_ready(port: int, token: String) -> void:
 	Net.pending_match_url = _match_url_template.replace("{port}", str(port))
+	Net.pending_token = token
 	get_tree().change_scene_to_file(MAIN_SCENE)
 
 func _on_gateway_error(reason: String) -> void:
 	_set_status(reason)
+
+func _on_gateway_lost() -> void:
+	_connected = false
+	_lobby_panel.visible = false
+	_set_status("Lost connection to the gateway.")
 
 func _set_status(text: String) -> void:
 	_status.text = text

@@ -27,6 +27,20 @@ var fog: FogOfWar = null
 # Per-player resource stockpiles: player_id -> {ResourceType -> int}
 var stockpiles: Array[Dictionary] = []
 
+# Match-server only: per-tribe fog knowledge (index = player_id), refreshed
+# by Replication. Empty everywhere else.
+var player_visions: Array[PlayerVision] = []
+
+# Has this tribe scouted the cell? Uses the server-side visions when they
+# exist, the local fog renderer otherwise; defaults to yes so single-player
+# behavior without fog stays permissive.
+func has_explored(player_id: int, cell: Vector2i) -> bool:
+	if player_id >= 0 and player_id < player_visions.size():
+		return player_visions[player_id].is_explored(cell)
+	if fog != null and player_id == local_player_id:
+		return fog.is_explored(cell)
+	return true
+
 func _ready() -> void:
 	if map_seed == 0:
 		map_seed = randi()

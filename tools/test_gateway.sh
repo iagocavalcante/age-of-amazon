@@ -57,4 +57,8 @@ if [ "$(grep -hc "config OK" "$DIR"/host.log "$DIR"/join.log | paste -sd+ - | bc
   echo "RESULT: INCOMPLETE (logs in $DIR)"
   exit 1
 fi
+if ! grep -q "stranger-refused OK" "$DIR/host.log"; then
+  echo "RESULT: INCOMPLETE (no stranger-refused verdict; logs in $DIR)"
+  exit 1
+fi
 echo "RESULT: OK"

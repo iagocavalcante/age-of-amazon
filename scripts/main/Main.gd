@@ -102,6 +102,9 @@ func _boot_server(args: PackedStringArray) -> void:
 	if seed_arg != 0:
 		GameManager.map_seed = seed_arg
 	GameManager.reset_players(players)
+	var tokens: String = _arg_value(args, "--tokens=")
+	if tokens != "":
+		Net.slot_tokens = tokens.split(",")
 
 	if Net.host(port, players) != OK:
 		push_error("[net] failed to bind port %d" % port)
@@ -112,7 +115,9 @@ func _boot_server(args: PackedStringArray) -> void:
 	$UILayer.queue_free()
 	chunk_manager.setup(camera, doodads)
 
+	GameManager.player_visions.clear()
 	for pid in range(players):
+		GameManager.player_visions.append(PlayerVision.new(pid))
 		var origin: Vector2i = WorldGen.PLAYER_ORIGINS[pid]
 		_place_building("town_center", pid, origin + Vector2i(-1, -1))
 		for cell: Vector2i in [Vector2i(2, 2), Vector2i(0, 3), Vector2i(3, 0)]:
@@ -193,12 +198,14 @@ func _run_move_test() -> void:
 # config handshake completes.
 func _run_gw_test(args: PackedStringArray, is_host: bool) -> void:
 	$EnemyAI.queue_free()
+	Net.auto_return_to_menu = false
 	var role: String = "host" if is_host else "join"
 	var updates: Array = []
 	var ports: Array = []
 	Gateway.room_updated.connect(func(code: String, count: int, slot: int) -> void:
 		updates.append([code, count, slot]))
-	Gateway.match_ready.connect(func(port: int) -> void: ports.append(port))
+	Gateway.match_ready.connect(func(port: int, token: String) -> void:
+		ports.append([port, token]))
 
 	var connected: Array = [false]
 	multiplayer.connected_to_server.connect(
@@ -233,12 +240,23 @@ func _run_gw_test(args: PackedStringArray, is_host: bool) -> void:
 		print("[test-gw] %s match-ready FAILED" % role)
 		get_tree().quit(1)
 		return
-	print("[test-gw] %s match port=%d" % [role, ports[0]])
+	print("[test-gw] %s match port=%d" % [role, ports[0][0]])
+
+	# A stranger without a seat token must be refused.
+	if is_host:
+		var refused: Array = [false]
+		Net.join_refused.connect(
+			func(_r: String) -> void: refused[0] = true, CONNECT_ONE_SHOT)
+		Net.pending_token = "not-a-real-token"
+		Net.join("ws://127.0.0.1:%d" % ports[0][0])
+		await _until(func() -> bool: return refused[0], 10.0)
+		print("[test-gw] stranger-refused ", "OK" if refused[0] else "FAILED")
 
 	var got_config: Array = [false]
 	Net.match_config_received.connect(
 		func() -> void: got_config[0] = true, CONNECT_ONE_SHOT)
-	Net.join("ws://127.0.0.1:%d" % ports[0])
+	Net.pending_token = ports[0][1]
+	Net.join("ws://127.0.0.1:%d" % ports[0][0])
 	await _until(func() -> bool: return got_config[0], 10.0)
 	print("[test-gw] %s config %s me=%d" % [
 		role, "OK" if got_config[0] else "FAILED", GameManager.local_player_id])
@@ -254,6 +272,7 @@ func _until(condition: Callable, timeout: float) -> void:
 # proves the snapshot lands, a command round-trips through the server and the
 # unit's replicated position moves, and foreign units can't be commanded.
 func _run_mp_client_test() -> void:
+	Net.auto_return_to_menu = false
 	print("[test-mp] me=", GameManager.local_player_id)
 
 	var own_group: String = "player_%d" % GameManager.local_player_id

@@ -77,7 +77,10 @@ func open() -> void:
 	_return_paused = get_tree().paused
 	_fit_to_viewport()
 	visible = true
-	get_tree().paused = true
+	# In multiplayer the overlay can't pause the server, so don't pause the
+	# local tree either — the match keeps rendering behind the help.
+	if Net.mode != Net.Mode.CLIENT:
+		get_tree().paused = true
 
 func close() -> void:
 	if not visible:

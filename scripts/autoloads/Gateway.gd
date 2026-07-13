@@ -18,7 +18,7 @@ const MATCH_BOOT_GRACE: float = 2.0
 
 # Client-side signals for the menu UI.
 signal room_updated(code: String, player_count: int, my_slot: int)
-signal match_ready(port: int)
+signal match_ready(port: int, token: String)
 signal gateway_error(reason: String)
 
 # Gateway side: code -> {"peers": Array[int], "started": bool}
@@ -116,7 +116,12 @@ func _start_match() -> void:
 	var port: int = _next_match_port
 	_next_match_port += 1
 	var match_seed: int = int(_rng.randi())
-	var pid: int = _spawn_match(port, room["peers"].size(), match_seed)
+	# One secret per seat: the match server only seats holders of these, and
+	# a reconnecting player re-claims exactly their old tribe.
+	var tokens: PackedStringArray = PackedStringArray()
+	for _i in range(room["peers"].size()):
+		tokens.append("%08x%08x" % [_rng.randi(), _rng.randi()])
+	var pid: int = _spawn_match(port, match_seed, tokens)
 	if pid < 0:
 		room["started"] = false
 		_error.rpc_id(sender, "could not start match server")
@@ -126,16 +131,17 @@ func _start_match() -> void:
 
 	# Give the match process a moment to bind before clients dial in.
 	await get_tree().create_timer(MATCH_BOOT_GRACE).timeout
-	for peer: int in room["peers"]:
-		_match_ready.rpc_id(peer, port)
+	for i in range(room["peers"].size()):
+		_match_ready.rpc_id(room["peers"][i], port, tokens[i])
 
-func _spawn_match(port: int, players: int, match_seed: int) -> int:
+func _spawn_match(port: int, match_seed: int, tokens: PackedStringArray) -> int:
 	var exe: String = OS.get_executable_path()
 	var args: PackedStringArray = ["--headless"]
 	if OS.has_feature("editor"):
 		args.append_array(["--path", ProjectSettings.globalize_path("res://")])
 	args.append_array(["++", "--server", "--port=%d" % port,
-		"--players=%d" % players, "--seed=%d" % match_seed])
+		"--players=%d" % tokens.size(), "--seed=%d" % match_seed,
+		"--tokens=%s" % ",".join(tokens)])
 	return OS.create_process(exe, args)
 
 func _on_peer_disconnected(peer_id: int) -> void:
@@ -175,8 +181,8 @@ func _room_update(code: String, player_count: int, my_slot: int) -> void:
 	room_updated.emit(code, player_count, my_slot)
 
 @rpc("authority", "call_remote", "reliable")
-func _match_ready(port: int) -> void:
-	match_ready.emit(port)
+func _match_ready(port: int, token: String) -> void:
+	match_ready.emit(port, token)
 
 @rpc("authority", "call_remote", "reliable")
 func _error(reason: String) -> void:

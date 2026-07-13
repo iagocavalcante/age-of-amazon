@@ -1,0 +1,55 @@
+name: tests
+
+on:
+  push:
+    branches: [main, feature/multiplayer]
+  pull_request:
+
+jobs:
+  harnesses:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GODOT_VERSION: 4.5.1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Godot
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: ~/godot
+          key: godot-${{ env.GODOT_VERSION }}-linux
+
+      - name: Download Godot
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot
+          curl -sSL -o /tmp/godot.zip \
+            "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d ~/godot
+          mv ~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64 ~/godot/godot
+          chmod +x ~/godot/godot
+
+      - name: Import project (class cache)
+        run: ~/godot/godot --headless --path . --import || true
+
+      - name: Offline harnesses
+        run: |
+          set -e
+          G=~/godot/godot
+          $G --headless --path . ++ --test-commands 2>&1 | tee /tmp/commands.log
+          grep -c " OK" /tmp/commands.log | grep -q "^4$"
+          $G --headless --path . ++ --test-victory 2>&1 | tee /tmp/victory.log
+          grep -c " OK" /tmp/victory.log | grep -q "^2$"
+          $G --headless --path . ++ --test-systems 2>&1 | tee /tmp/systems.log
+          grep -c " OK" /tmp/systems.log | grep -q "^6$"
+
+      - name: Multiplayer harness (2 players)
+        run: GODOT=~/godot/godot bash tools/test_mp.sh
+
+      - name: Multiplayer harness (4 players)
+        run: GODOT=~/godot/godot PLAYERS=4 PORT=9111 bash tools/test_mp.sh
+
+      - name: Gateway lobby harness
+        run: GODOT=~/godot/godot bash tools/test_gateway.sh

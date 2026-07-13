@@ -25,7 +25,8 @@ func _submit_to_server(command: Dictionary) -> void:
 	# Identity comes from the connection, never from the payload — a client
 	# cannot command another tribe's units no matter what it sends.
 	command["player_id"] = Net.peer_players[sender]
-	print("[cmd] p%s %s" % [command["player_id"], command.get("type", "?")])
+	if OS.is_stdout_verbose():
+		print("[cmd] p%s %s" % [command["player_id"], command.get("type", "?")])
 	_validate_and_execute(command)
 
 func _validate_and_execute(command: Dictionary) -> void:

@@ -11,13 +11,18 @@ extends Node
 # Identity/authority: everything in this file flows server -> client except
 # _client_world_ready.
 
-const SYNC_INTERVAL: float = 0.1  # 10 Hz state ticks
+const SYNC_INTERVAL: float = 0.1     # 10 Hz state ticks
+const VISION_INTERVAL: float = 1.0   # server-side per-player fog refresh
 
 var _unit_scene: PackedScene = preload("res://scenes/units/Unit.tscn")
 
 # Server: peers that finished building their world (receive events + ticks).
 var _live_peers: Array[int] = []
 var _accum: float = 0.0
+var _vision_accum: float = VISION_INTERVAL  # first update on the first frame
+# Server: every cell whose resource ran out, so late (re)joiners don't see
+# ghost trees from the initial seed generation.
+var _depleted_cells: Array[Vector2i] = []
 
 # Client: name -> entity, so ticks don't scan groups.
 var _entities: Dictionary = {}
@@ -25,6 +30,11 @@ var _first_tick_logged: bool = false
 
 func _ready() -> void:
 	EventBus.world_ready.connect(_on_world_ready)
+
+# Called by Net.reset() so a later match starts from a clean slate.
+func reset_client() -> void:
+	_entities.clear()
+	_first_tick_logged = false
 
 func _on_world_ready() -> void:
 	match Net.mode:
@@ -52,6 +62,8 @@ func _client_world_ready() -> void:
 		_spawn_building.rpc_id(sender, _building_data(node as Building))
 	for node: Node in get_tree().get_nodes_in_group("units"):
 		_spawn_unit.rpc_id(sender, _unit_data(node as UnitBase))
+	for cell: Vector2i in _depleted_cells:
+		_deplete_resource.rpc_id(sender, cell)
 	GameManager.push_stockpile_to_peer(sender)
 	print("[net] snapshot sent to player %d" % Net.peer_players[sender])
 
@@ -68,35 +80,64 @@ func _on_entity_gone(entity: Node2D) -> void:
 		_despawn.rpc_id(peer, String(entity.name))
 
 func _on_resource_depleted(cell: Vector2i) -> void:
+	_depleted_cells.append(cell)
 	for peer: int in _live_peers:
 		_deplete_resource.rpc_id(peer, cell)
 
 func _process(delta: float) -> void:
-	if Net.mode != Net.Mode.SERVER or _live_peers.is_empty():
+	if Net.mode != Net.Mode.SERVER:
+		return
+
+	# Per-player fog on the server: powers gather-retarget parity with
+	# offline play and filters enemy positions out of the state ticks.
+	_vision_accum += delta
+	if _vision_accum >= VISION_INTERVAL and GameManager.world != null:
+		_vision_accum = 0.0
+		for vision: PlayerVision in GameManager.player_visions:
+			vision.update(get_tree(), GameManager.world)
+			vision.changed_chunks.clear()
+
+	if _live_peers.is_empty():
 		return
 	_accum += delta
 	if _accum < SYNC_INTERVAL:
 		return
 	_accum = 0.0
 
-	var unit_states: Array = []
+	var units: Array[UnitBase] = []
 	for node: Node in get_tree().get_nodes_in_group("units"):
 		var unit: UnitBase = node as UnitBase
 		if unit != null:
-			unit_states.append([String(unit.name), unit.global_position.x,
-				unit.global_position.y, unit.velocity.x, unit.velocity.y,
-				unit.current_hp, unit.current_state])
+			units.append(unit)
 	var building_states: Array = []
 	for node: Node in get_tree().get_nodes_in_group("buildings"):
 		var building: Building = node as Building
 		if building != null:
 			building_states.append([String(building.name), building.current_hp,
 				building.train_queue.duplicate(), building.train_progress])
+
 	for peer: int in _live_peers:
+		var player_id: int = Net.peer_players.get(peer, -1)
+		var unit_states: Array = []
+		for unit: UnitBase in units:
+			# A tribe receives live state for its own units and for enemies
+			# inside its vision. Everything else stays frozen at last-known —
+			# which local fog hides anyway — so a modified client can't track
+			# live positions through the fog.
+			if unit.player_id != player_id and not _visible_to(player_id, unit):
+				continue
+			unit_states.append([String(unit.name), unit.global_position.x,
+				unit.global_position.y, unit.velocity.x, unit.velocity.y,
+				unit.current_hp, unit.current_state])
 		_tick.rpc_id(peer, unit_states, building_states)
 	if not _first_tick_logged:
 		_first_tick_logged = true
-		print("[net] state ticks flowing (%d units)" % unit_states.size())
+		print("[net] state ticks flowing (%d units)" % units.size())
+
+func _visible_to(player_id: int, unit: UnitBase) -> bool:
+	if player_id < 0 or player_id >= GameManager.player_visions.size():
+		return true
+	return GameManager.player_visions[player_id].can_see_entity(unit)
 
 func _building_data(building: Building) -> Dictionary:
 	return {

@@ -23,6 +23,7 @@ var _minimap_image: Image
 
 var _game_over: Control
 var _game_over_label: Label
+var _restart_button: Button
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -41,6 +42,10 @@ func _ready() -> void:
 	EventBus.training_queued.connect(func(_b: Node2D, _t: String) -> void: _refresh_selection_panel())
 	EventBus.training_completed.connect(func(_b: Node2D, _t: String) -> void: _refresh_selection_panel())
 	EventBus.game_over.connect(_on_game_over)
+	# Pausing is meaningless in multiplayer — the server marches on. Mode is
+	# only known after Main's boot, so decide at world_ready.
+	EventBus.world_ready.connect(func() -> void:
+		_pause_button.visible = Net.mode != Net.Mode.CLIENT)
 
 	var timer: Timer = Timer.new()
 	timer.wait_time = REFRESH_INTERVAL
@@ -357,21 +362,25 @@ func _build_game_over() -> void:
 	_game_over_label.add_theme_font_size_override("font_size", 28)
 	box.add_child(_game_over_label)
 
-	var restart: Button = Button.new()
-	restart.text = "Play Again"
-	restart.focus_mode = Control.FOCUS_NONE
-	restart.pressed.connect(_on_restart_pressed)
-	box.add_child(restart)
+	_restart_button = Button.new()
+	_restart_button.text = "Play Again"
+	_restart_button.focus_mode = Control.FOCUS_NONE
+	_restart_button.pressed.connect(_on_restart_pressed)
+	box.add_child(_restart_button)
 
 func _on_game_over(winner_player_id: int) -> void:
 	get_tree().paused = true
 	_game_over_label.text = "Victory!" if winner_player_id == GameManager.local_player_id else "Defeat"
+	_restart_button.text = "Back to Menu" if Net.mode == Net.Mode.CLIENT else "Play Again"
 	_game_over.visible = true
 
 func _on_restart_pressed() -> void:
 	get_tree().paused = false
 	_game_over.visible = false
 	SelectionManager.clear_selection()
+	if Net.mode == Net.Mode.CLIENT:
+		Net.back_to_menu()
+		return
 	GameManager.map_seed = randi()
 	GameManager.world = null
 	GameManager.pathfinder = null
