@@ -1,5 +1,19 @@
 # Deploying Multiplayer
 
+> **Current deployment (2026-07-13):** live on the `ssh-tron` box
+> (ssh.iagocavalcante.com, Ubuntu 22.04) WITHOUT root: user systemd services
+> `aoa-gateway` (gateway :9000, matches 9100+) and `aoa-proxy` (user-space
+> Caddy from `~/bin/caddy`, plain HTTP :8081 doing `/ws` + `/m/<port>`
+> routing), linger enabled so both survive reboots. Binary + Caddyfile live
+> in `~tron/age-of-amazon/`. The box's cloudflared tunnel is token-managed,
+> so the ONE remaining step is in the Cloudflare Zero Trust dashboard: add a
+> public hostname (e.g. `game.iagocavalcante.com`) on tunnel
+> `iagocavalcante-local` pointing at `http://localhost:8081`, then set
+> `server_config.json` to `wss://game.iagocavalcante.com/ws` /
+> `wss://game.iagocavalcante.com/m/{port}` and re-export the web build.
+> The generic runbook below describes the root-based layout for a dedicated
+> VPS; adapt as needed.
+
 One small VPS runs everything: a **gateway** process (lobby, room codes) that
 spawns one **match server** process per room. Browser clients need WSS, so
 Caddy terminates TLS and path-routes to the local ports.
