@@ -112,8 +112,17 @@ func is_authority() -> bool:
 func is_headless_server() -> bool:
 	return mode == Mode.SERVER or mode == Mode.GATEWAY
 
+# Generous socket buffers: the join snapshot is a burst of reliable RPCs, and
+# a browser tab that loses focus stops draining its queue — overflow drops
+# packets (including reliable ones), which is a permanent desync.
+static func _configure_ws(peer: WebSocketMultiplayerPeer) -> void:
+	peer.inbound_buffer_size = 256 * 1024
+	peer.outbound_buffer_size = 256 * 1024
+	peer.max_queued_packets = 4096
+
 func host(port: int, players: int) -> Error:
 	var peer := WebSocketMultiplayerPeer.new()
+	_configure_ws(peer)
 	var err: Error = peer.create_server(port)
 	if err != OK:
 		return err
@@ -126,6 +135,7 @@ func host(port: int, players: int) -> Error:
 
 func join(url: String) -> Error:
 	var peer := WebSocketMultiplayerPeer.new()
+	_configure_ws(peer)
 	var err: Error = peer.create_client(url)
 	if err != OK:
 		return err

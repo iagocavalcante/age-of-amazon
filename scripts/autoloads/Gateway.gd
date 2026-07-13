@@ -31,6 +31,7 @@ func host(port: int, match_port_base: int) -> Error:
 	_rng.randomize()
 	_next_match_port = match_port_base
 	var peer := WebSocketMultiplayerPeer.new()
+	Net._configure_ws(peer)
 	var err: Error = peer.create_server(port)
 	if err != OK:
 		return err
@@ -44,6 +45,7 @@ func host(port: int, match_port_base: int) -> Error:
 # peer via Net.join).
 func connect_to_gateway(url: String) -> Error:
 	var peer := WebSocketMultiplayerPeer.new()
+	Net._configure_ws(peer)
 	var err: Error = peer.create_client(url)
 	if err != OK:
 		return err

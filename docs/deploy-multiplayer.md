@@ -86,7 +86,18 @@ Set these before exporting the Web build; the local-dev defaults are
 `ws://127.0.0.1:9000` / `ws://127.0.0.1:{port}`. The Web deploy itself is
 unchanged (export preset "Web" → `build/web` → `gh-pages`).
 
-## 5. Local smoke tests
+## 5. Browser caveats
+
+- A backgrounded/occluded tab throttles `requestAnimationFrame`, freezing the
+  Godot loop: the world stops updating and inbound packets queue up. The
+  WebSocket buffers (256 KB / 4096 packets) absorb a few minutes of this;
+  beyond that, packets drop and the client desyncs — rejoining the match
+  (fresh snapshot) recovers. Verified: an occluded tab shows exactly
+  "Buffer payload full! Dropping data." in the console.
+- Browsers on HTTPS pages require `wss://` — set both URLs in
+  `server_config.json` accordingly before exporting.
+
+## 6. Local smoke tests
 
 ```bash
 bash tools/test_mp.sh        # 1 match server + 2 scripted clients
