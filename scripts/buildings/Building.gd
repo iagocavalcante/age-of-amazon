@@ -49,6 +49,7 @@ func setup(p_type: String, p_player_id: int, base_cell: Vector2i) -> void:
 	add_to_group("player_%d" % player_id)
 
 func _ready() -> void:
+	EventBus.entity_spawned.emit(self)
 	# Presentation is client-side only; the headless server keeps _sprite and
 	# _health_bar null and every visual path checks for that.
 	if Net.is_headless_server():
@@ -145,6 +146,15 @@ func _die() -> void:
 		if alive.size() == 1:
 			GameManager.end_game(alive[0])
 	queue_free()
+
+# Multiplayer client: server state ticks land here (the building never
+# simulates locally — _process is authority-gated).
+func net_apply(hp: int, queue: Array, progress: float) -> void:
+	if hp != current_hp:
+		current_hp = hp
+		_update_health_bar()
+	train_queue.assign(queue)
+	train_progress = progress
 
 func body_radius() -> float:
 	return 44.0

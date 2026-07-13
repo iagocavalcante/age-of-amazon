@@ -114,11 +114,11 @@ func _icon_rect(texture: Texture2D) -> TextureRect:
 
 func _refresh_top_bar() -> void:
 	for type: int in _resource_labels:
-		_resource_labels[type].text = str(GameManager.get_resource(GameManager.LOCAL_PLAYER_ID, type))
-	_pop_label.text = "%d/%d" % [GameManager.get_population(GameManager.LOCAL_PLAYER_ID), Constants.POPULATION_CAP]
+		_resource_labels[type].text = str(GameManager.get_resource(GameManager.local_player_id, type))
+	_pop_label.text = "%d/%d" % [GameManager.get_population(GameManager.local_player_id), Constants.POPULATION_CAP]
 
 func _on_resources_changed(player_id: int) -> void:
-	if player_id == GameManager.LOCAL_PLAYER_ID:
+	if player_id == GameManager.local_player_id:
 		_refresh_top_bar()
 
 # --- Selection / training panel ---
@@ -167,7 +167,7 @@ func _train(unit_type: String) -> void:
 	if building == null or not is_instance_valid(building):
 		return
 	CommandRouter.submit({
-		"type": "train", "player_id": GameManager.LOCAL_PLAYER_ID,
+		"type": "train", "player_id": GameManager.local_player_id,
 		"building_name": String(building.name), "unit_type": unit_type,
 	})
 	_refresh_selection_panel()
@@ -365,7 +365,7 @@ func _build_game_over() -> void:
 
 func _on_game_over(winner_player_id: int) -> void:
 	get_tree().paused = true
-	_game_over_label.text = "Victory!" if winner_player_id == GameManager.LOCAL_PLAYER_ID else "Defeat"
+	_game_over_label.text = "Victory!" if winner_player_id == GameManager.local_player_id else "Defeat"
 	_game_over.visible = true
 
 func _on_restart_pressed() -> void:

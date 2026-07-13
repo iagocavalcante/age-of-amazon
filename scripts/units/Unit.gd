@@ -98,10 +98,13 @@ func _ready() -> void:
 		_update_health_bar()
 
 	EventBus.population_changed.emit(player_id)
+	EventBus.entity_spawned.emit(self)
 
 func _physics_process(delta: float) -> void:
 	if Net.is_authority():
 		_sim_step(delta)
+	elif Net.mode == Net.Mode.CLIENT:
+		_net_step(delta)
 	if not Net.is_headless_server():
 		_view_step(delta)
 
@@ -127,6 +130,32 @@ func _sim_step(delta: float) -> void:
 			_process_gathering(delta)
 		State.ATTACKING:
 			_process_attacking(delta)
+
+# Multiplayer client: the unit is a puppet — the server's 10 Hz state ticks
+# land in net_apply(), and _net_step eases the rendered position toward the
+# latest snapshot so movement looks continuous between ticks.
+
+const NET_SNAP_DISTANCE: float = 96.0
+const NET_LERP_RATE: float = 12.0
+
+var _net_pos: Vector2 = Vector2.ZERO
+
+func net_snap(world_pos: Vector2) -> void:
+	_net_pos = world_pos
+	global_position = world_pos
+
+func net_apply(world_pos: Vector2, net_velocity: Vector2, hp: int, state: int) -> void:
+	_net_pos = world_pos
+	velocity = net_velocity
+	current_state = state as State
+	if hp != current_hp:
+		current_hp = hp
+		_update_health_bar()
+	if global_position.distance_to(_net_pos) > NET_SNAP_DISTANCE:
+		global_position = _net_pos
+
+func _net_step(delta: float) -> void:
+	global_position = global_position.lerp(_net_pos, minf(1.0, delta * NET_LERP_RATE))
 
 # Presentation: derives animation purely from replicable state (velocity,
 # current_state), so a multiplayer client renders correctly from sync alone.

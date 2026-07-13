@@ -100,7 +100,7 @@ func _left_pick_building(screen_pos: Vector2) -> void:
 		return
 	var cell: Vector2i = Constants.world_to_grid(_screen_to_world(screen_pos))
 	var building: Node2D = GameManager.world.building_at(cell)
-	if building != null and building.get("player_id") == GameManager.LOCAL_PLAYER_ID:
+	if building != null and building.get("player_id") == GameManager.local_player_id:
 		selected_building = building
 		if building.has_method("select"):
 			building.select()
@@ -111,7 +111,7 @@ func _pick_own_unit(screen_pos: Vector2) -> Node2D:
 	var closest_unit: Node2D = null
 	var closest_dist: float = CLICK_PICK_RADIUS
 
-	for node: Node in get_tree().get_nodes_in_group("player_%d" % GameManager.LOCAL_PLAYER_ID):
+	for node: Node in get_tree().get_nodes_in_group("player_%d" % GameManager.local_player_id):
 		var unit: Node2D = node as Node2D
 		if unit == null or not unit.is_in_group("units"):
 			continue
@@ -135,7 +135,7 @@ func _pick_enemy(screen_pos: Vector2) -> Node2D:
 			var target: Node2D = node as Node2D
 			if target == null or not target.visible:
 				continue
-			if group == "units" and target.get("player_id") == GameManager.LOCAL_PLAYER_ID:
+			if group == "units" and target.get("player_id") == GameManager.local_player_id:
 				continue
 			var dist: float = target.global_position.distance_to(world_pos)
 			if dist < closest_dist:
@@ -146,7 +146,7 @@ func _pick_enemy(screen_pos: Vector2) -> Node2D:
 
 	# Enemy building on the clicked tile? (only if remembered/visible)
 	var building: Node2D = GameManager.world.building_at(Constants.world_to_grid(world_pos))
-	if building != null and building.get("player_id") != GameManager.LOCAL_PLAYER_ID and building.visible:
+	if building != null and building.get("player_id") != GameManager.local_player_id and building.visible:
 		return building
 	return null
 
@@ -158,7 +158,7 @@ func _box_select(start: Vector2, end: Vector2) -> void:
 	var world_end: Vector2 = _screen_to_world(end)
 	var rect: Rect2 = Rect2(world_start, world_end - world_start).abs()
 
-	for node: Node in get_tree().get_nodes_in_group("player_%d" % GameManager.LOCAL_PLAYER_ID):
+	for node: Node in get_tree().get_nodes_in_group("player_%d" % GameManager.local_player_id):
 		var unit: Node2D = node as Node2D
 		if unit == null or not unit.is_in_group("units"):
 			continue
@@ -190,7 +190,7 @@ func _command_at(screen_pos: Vector2) -> void:
 	var enemy: Node2D = _pick_enemy(screen_pos)
 	if enemy != null:
 		CommandRouter.submit({
-			"type": "attack", "player_id": GameManager.LOCAL_PLAYER_ID,
+			"type": "attack", "player_id": GameManager.local_player_id,
 			"actor_names": names, "target_name": String(enemy.name),
 		})
 		return
@@ -198,13 +198,13 @@ func _command_at(screen_pos: Vector2) -> void:
 	var cell: Vector2i = Constants.world_to_grid(world_pos)
 	if not GameManager.world.get_resource_at(cell).is_empty():
 		CommandRouter.submit({
-			"type": "gather", "player_id": GameManager.LOCAL_PLAYER_ID,
+			"type": "gather", "player_id": GameManager.local_player_id,
 			"actor_names": names, "cell": cell,
 		})
 		return
 
 	CommandRouter.submit({
-		"type": "move", "player_id": GameManager.LOCAL_PLAYER_ID,
+		"type": "move", "player_id": GameManager.local_player_id,
 		"actor_names": names, "target": world_pos,
 	})
 	EventBus.units_commanded_move.emit(selected_units, world_pos)

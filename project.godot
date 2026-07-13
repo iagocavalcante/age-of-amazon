@@ -24,6 +24,7 @@ SelectionManager="*res://scripts/ui/SelectionManager.gd"
 AssetLibrary="*res://scripts/autoloads/AssetLibrary.gd"
 Net="*res://scripts/autoloads/Net.gd"
 CommandRouter="*res://scripts/autoloads/CommandRouter.gd"
+Replication="*res://scripts/autoloads/Replication.gd"
 
 [display]
 

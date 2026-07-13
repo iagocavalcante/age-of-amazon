@@ -64,6 +64,11 @@ func toggle() -> void:
 		open()
 
 func open() -> void:
+	# The auto-open is deferred from _ready, which runs before Main decides
+	# the boot mode — so the dedicated-server guard must live here. A paused
+	# tree on the match server would freeze every tribe's simulation.
+	if Net.is_headless_server():
+		return
 	if visible or GameManager.state == GameManager.GameState.GAME_OVER:
 		return
 	GameManager.help_seen = true
@@ -267,7 +272,7 @@ func _add_unit(col: VBoxContainer, unit_type: String, desc: String) -> void:
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	var icon: TextureRect = TextureRect.new()
-	var frames: Array = AssetLibrary.get_unit_frames(GameManager.LOCAL_PLAYER_ID, unit_type)
+	var frames: Array = AssetLibrary.get_unit_frames(GameManager.local_player_id, unit_type)
 	if frames.size() > 0:
 		icon.texture = frames[0] as Texture2D
 	icon.custom_minimum_size = Vector2(46, 46)

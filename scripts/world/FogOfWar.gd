@@ -21,7 +21,9 @@ const VISIBLE_VALUE: int = 255
 const EXPLORED_VALUE: int = 140  # -> ~45% black in the shader
 
 var camera: Camera2D
-var vision: PlayerVision = PlayerVision.new(GameManager.LOCAL_PLAYER_ID)
+# Re-created in setup(): on multiplayer clients local_player_id is only known
+# after the match config arrives, which is later than this node's init.
+var vision: PlayerVision = PlayerVision.new(GameManager.local_player_id)
 
 var _rect: ColorRect
 var _material: ShaderMaterial
@@ -42,6 +44,7 @@ func _ready() -> void:
 
 func setup(p_camera: Camera2D) -> void:
 	camera = p_camera
+	vision = PlayerVision.new(GameManager.local_player_id)
 	GameManager.fog = self
 
 func _process(delta: float) -> void:
@@ -138,13 +141,13 @@ func _compose_window(world: WorldData) -> void:
 func _cull_entities() -> void:
 	for node: Node in get_tree().get_nodes_in_group("units"):
 		var unit: Node2D = node as Node2D
-		if unit == null or unit.get("player_id") == GameManager.LOCAL_PLAYER_ID:
+		if unit == null or unit.get("player_id") == GameManager.local_player_id:
 			continue
 		unit.visible = vision.can_see_entity(unit)
 
 	for node: Node in get_tree().get_nodes_in_group("buildings"):
 		var building: Building = node as Building
-		if building == null or building.player_id == GameManager.LOCAL_PLAYER_ID:
+		if building == null or building.player_id == GameManager.local_player_id:
 			continue
 		# Buildings can't move: once their ground is explored, remember them.
 		building.visible = vision.has_discovered_building(building)

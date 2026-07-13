@@ -103,7 +103,7 @@ func _known_player_target(tc: Building) -> Node2D:
 	# Discovered player buildings (remembered once seen — they can't move).
 	for node: Node in get_tree().get_nodes_in_group("buildings"):
 		var building: Building = node as Building
-		if building == null or building.player_id != GameManager.LOCAL_PLAYER_ID:
+		if building == null or building.player_id != GameManager.local_player_id:
 			continue
 		if vision.has_discovered_building(building):
 			return building
@@ -111,7 +111,7 @@ func _known_player_target(tc: Building) -> Node2D:
 	# Player units currently inside the AI's vision; nearest to home.
 	var best: Node2D = null
 	var best_dist: float = INF
-	for node: Node in get_tree().get_nodes_in_group("player_%d" % GameManager.LOCAL_PLAYER_ID):
+	for node: Node in get_tree().get_nodes_in_group("player_%d" % GameManager.local_player_id):
 		var unit: UnitBase = node as UnitBase
 		if unit == null or not vision.can_see_entity(unit):
 			continue

@@ -22,7 +22,7 @@ y_sort_enabled = true
 [node name="Doodads" type="Node2D" parent="World"]
 y_sort_enabled = true
 
-[node name="Buildings" type="Node2D" parent="World"]
+[node name="Buildings" type="Node2D" parent="World" groups=["building_container"]]
 y_sort_enabled = true
 
 [node name="Units" type="Node2D" parent="World" groups=["unit_container"]]

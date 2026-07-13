@@ -338,7 +338,7 @@ func _die(killer: Node2D) -> void:
 		if pid != null and int(pid) >= 0:
 			GameManager.add_resource(int(pid), Constants.ResourceType.FOOD, food_bounty)
 			EventBus.animal_hunted.emit(self, killer, food_bounty)
-			if int(pid) == GameManager.LOCAL_PLAYER_ID:
+			if int(pid) == GameManager.local_player_id:
 				_spawn_food_popup(food_bounty)
 
 	EventBus.animal_died.emit(self)

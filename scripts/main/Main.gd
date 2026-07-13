@@ -12,6 +12,51 @@ extends Node2D
 var unit_scene: PackedScene = preload("res://scenes/units/Unit.tscn")
 
 func _ready() -> void:
+	var args: PackedStringArray = OS.get_cmdline_user_args()
+
+	if "--server" in args:
+		_boot_server(args)
+	elif _arg_value(args, "--join=") != "":
+		await _boot_client(args)
+	else:
+		_boot_offline(args)
+
+	if "--test-move" in args:
+		_run_move_test()
+	if "--test-commands" in args:
+		_run_commands_test()
+	if "--test-mp-client" in args:
+		_run_mp_client_test()
+	if "--test-victory" in args:
+		_run_victory_test()
+	if "--test-systems" in args:
+		_run_systems_test()
+	if "--test-scout" in args:
+		_run_scout_test()
+	if "--test-hunt" in args:
+		_run_hunt_test()
+	if "--capture-help" in args:
+		_run_capture_help()
+	if "--capture-animals" in args:
+		_run_capture_animals()
+
+func _is_harness(args: PackedStringArray) -> bool:
+	for arg: String in args:
+		if arg.begins_with("--test") or arg.begins_with("--capture"):
+			return true
+	return false
+
+func _arg_value(args: PackedStringArray, prefix: String, fallback: String = "") -> String:
+	for arg: String in args:
+		if arg.begins_with(prefix):
+			return arg.trim_prefix(prefix)
+	return fallback
+
+# --- Boot modes ---
+
+# Single-player: this process is the authority; the classic asymmetric start
+# (player villagers vs AI warriors) and the EnemyAI opponent.
+func _boot_offline(args: PackedStringArray) -> void:
 	chunk_manager.setup(camera, doodads)
 
 	# Bases sit inside the guaranteed spawn clearings (see WorldGen).
@@ -32,35 +77,61 @@ func _ready() -> void:
 	EventBus.world_ready.emit()
 	GameManager.change_state(GameManager.GameState.RUNNING)
 
-	var args: PackedStringArray = OS.get_cmdline_user_args()
-
 	# Ambient wildlife runs in normal play; harnesses seed their own animals
 	# (or none) so the simulation stays deterministic.
 	if not _is_harness(args):
 		animals.setup(camera)
 
-	if "--test-move" in args:
-		_run_move_test()
-	if "--test-commands" in args:
-		_run_commands_test()
-	if "--test-victory" in args:
-		_run_victory_test()
-	if "--test-systems" in args:
-		_run_systems_test()
-	if "--test-scout" in args:
-		_run_scout_test()
-	if "--test-hunt" in args:
-		_run_hunt_test()
-	if "--capture-help" in args:
-		_run_capture_help()
-	if "--capture-animals" in args:
-		_run_capture_animals()
+# Headless authoritative match server: symmetric starts for N human tribes,
+# no EnemyAI, no wildlife, no rendering concerns.
+func _boot_server(args: PackedStringArray) -> void:
+	var port: int = int(_arg_value(args, "--port=", "9100"))
+	var players: int = clampi(int(_arg_value(args, "--players=", "2")), 2, WorldGen.PLAYER_ORIGINS.size())
+	var seed_arg: int = int(_arg_value(args, "--seed=", "0"))
+	if seed_arg != 0:
+		GameManager.map_seed = seed_arg
+	GameManager.reset_players(players)
 
-func _is_harness(args: PackedStringArray) -> bool:
-	for arg: String in args:
-		if arg.begins_with("--test") or arg.begins_with("--capture"):
-			return true
-	return false
+	if Net.host(port, players) != OK:
+		push_error("[net] failed to bind port %d" % port)
+		get_tree().quit(1)
+		return
+
+	$EnemyAI.queue_free()
+	$UILayer.queue_free()
+	chunk_manager.setup(camera, doodads)
+
+	for pid in range(players):
+		var origin: Vector2i = WorldGen.PLAYER_ORIGINS[pid]
+		_place_building("town_center", pid, origin + Vector2i(-1, -1))
+		for cell: Vector2i in [Vector2i(2, 2), Vector2i(0, 3), Vector2i(3, 0)]:
+			_spawn_unit("villager", pid, origin + cell)
+
+	chunk_manager.load_now()
+	EventBus.world_ready.emit()
+	GameManager.change_state(GameManager.GameState.RUNNING)
+
+# Multiplayer client: connect first, build the world from the replicated
+# seed once the match config arrives. Entities come from the server via the
+# spawners — nothing is spawned locally.
+func _boot_client(args: PackedStringArray) -> void:
+	$EnemyAI.queue_free()
+	if Net.join(_arg_value(args, "--join=")) != OK:
+		push_error("[net] failed to open connection")
+		get_tree().quit(1)
+		return
+	await Net.match_config_received
+
+	chunk_manager.setup(camera, doodads)
+	var origin: Vector2i = WorldGen.PLAYER_ORIGINS[GameManager.local_player_id]
+	camera.center_on(Constants.grid_to_world(origin.x, origin.y))
+	chunk_manager.load_now()
+
+	fog.setup(camera)
+	fog.force_update()
+
+	EventBus.world_ready.emit()
+	GameManager.change_state(GameManager.GameState.RUNNING)
 
 func _place_building(type: String, player_id: int, base_cell: Vector2i) -> Building:
 	var building: Building = Building.new()
@@ -92,6 +163,58 @@ func _run_move_test() -> void:
 	await get_tree().create_timer(3.0).timeout
 	for u: Node2D in SelectionManager.selected_units:
 		print("[test-move] unit after 3s: ", u.global_position, " state=", u.current_state)
+	get_tree().quit()
+
+# Multiplayer client harness (run with --join=ws://... by tools/test_mp.sh):
+# proves the snapshot lands, a command round-trips through the server and the
+# unit's replicated position moves, and foreign units can't be commanded.
+func _run_mp_client_test() -> void:
+	print("[test-mp] me=", GameManager.local_player_id)
+
+	var own_group: String = "player_%d" % GameManager.local_player_id
+	var deadline: float = 10.0
+	while deadline > 0.0 and get_tree().get_nodes_in_group(own_group).size() < 4:
+		await get_tree().create_timer(0.5).timeout
+		deadline -= 0.5
+	var mine: Array = get_tree().get_nodes_in_group(own_group).filter(
+		func(n: Node) -> bool: return n is UnitBase)
+	print("[test-mp] snapshot ", "OK" if mine.size() == 3 else "FAILED",
+		" units=", mine.size())
+	if mine.is_empty():
+		get_tree().quit(1)
+		return
+
+	var mover: UnitBase = mine[0]
+	var start: Vector2 = mover.global_position
+	var origin: Vector2i = WorldGen.PLAYER_ORIGINS[GameManager.local_player_id]
+	CommandRouter.submit({
+		"type": "move", "player_id": GameManager.local_player_id,
+		"actor_names": [String(mover.name)],
+		"target": Constants.grid_to_world(origin.x + 8, origin.y + 8),
+	})
+	await get_tree().create_timer(5.0).timeout
+	var moved: bool = mover.global_position.distance_to(start) > 40.0
+	print("[test-mp] move-sync ", "OK" if moved else "FAILED")
+
+	# Spoof a command for another tribe's unit; the server derives identity
+	# from the connection, so nothing may happen.
+	var other_id: int = (GameManager.local_player_id + 1) % GameManager.player_count
+	var theirs: Array = get_tree().get_nodes_in_group("player_%d" % other_id).filter(
+		func(n: Node) -> bool: return n is UnitBase)
+	if theirs.is_empty():
+		print("[test-mp] foreign-command FAILED (no foreign units replicated)")
+	else:
+		var victim: UnitBase = theirs[0]
+		var far: Vector2i = WorldGen.PLAYER_ORIGINS[other_id] + Vector2i(20, 20)
+		var before: Vector2 = victim.global_position
+		CommandRouter.submit({
+			"type": "move", "player_id": other_id,
+			"actor_names": [String(victim.name)],
+			"target": Constants.grid_to_world(far.x, far.y),
+		})
+		await get_tree().create_timer(4.0).timeout
+		var unmoved: bool = victim.global_position.distance_to(before) < 60.0
+		print("[test-mp] foreign-command ", "OK" if unmoved else "FAILED")
 	get_tree().quit()
 
 # Prove N-player victory: with three tribes, losing one town center does NOT

@@ -10,6 +10,22 @@ extends Node
 # commands to the server, which validates and executes the same way.
 
 func submit(command: Dictionary) -> void:
+	if Net.mode == Net.Mode.CLIENT:
+		_submit_to_server.rpc_id(1, command)
+	else:
+		_validate_and_execute(command)
+
+@rpc("any_peer", "call_remote", "reliable")
+func _submit_to_server(command: Dictionary) -> void:
+	if Net.mode != Net.Mode.SERVER:
+		return
+	var sender: int = multiplayer.get_remote_sender_id()
+	if not Net.peer_players.has(sender):
+		return
+	# Identity comes from the connection, never from the payload — a client
+	# cannot command another tribe's units no matter what it sends.
+	command["player_id"] = Net.peer_players[sender]
+	print("[cmd] p%s %s" % [command["player_id"], command.get("type", "?")])
 	_validate_and_execute(command)
 
 func _validate_and_execute(command: Dictionary) -> void:

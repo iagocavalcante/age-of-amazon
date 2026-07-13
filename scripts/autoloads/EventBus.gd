@@ -1,6 +1,9 @@
 # scripts/autoloads/EventBus.gd
 extends Node
 
+# Entity lifecycle (multiplayer replication listens to this on the server)
+signal entity_spawned(entity: Node2D)
+
 # Unit signals
 signal unit_selected(unit: Node2D)
 signal unit_deselected(unit: Node2D)
