@@ -330,3 +330,38 @@ regardless of how far the world is explored. Predators add danger and naturally
 exercise the existing retaliation rules. The main trade-off versus AoE-style
 carcass-gathering is that villagers gain no special role in hunting — accepted
 for the symmetry and simplicity.
+
+## ADR 15 — Multiplayer: authoritative server, explicit replication, process-per-match
+
+**Context.** Live 2–4 player PvP with the browser as the primary client.
+Browsers cannot use UDP, and GitHub Pages cannot host a server, so multiplayer
+means WebSockets to a VPS. Deterministic lockstep (the classic RTS approach)
+was rejected: retrofitting perfect determinism onto this codebase risks
+undebuggable desyncs.
+
+**Decision.** One Godot project, four run modes (`Net.Mode`): OFFLINE
+single-player (unchanged, local authority), headless SERVER (authoritative
+match simulation), CLIENT (renders and sends commands, never simulates), and
+GATEWAY (lobby with 4-letter room codes that spawns one match-server process
+per room). Every gameplay order flows through `CommandRouter` as plain data;
+on the server, the issuing tribe is derived from the connection
+(`Net.peer_players`), never from the payload. Replication is an explicit
+protocol in `Replication.gd` — config → client builds the world from the
+seed → client-ready → snapshot → spawn/despawn events + 10 Hz state ticks —
+rather than `MultiplayerSpawner`/`MultiplayerSynchronizer`, because engine
+auto-replication can deliver spawns before a client's world exists. Terrain
+never crosses the wire; both sides generate it from `map_seed`.
+
+**Consequences.**
+- Cheating that affects gameplay is structurally impossible (server validates
+  ownership, cost, population); but clients receive all entity positions and
+  hide them with local fog — a modified client could maphack. Server-side
+  visibility filtering is the known hardening step, deliberately deferred.
+- Process-per-match keeps the autoload architecture (match state in
+  singletons) and buys crash isolation; matches shut themselves down when
+  idle, so the gateway tracks no pids.
+- The sim/view split in `UnitBase` (authority-gated `_sim_step`, state-derived
+  `_view_step`) is what lets one codebase serve all four modes.
+- Rejoin is slot-reuse (a returning player gets the lowest free tribe slot,
+  whose units persisted). If two players drop at once they may swap tribes on
+  return — accepted until session tokens (v2).
