@@ -61,4 +61,8 @@ if ! grep -q "stranger-refused OK" "$DIR/host.log"; then
   echo "RESULT: INCOMPLETE (no stranger-refused verdict; logs in $DIR)"
   exit 1
 fi
+if ! grep -q "rejoin-takeover OK" "$DIR/host.log"; then
+  echo "RESULT: INCOMPLETE (no rejoin-takeover verdict; logs in $DIR)"
+  exit 1
+fi
 echo "RESULT: OK"

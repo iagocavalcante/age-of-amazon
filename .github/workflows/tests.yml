@@ -44,6 +44,8 @@ jobs:
           grep -c " OK" /tmp/victory.log | grep -q "^2$"
           $G --headless --path . ++ --test-systems 2>&1 | tee /tmp/systems.log
           grep -c " OK" /tmp/systems.log | grep -q "^6$"
+          $G --headless --path . ++ --test-seat 2>&1 | tee /tmp/seat.log
+          grep -c " OK" /tmp/seat.log | grep -q "^4$"
 
       - name: Multiplayer harness (2 players)
         run: GODOT=~/godot/godot bash tools/test_mp.sh

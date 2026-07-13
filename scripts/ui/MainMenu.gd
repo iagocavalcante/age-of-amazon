@@ -87,6 +87,17 @@ func _build_ui() -> void:
 	single.pressed.connect(func() -> void: get_tree().change_scene_to_file(MAIN_SCENE))
 	box.add_child(single)
 
+	# A live seat from a previous session (e.g. before a page refresh).
+	var seat: Dictionary = Net.load_seat()
+	if not seat.is_empty():
+		var rejoin: Button = Button.new()
+		rejoin.text = "Rejoin Last Match"
+		rejoin.pressed.connect(func() -> void:
+			Net.pending_match_url = seat["url"]
+			Net.pending_token = seat["token"]
+			get_tree().change_scene_to_file(MAIN_SCENE))
+		box.add_child(rejoin)
+
 	box.add_child(HSeparator.new())
 
 	var mp_label: Label = Label.new()
@@ -169,6 +180,7 @@ func _on_room_updated(code: String, player_count: int, my_slot: int) -> void:
 func _on_match_ready(port: int, token: String) -> void:
 	Net.pending_match_url = _match_url_template.replace("{port}", str(port))
 	Net.pending_token = token
+	Net.save_seat(Net.pending_match_url, token)
 	get_tree().change_scene_to_file(MAIN_SCENE)
 
 func _on_gateway_error(reason: String) -> void:

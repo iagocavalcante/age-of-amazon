@@ -38,6 +38,8 @@ func _ready() -> void:
 		_run_gw_test(args, true)
 	if "--test-gw-join" in args:
 		_run_gw_test(args, false)
+	if "--test-seat" in args:
+		_run_seat_test()
 	if "--test-victory" in args:
 		_run_victory_test()
 	if "--test-systems" in args:
@@ -192,6 +194,30 @@ func _run_move_test() -> void:
 		print("[test-move] unit after 3s: ", u.global_position, " state=", u.current_state)
 	get_tree().quit()
 
+# Prove the persisted seat (refresh-rejoin) file layer: save/load roundtrip,
+# TTL expiry, and clearing.
+func _run_seat_test() -> void:
+	Net.clear_seat()
+	print("[test-seat] empty ", "OK" if Net.load_seat().is_empty() else "FAILED")
+
+	Net.save_seat("ws://example:9101", "tok123")
+	var seat: Dictionary = Net.load_seat()
+	var roundtrip: bool = seat.get("url", "") == "ws://example:9101" \
+		and seat.get("token", "") == "tok123"
+	print("[test-seat] roundtrip ", "OK" if roundtrip else "FAILED")
+
+	# A stale seat must expire.
+	var file: FileAccess = FileAccess.open(Net.SEAT_PATH, FileAccess.WRITE)
+	file.store_string(JSON.stringify({"url": "ws://x", "token": "t",
+		"ts": Time.get_unix_time_from_system() - Net.SEAT_TTL_SECS - 60.0}))
+	file = null
+	print("[test-seat] ttl-expiry ", "OK" if Net.load_seat().is_empty() else "FAILED")
+
+	Net.save_seat("ws://x", "t")
+	Net.clear_seat()
+	print("[test-seat] clear ", "OK" if Net.load_seat().is_empty() else "FAILED")
+	get_tree().quit()
+
 # Gateway lobby harness (driven by tools/test_gateway.sh). The host creates a
 # room and prints its code; the script feeds that code to the joiner. Both
 # then ride the lobby into a gateway-spawned match and assert the match
@@ -260,6 +286,17 @@ func _run_gw_test(args: PackedStringArray, is_host: bool) -> void:
 	await _until(func() -> bool: return got_config[0], 10.0)
 	print("[test-gw] %s config %s me=%d" % [
 		role, "OK" if got_config[0] else "FAILED", GameManager.local_player_id])
+
+	# Simulate a page refresh: a brand-new connection presenting the same
+	# seat token, while the old socket is still open, must take over the
+	# seat and receive a fresh match config.
+	if is_host and got_config[0]:
+		var re_config: Array = [false]
+		Net.match_config_received.connect(
+			func() -> void: re_config[0] = true, CONNECT_ONE_SHOT)
+		Net.join("ws://127.0.0.1:%d" % ports[0][0])
+		await _until(func() -> bool: return re_config[0], 10.0)
+		print("[test-gw] rejoin-takeover ", "OK" if re_config[0] else "FAILED")
 	get_tree().quit()
 
 func _until(condition: Callable, timeout: float) -> void:

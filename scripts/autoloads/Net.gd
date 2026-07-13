@@ -39,6 +39,36 @@ var pending_match_url: String = ""
 # One-shot message for the main menu (why the last session ended).
 var last_status: String = ""
 
+# The current seat (match URL + token), persisted so a browser refresh can
+# rejoin the live match. user:// is IndexedDB-backed on the web export.
+const SEAT_PATH: String = "user://last_match.json"
+const SEAT_TTL_SECS: float = 3.0 * 3600.0
+
+func save_seat(url: String, token: String) -> void:
+	var file: FileAccess = FileAccess.open(SEAT_PATH, FileAccess.WRITE)
+	if file == null:
+		return
+	file.store_string(JSON.stringify({
+		"url": url, "token": token,
+		"ts": Time.get_unix_time_from_system(),
+	}))
+
+# Returns {url, token} for a fresh, complete seat; {} otherwise.
+func load_seat() -> Dictionary:
+	if not FileAccess.file_exists(SEAT_PATH):
+		return {}
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(SEAT_PATH))
+	if not (parsed is Dictionary) or not parsed.has_all(["url", "token", "ts"]):
+		return {}
+	if Time.get_unix_time_from_system() - float(parsed["ts"]) > SEAT_TTL_SECS:
+		clear_seat()
+		return {}
+	return {"url": String(parsed["url"]), "token": String(parsed["token"])}
+
+func clear_seat() -> void:
+	if FileAccess.file_exists(SEAT_PATH):
+		DirAccess.remove_absolute(SEAT_PATH)
+
 # Normal play returns to the menu on disconnect/refusal. Headless harnesses
 # switch this off — a scene change mid-test would restart the harness.
 var auto_return_to_menu: bool = true
@@ -52,6 +82,10 @@ var slot_tokens: PackedStringArray = PackedStringArray()
 func _ready() -> void:
 	multiplayer.server_disconnected.connect(_on_server_disconnected)
 	multiplayer.connection_failed.connect(_on_connection_failed)
+	# A finished match can't be rejoined — drop the persisted seat.
+	EventBus.game_over.connect(func(_winner: int) -> void:
+		if mode == Mode.CLIENT:
+			clear_seat())
 
 # Tear down all match/connection state and return this process to a clean
 # offline baseline. The single exit path for every way a match can end.
@@ -177,9 +211,15 @@ func _client_hello(proto_version: int, token: String = "") -> void:
 		if slot < 0:
 			_refuse_and_drop(sender, "not invited to this match")
 			return
-		if peer_players.values().has(slot):
-			_refuse_and_drop(sender, "this seat is already connected")
-			return
+		# If the seat looks occupied, this is a page refresh whose old socket
+		# hasn't closed yet (the token is secret, so the newcomer IS the same
+		# player). The new connection wins; the stale one is dropped.
+		for old_peer: int in peer_players.keys():
+			if peer_players[old_peer] == slot:
+				peer_players.erase(old_peer)
+				print("[net] player %d reconnected; dropping stale peer %d" % [slot, old_peer])
+				if multiplayer.get_peers().has(old_peer):
+					multiplayer.multiplayer_peer.disconnect_peer(old_peer)
 	peer_players[sender] = slot
 	_had_peers = true
 	print("[net] player %d joined (peer %d)" % [slot, sender])
@@ -211,5 +251,7 @@ func _match_config(map_seed: int, player_count: int, my_player_id: int) -> void:
 func _refuse(reason: String) -> void:
 	push_error("[net] join refused: %s" % reason)
 	join_refused.emit(reason)
-	if mode == Mode.CLIENT and auto_return_to_menu:
-		back_to_menu("Join refused: %s" % reason)
+	if mode == Mode.CLIENT:
+		clear_seat()  # a refused seat is never usable again
+		if auto_return_to_menu:
+			back_to_menu("Join refused: %s" % reason)
