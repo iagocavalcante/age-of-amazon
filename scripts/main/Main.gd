@@ -16,8 +16,15 @@ func _ready() -> void:
 
 	if "--server" in args:
 		_boot_server(args)
+	elif "--gateway" in args:
+		_boot_gateway(args)
+		return
 	elif _arg_value(args, "--join=") != "":
-		await _boot_client(args)
+		await _boot_client(_arg_value(args, "--join="))
+	elif Net.pending_match_url != "":
+		var url: String = Net.pending_match_url
+		Net.pending_match_url = ""
+		await _boot_client(url)
 	else:
 		_boot_offline(args)
 
@@ -27,6 +34,10 @@ func _ready() -> void:
 		_run_commands_test()
 	if "--test-mp-client" in args:
 		_run_mp_client_test()
+	if "--test-gw-host" in args:
+		_run_gw_test(args, true)
+	if "--test-gw-join" in args:
+		_run_gw_test(args, false)
 	if "--test-victory" in args:
 		_run_victory_test()
 	if "--test-systems" in args:
@@ -111,12 +122,23 @@ func _boot_server(args: PackedStringArray) -> void:
 	EventBus.world_ready.emit()
 	GameManager.change_state(GameManager.GameState.RUNNING)
 
+# Headless lobby: no game world at all — just the Gateway autoload's room
+# service. The Main scene's world/UI nodes are dropped.
+func _boot_gateway(args: PackedStringArray) -> void:
+	var port: int = int(_arg_value(args, "--port=", "9000"))
+	var base: int = int(_arg_value(args, "--match-port-base=", "9100"))
+	$EnemyAI.queue_free()
+	$UILayer.queue_free()
+	if Gateway.host(port, base) != OK:
+		push_error("[gw] failed to bind port %d" % port)
+		get_tree().quit(1)
+
 # Multiplayer client: connect first, build the world from the replicated
 # seed once the match config arrives. Entities come from the server via the
 # spawners — nothing is spawned locally.
-func _boot_client(args: PackedStringArray) -> void:
+func _boot_client(url: String) -> void:
 	$EnemyAI.queue_free()
-	if Net.join(_arg_value(args, "--join=")) != OK:
+	if Net.join(url) != OK:
 		push_error("[net] failed to open connection")
 		get_tree().quit(1)
 		return
@@ -164,6 +186,69 @@ func _run_move_test() -> void:
 	for u: Node2D in SelectionManager.selected_units:
 		print("[test-move] unit after 3s: ", u.global_position, " state=", u.current_state)
 	get_tree().quit()
+
+# Gateway lobby harness (driven by tools/test_gateway.sh). The host creates a
+# room and prints its code; the script feeds that code to the joiner. Both
+# then ride the lobby into a gateway-spawned match and assert the match
+# config handshake completes.
+func _run_gw_test(args: PackedStringArray, is_host: bool) -> void:
+	$EnemyAI.queue_free()
+	var role: String = "host" if is_host else "join"
+	var updates: Array = []
+	var ports: Array = []
+	Gateway.room_updated.connect(func(code: String, count: int, slot: int) -> void:
+		updates.append([code, count, slot]))
+	Gateway.match_ready.connect(func(port: int) -> void: ports.append(port))
+
+	var connected: Array = [false]
+	multiplayer.connected_to_server.connect(
+		func() -> void: connected[0] = true, CONNECT_ONE_SHOT)
+	Gateway.connect_to_gateway(_arg_value(args, "--gateway-url="))
+	await _until(func() -> bool: return connected[0], 10.0)
+	if not connected[0]:
+		print("[test-gw] %s gateway-connect FAILED" % role)
+		get_tree().quit(1)
+		return
+
+	if is_host:
+		Gateway.create_room()
+		await _until(func() -> bool: return not updates.is_empty(), 10.0)
+		if updates.is_empty():
+			print("[test-gw] host room FAILED")
+			get_tree().quit(1)
+			return
+		print("[test-gw] code=", updates[0][0])
+		await _until(func() -> bool: return updates.back()[1] >= 2, 30.0)
+		if updates.back()[1] < 2:
+			print("[test-gw] host waiting-for-joiner FAILED")
+			get_tree().quit(1)
+			return
+		Gateway.start_match()
+	else:
+		Gateway.join_room(_arg_value(args, "--room="))
+		await _until(func() -> bool: return not updates.is_empty(), 10.0)
+
+	await _until(func() -> bool: return not ports.is_empty(), 30.0)
+	if ports.is_empty():
+		print("[test-gw] %s match-ready FAILED" % role)
+		get_tree().quit(1)
+		return
+	print("[test-gw] %s match port=%d" % [role, ports[0]])
+
+	var got_config: Array = [false]
+	Net.match_config_received.connect(
+		func() -> void: got_config[0] = true, CONNECT_ONE_SHOT)
+	Net.join("ws://127.0.0.1:%d" % ports[0])
+	await _until(func() -> bool: return got_config[0], 10.0)
+	print("[test-gw] %s config %s me=%d" % [
+		role, "OK" if got_config[0] else "FAILED", GameManager.local_player_id])
+	get_tree().quit()
+
+func _until(condition: Callable, timeout: float) -> void:
+	var elapsed: float = 0.0
+	while elapsed < timeout and not condition.call():
+		await get_tree().create_timer(0.25).timeout
+		elapsed += 0.25
 
 # Multiplayer client harness (run with --join=ws://... by tools/test_mp.sh):
 # proves the snapshot lands, a command round-trips through the server and the

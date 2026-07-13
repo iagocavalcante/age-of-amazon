@@ -1,0 +1,4 @@
+{
+	"gateway_url": "ws://127.0.0.1:9000",
+	"match_url_template": "ws://127.0.0.1:{port}"
+}

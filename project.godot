@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="Age Of Amazon"
-run/main_scene="res://scenes/main/Main.tscn"
+run/main_scene="res://scenes/ui/MainMenu.tscn"
 config/features=PackedStringArray("4.5", "GL Compatibility")
 config/icon="res://icon.svg"
 
@@ -25,6 +25,7 @@ AssetLibrary="*res://scripts/autoloads/AssetLibrary.gd"
 Net="*res://scripts/autoloads/Net.gd"
 CommandRouter="*res://scripts/autoloads/CommandRouter.gd"
 Replication="*res://scripts/autoloads/Replication.gd"
+Gateway="*res://scripts/autoloads/Gateway.gd"
 
 [display]
 
