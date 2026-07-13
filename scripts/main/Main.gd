@@ -226,6 +226,7 @@ func _run_gw_test(args: PackedStringArray, is_host: bool) -> void:
 	$EnemyAI.queue_free()
 	Net.auto_return_to_menu = false
 	var role: String = "host" if is_host else "join"
+	var match_template: String = _arg_value(args, "--match-template=", "ws://127.0.0.1:{port}")
 	var updates: Array = []
 	var ports: Array = []
 	Gateway.room_updated.connect(func(code: String, count: int, slot: int) -> void:
@@ -274,7 +275,7 @@ func _run_gw_test(args: PackedStringArray, is_host: bool) -> void:
 		Net.join_refused.connect(
 			func(_r: String) -> void: refused[0] = true, CONNECT_ONE_SHOT)
 		Net.pending_token = "not-a-real-token"
-		Net.join("ws://127.0.0.1:%d" % ports[0][0])
+		Net.join(match_template.replace("{port}", str(ports[0][0])))
 		await _until(func() -> bool: return refused[0], 10.0)
 		print("[test-gw] stranger-refused ", "OK" if refused[0] else "FAILED")
 
@@ -282,7 +283,7 @@ func _run_gw_test(args: PackedStringArray, is_host: bool) -> void:
 	Net.match_config_received.connect(
 		func() -> void: got_config[0] = true, CONNECT_ONE_SHOT)
 	Net.pending_token = ports[0][1]
-	Net.join("ws://127.0.0.1:%d" % ports[0][0])
+	Net.join(match_template.replace("{port}", str(ports[0][0])))
 	await _until(func() -> bool: return got_config[0], 10.0)
 	print("[test-gw] %s config %s me=%d" % [
 		role, "OK" if got_config[0] else "FAILED", GameManager.local_player_id])
@@ -294,7 +295,7 @@ func _run_gw_test(args: PackedStringArray, is_host: bool) -> void:
 		var re_config: Array = [false]
 		Net.match_config_received.connect(
 			func() -> void: re_config[0] = true, CONNECT_ONE_SHOT)
-		Net.join("ws://127.0.0.1:%d" % ports[0][0])
+		Net.join(match_template.replace("{port}", str(ports[0][0])))
 		await _until(func() -> bool: return re_config[0], 10.0)
 		print("[test-gw] rejoin-takeover ", "OK" if re_config[0] else "FAILED")
 	get_tree().quit()

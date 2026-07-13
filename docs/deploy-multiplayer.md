@@ -5,12 +5,17 @@
 > `aoa-gateway` (gateway :9000, matches 9100+) and `aoa-proxy` (user-space
 > Caddy from `~/bin/caddy`, plain HTTP :8081 doing `/ws` + `/m/<port>`
 > routing), linger enabled so both survive reboots. Binary + Caddyfile live
-> in `~tron/age-of-amazon/`. The box's cloudflared tunnel is token-managed,
-> so the ONE remaining step is in the Cloudflare Zero Trust dashboard: add a
-> public hostname (e.g. `game.iagocavalcante.com`) on tunnel
-> `iagocavalcante-local` pointing at `http://localhost:8081`, then set
-> `server_config.json` to `wss://game.iagocavalcante.com/ws` /
-> `wss://game.iagocavalcante.com/m/{port}` and re-export the web build.
+> in `~tron/age-of-amazon/`. Public exposure: dedicated locally-managed
+> cloudflared tunnel `aoa-game` (id 535313f6, config
+> `~/.cloudflared/aoa-game-config.yml`, `protocol: http2` — QUIC dies under
+> the box's VPN) run by user service `aoa-tunnel`, serving
+> `game.iagocavalcante.com -> http://localhost:8081`. PUBLIC AND VERIFIED:
+> the gateway harness passes end-to-end against
+> `wss://game.iagocavalcante.com/ws` + `/m/{port}`.
+> Web builds for production need `server_config.json` set to those wss URLs
+> before exporting. Gotchas learned: `cloudflared tunnel route dns` reads the
+> default `~/.cloudflared/config.yml` and can route to the WRONG tunnel —
+> pass `--config` explicitly (and `--overwrite-dns` to fix a bad record).
 > The generic runbook below describes the root-based layout for a dedicated
 > VPS; adapt as needed.
 
