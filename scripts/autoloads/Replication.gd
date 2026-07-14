@@ -114,7 +114,8 @@ func _process(delta: float) -> void:
 		var building: Building = node as Building
 		if building != null:
 			building_states.append([String(building.name), building.current_hp,
-				building.train_queue.duplicate(), building.train_progress])
+				building.train_queue.duplicate(), building.train_progress,
+				building.is_constructed])
 
 	for peer: int in _live_peers:
 		var player_id: int = Net.peer_players.get(peer, -1)
@@ -143,7 +144,7 @@ func _building_data(building: Building) -> Dictionary:
 	return {
 		"n": String(building.name), "t": building.building_type,
 		"p": building.player_id, "c": building.footprint_cells[0],
-		"hp": building.current_hp,
+		"hp": building.current_hp, "done": building.is_constructed,
 	}
 
 func _unit_data(unit: UnitBase) -> Dictionary:
@@ -181,7 +182,7 @@ func _spawn_building(data: Dictionary) -> void:
 		return
 	var building: Building = Building.new()
 	building.name = data["n"]
-	building.setup(data["t"], data["p"], data["c"])
+	building.setup(data["t"], data["p"], data["c"], data.get("done", true))
 	containers[0].add_child(building)
 	building.current_hp = data["hp"]
 	_entities[data["n"]] = building
@@ -222,4 +223,4 @@ func _tick(unit_states: Array, building_states: Array) -> void:
 	for s: Array in building_states:
 		var building: Building = _entities.get(s[0]) as Building
 		if building != null and is_instance_valid(building):
-			building.net_apply(s[1], s[2], s[3])
+			building.net_apply(s[1], s[2], s[3], s[4] if s.size() > 4 else true)

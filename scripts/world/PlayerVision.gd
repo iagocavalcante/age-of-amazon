@@ -34,7 +34,10 @@ func update(tree: SceneTree, world: WorldData) -> void:
 			# vision_range is world px; ~32 px per tile step in grid space.
 			radius = maxi(4, int(round((entity as UnitBase).vision_range / 32.0)))
 		elif entity is Building:
-			radius = Constants.BUILDING_DEFS[(entity as Building).building_type]["vision_tiles"]
+			# Construction sites barely see past their own scaffolding.
+			var building: Building = entity as Building
+			radius = Constants.BUILDING_DEFS[building.building_type]["vision_tiles"] \
+				if building.is_constructed else 3
 		_reveal_circle(world, Constants.world_to_grid(entity.global_position), radius)
 
 func _reveal_circle(world: WorldData, center: Vector2i, radius: int) -> void:

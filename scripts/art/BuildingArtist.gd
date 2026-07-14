@@ -83,3 +83,185 @@ func build_town_center(player_color: Color) -> ImageTexture:
 			img.set_pixel(x, y, stone_top if y < base_y - 70 else door_color)
 
 	return ImageTexture.create_from_image(img)
+
+# 1x1 hut: timber walls under a layered palm roof, player-color door banner.
+func build_house(player_color: Color) -> ImageTexture:
+	var w: int = 56
+	var h: int = 52
+	var img: Image = Image.create(w, h, false, Image.FORMAT_RGBA8)
+
+	var wood_dark: Color = Color8(96, 68, 42)
+	var wood_mid: Color = Color8(130, 94, 58)
+	var wood_light: Color = Color8(158, 118, 74)
+	var leaf_dark: Color = Color8(56, 88, 44)
+	var leaf_mid: Color = Color8(84, 122, 58)
+	var leaf_light: Color = Color8(112, 150, 72)
+	var outline: Color = Color8(52, 38, 22)
+	var door_color: Color = Color8(40, 28, 16)
+
+	var cx: float = w / 2.0
+	var base_y: int = h - 6
+
+	PixelArt.draw_ellipse(img, cx, float(base_y), 24.0, 9.0, Color(0, 0, 0, 0.30), true)
+
+	# Walls: vertical timber planks with speckle.
+	for y in range(base_y - 18, base_y + 1):
+		for x in range(int(cx) - 16, int(cx) + 17):
+			var plank: float = PixelArt.hash2(int(x / 3), 0, 41)
+			var speckle: float = PixelArt.hash2(x, y, 42)
+			img.set_pixel(x, y, PixelArt.ramp_shade(
+				[wood_dark, wood_mid, wood_light], 0.3 + plank * 0.3 + speckle * 0.2, x, y))
+		img.set_pixel(int(cx) - 16, y, outline)
+		img.set_pixel(int(cx) + 16, y, outline)
+
+	# Layered thatch roof, widest at the eaves.
+	for y in range(base_y - 34, base_y - 16):
+		var t: float = float(y - (base_y - 34)) / 18.0
+		var half: int = int(4.0 + t * 20.0)
+		for x in range(int(cx) - half, int(cx) + half + 1):
+			var band: float = PixelArt.hash2(0, int(y / 3), 43)
+			var speckle: float = PixelArt.hash2(x, y, 44)
+			img.set_pixel(x, y, PixelArt.ramp_shade(
+				[leaf_dark, leaf_mid, leaf_light], 0.25 + band * 0.35 + speckle * 0.25, x, y))
+		img.set_pixel(clampi(int(cx) - half, 0, w - 1), y, outline)
+		img.set_pixel(clampi(int(cx) + half, 0, w - 1), y, outline)
+
+	# Door with a player-color lintel banner.
+	for y in range(base_y - 12, base_y + 1):
+		for x in range(int(cx) - 4, int(cx) + 5):
+			img.set_pixel(x, y, door_color)
+	for x in range(int(cx) - 5, int(cx) + 6):
+		img.set_pixel(x, base_y - 13, player_color)
+		img.set_pixel(x, base_y - 14, player_color.darkened(0.25))
+
+	return ImageTexture.create_from_image(img)
+
+# 2x2 longhouse: a wide ridge-roofed hall with a spear rack and a
+# player-color shield beside the door.
+func build_barracks(player_color: Color) -> ImageTexture:
+	var w: int = 116
+	var h: int = 78
+	var img: Image = Image.create(w, h, false, Image.FORMAT_RGBA8)
+
+	var wood_dark: Color = Color8(88, 60, 38)
+	var wood_mid: Color = Color8(120, 86, 52)
+	var wood_light: Color = Color8(150, 110, 68)
+	var thatch_dark: Color = Color8(122, 98, 48)
+	var thatch_mid: Color = Color8(152, 126, 62)
+	var thatch_light: Color = Color8(180, 152, 80)
+	var outline: Color = Color8(52, 38, 22)
+	var door_color: Color = Color8(38, 26, 15)
+
+	var cx: float = w / 2.0
+	var base_y: int = h - 8
+
+	PixelArt.draw_ellipse(img, cx, float(base_y), 52.0, 18.0, Color(0, 0, 0, 0.30), true)
+
+	# Long walls.
+	for y in range(base_y - 22, base_y + 1):
+		for x in range(int(cx) - 42, int(cx) + 43):
+			var plank: float = PixelArt.hash2(int(x / 4), 0, 51)
+			var speckle: float = PixelArt.hash2(x, y, 52)
+			img.set_pixel(x, y, PixelArt.ramp_shade(
+				[wood_dark, wood_mid, wood_light], 0.3 + plank * 0.3 + speckle * 0.2, x, y))
+		img.set_pixel(int(cx) - 42, y, outline)
+		img.set_pixel(int(cx) + 42, y, outline)
+
+	# Ridged thatch roof.
+	for y in range(base_y - 44, base_y - 20):
+		var t: float = float(y - (base_y - 44)) / 24.0
+		var half: int = int(8.0 + t * 40.0)
+		for x in range(int(cx) - half, int(cx) + half + 1):
+			var band: float = PixelArt.hash2(0, int(y / 3), 53)
+			var speckle: float = PixelArt.hash2(x, y, 54)
+			img.set_pixel(x, y, PixelArt.ramp_shade(
+				[thatch_dark, thatch_mid, thatch_light], 0.25 + band * 0.35 + speckle * 0.25, x, y))
+		img.set_pixel(clampi(int(cx) - half, 0, w - 1), y, outline)
+		img.set_pixel(clampi(int(cx) + half, 0, w - 1), y, outline)
+	# Ridge pole.
+	for x in range(int(cx) - 10, int(cx) + 11):
+		img.set_pixel(x, base_y - 45, outline)
+
+	# Doorway.
+	for y in range(base_y - 16, base_y + 1):
+		for x in range(int(cx) - 7, int(cx) + 8):
+			img.set_pixel(x, y, door_color)
+
+	# Player-color shield by the door.
+	PixelArt.draw_ellipse(img, cx - 18.0, float(base_y - 9), 5.0, 7.0, player_color, false)
+	PixelArt.draw_ellipse(img, cx - 18.0, float(base_y - 9), 2.0, 3.0, player_color.darkened(0.35), false)
+
+	# Spear rack on the right: leaning shafts with stone tips.
+	for i in range(4):
+		var sx: int = int(cx) + 22 + i * 5
+		for y in range(base_y - 20, base_y + 1):
+			var lean: int = int(float(base_y - y) * 0.15)
+			img.set_pixel(sx + lean, y, wood_light if (y % 5) != 0 else wood_dark)
+		img.set_pixel(sx + int(20.0 * 0.15), base_y - 21, Color8(190, 190, 180))
+
+	return ImageTexture.create_from_image(img)
+
+# 1x1 stilted lookout: long legs, a railed platform, thatch cap, and a tall
+# player-color pennant — reads far vision at a glance.
+func build_watchtower(player_color: Color) -> ImageTexture:
+	var w: int = 52
+	var h: int = 92
+	var img: Image = Image.create(w, h, false, Image.FORMAT_RGBA8)
+
+	var wood_dark: Color = Color8(96, 68, 42)
+	var wood_mid: Color = Color8(126, 92, 56)
+	var wood_light: Color = Color8(156, 116, 72)
+	var leaf_dark: Color = Color8(56, 88, 44)
+	var leaf_mid: Color = Color8(84, 122, 58)
+	var outline: Color = Color8(52, 38, 22)
+
+	var cx: float = w / 2.0
+	var base_y: int = h - 6
+
+	PixelArt.draw_ellipse(img, cx, float(base_y), 20.0, 8.0, Color(0, 0, 0, 0.30), true)
+
+	# Four stilt legs with cross-bracing.
+	for side: int in [-1, 1]:
+		for leg: int in [10, 16]:
+			var lx: int = int(cx) + side * leg
+			for y in range(base_y - 40, base_y + 1):
+				img.set_pixel(lx, y, wood_mid if (y % 7) != 0 else wood_dark)
+	for y in range(base_y - 30, base_y - 8):
+		var t: float = float(y - (base_y - 30)) / 22.0
+		img.set_pixel(int(cx) - 16 + int(t * 32.0), y, wood_light)
+		img.set_pixel(int(cx) + 16 - int(t * 32.0), y, wood_light)
+
+	# Platform with railing.
+	for y in range(base_y - 46, base_y - 39):
+		for x in range(int(cx) - 20, int(cx) + 21):
+			img.set_pixel(x, y, PixelArt.ramp_shade(
+				[wood_dark, wood_mid, wood_light],
+				0.35 + PixelArt.hash2(x, y, 61) * 0.35, x, y))
+	for x in range(int(cx) - 20, int(cx) + 21):
+		img.set_pixel(x, base_y - 46, outline)
+		img.set_pixel(x, base_y - 39, outline)
+	for side: int in [-1, 1]:
+		var rx: int = int(cx) + side * 20
+		for y in range(base_y - 54, base_y - 45):
+			img.set_pixel(rx, y, wood_light)
+
+	# Thatch cap.
+	for y in range(base_y - 64, base_y - 52):
+		var t: float = float(y - (base_y - 64)) / 12.0
+		var half: int = int(3.0 + t * 19.0)
+		for x in range(int(cx) - half, int(cx) + half + 1):
+			var band: float = PixelArt.hash2(0, int(y / 2), 62)
+			img.set_pixel(x, y, leaf_dark if band < 0.5 else leaf_mid)
+		img.set_pixel(clampi(int(cx) - half, 0, w - 1), y, outline)
+		img.set_pixel(clampi(int(cx) + half, 0, w - 1), y, outline)
+
+	# Player pennant above everything.
+	var px: int = int(cx)
+	for y in range(base_y - 84, base_y - 62):
+		img.set_pixel(px, y, outline)
+	for fy in range(base_y - 84, base_y - 76):
+		for fx in range(1, 12):
+			img.set_pixel(clampi(px + fx, 0, w - 1), fy,
+				player_color if (fx + fy) % 5 != 0 else player_color.darkened(0.25))
+
+	return ImageTexture.create_from_image(img)

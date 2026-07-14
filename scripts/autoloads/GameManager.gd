@@ -91,8 +91,18 @@ func get_population(player_id: int) -> int:
 		func(n: Node) -> bool: return n.is_in_group("units")
 	).size()
 
+# Base cap plus a bonus per FINISHED house, up to the ceiling.
+func population_cap(player_id: int) -> int:
+	var cap: int = Constants.POPULATION_CAP
+	for node: Node in get_tree().get_nodes_in_group("buildings"):
+		var building: Building = node as Building
+		if building != null and building.player_id == player_id \
+				and building.is_constructed:
+			cap += Constants.BUILDING_DEFS[building.building_type].get("pop_bonus", 0)
+	return mini(cap, Constants.POPULATION_CEILING)
+
 func has_population_room(player_id: int) -> bool:
-	return get_population(player_id) < Constants.POPULATION_CAP
+	return get_population(player_id) < population_cap(player_id)
 
 func change_state(new_state: GameState) -> void:
 	state = new_state

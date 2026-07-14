@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Multiplayer convergence harness: 1 headless match server + PLAYERS headless
 # scripted clients (--test-mp-client). Each client must produce 3 OK verdicts
-# (snapshot, move-sync, foreign-command); any FAILED fails the run.
+# (snapshot, move-sync, foreign-command, build-sync); any FAILED fails the run.
 #   PLAYERS=4 bash tools/test_mp.sh   # 4-tribe match
 set -euo pipefail
 
@@ -36,7 +36,7 @@ if grep -h "\[test-mp\]" "$DIR"/client*.log | grep -q FAILED; then
   exit 1
 fi
 OKS=$(grep -h "\[test-mp\].* OK" "$DIR"/client*.log | wc -l | tr -d ' ')
-NEED=$((PLAYERS * 3))
+NEED=$((PLAYERS * 4))
 if [ "$OKS" -lt "$NEED" ]; then
   echo "RESULT: INCOMPLETE ($OKS/$NEED OK verdicts; logs in $DIR)"
   exit 1

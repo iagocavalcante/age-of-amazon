@@ -16,6 +16,10 @@ var current_hp: int = 600
 var footprint_cells: Array[Vector2i] = []
 var is_selected: bool = false
 
+# Construction: sites spawn at a fraction of max hp and villagers hammer
+# them up to full. Training and pop bonuses only apply once constructed.
+var is_constructed: bool = true
+
 # Training
 var train_queue: Array[String] = []
 var train_progress: float = 0.0
@@ -24,13 +28,16 @@ var _sprite: Sprite2D
 var _health_bar: ProgressBar
 
 # base_cell = top-left tile of the footprint.
-func setup(p_type: String, p_player_id: int, base_cell: Vector2i) -> void:
+func setup(p_type: String, p_player_id: int, base_cell: Vector2i,
+		p_constructed: bool = true) -> void:
 	building_type = p_type
 	player_id = p_player_id
+	is_constructed = p_constructed
 
 	var def: Dictionary = Constants.BUILDING_DEFS[building_type]
 	max_hp = def["max_hp"]
-	current_hp = max_hp
+	current_hp = max_hp if is_constructed else maxi(1,
+		int(max_hp * Constants.SITE_STARTING_HP_FRACTION))
 
 	var footprint: Vector2i = def["footprint"]
 	footprint_cells.clear()
@@ -55,9 +62,10 @@ func _ready() -> void:
 	if Net.is_headless_server():
 		return
 	_sprite = Sprite2D.new()
-	_sprite.texture = AssetLibrary.get_town_center_texture(player_id)
+	_sprite.texture = AssetLibrary.get_building_texture(building_type, player_id)
 	_sprite.offset = Vector2(0, -_sprite.texture.get_height() / 2.0 + 24.0)
 	add_child(_sprite)
+	_update_construction_look()
 
 	_health_bar = ProgressBar.new()
 	_health_bar.show_percentage = false
@@ -87,17 +95,42 @@ func _process(delta: float) -> void:
 			_spawn_unit(unit_type)
 			EventBus.training_completed.emit(self, unit_type)
 
-# Returns false (and refunds nothing) when unaffordable or out of room.
+# Returns false (and refunds nothing) when unaffordable, out of room, still
+# under construction, or the wrong kind of building.
 func queue_train(unit_type: String) -> bool:
+	if not is_constructed:
+		return false
+	if not (unit_type in Constants.BUILDING_DEFS[building_type]["trains"]):
+		return false
 	var def: Dictionary = Constants.UNIT_DEFS[unit_type]
 	var planned: int = GameManager.get_population(player_id) + train_queue.size()
-	if planned >= Constants.POPULATION_CAP:
+	if planned >= GameManager.population_cap(player_id):
 		return false
 	if not GameManager.spend(player_id, def["cost"]):
 		return false
 	train_queue.append(unit_type)
 	EventBus.training_queued.emit(self, unit_type)
 	return true
+
+# One builder swing (authority only). Completion flips the site to a real
+# building — training unlocks and any pop bonus starts counting.
+func build_tick(amount: int) -> void:
+	if is_constructed:
+		return
+	current_hp = mini(max_hp, current_hp + amount)
+	_update_health_bar()
+	if current_hp >= max_hp:
+		is_constructed = true
+		_update_construction_look()
+		EventBus.building_constructed.emit(self)
+		EventBus.population_changed.emit(player_id)
+
+func _update_construction_look() -> void:
+	if _sprite == null:
+		return
+	# Sites read as translucent, earth-toned frames until finished.
+	_sprite.self_modulate = Color.WHITE if is_constructed \
+		else Color(0.9, 0.78, 0.6, 0.55)
 
 func _spawn_unit(unit_type: String) -> void:
 	var spot: Dictionary = GameManager.pathfinder.adjacent_walkable(
@@ -149,10 +182,14 @@ func _die() -> void:
 
 # Multiplayer client: server state ticks land here (the building never
 # simulates locally — _process is authority-gated).
-func net_apply(hp: int, queue: Array, progress: float) -> void:
+func net_apply(hp: int, queue: Array, progress: float, constructed: bool) -> void:
 	if hp != current_hp:
 		current_hp = hp
 		_update_health_bar()
+	if constructed != is_constructed:
+		is_constructed = constructed
+		_update_construction_look()
+		EventBus.population_changed.emit(player_id)
 	train_queue.assign(queue)
 	train_progress = progress
 

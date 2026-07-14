@@ -39,6 +39,10 @@ func _validate_and_execute(command: Dictionary) -> void:
 			_exec_attack(command)
 		"train":
 			_exec_train(command)
+		"place":
+			_exec_place(command)
+		"build":
+			_exec_build(command)
 		_:
 			push_warning("CommandRouter: unknown command %s" % [command])
 
@@ -100,6 +104,54 @@ func _exec_attack(command: Dictionary) -> void:
 		return
 	for unit: UnitBase in _resolve_actors(command):
 		unit.command_attack(target)
+
+# Place a construction site: pay the cost, occupy the cells, then send the
+# issuing villagers to build it. Every rule a client could bend is checked
+# here, on the authority.
+func _exec_place(command: Dictionary) -> void:
+	var building_type: String = command.get("building_type", "")
+	var def: Dictionary = Constants.BUILDING_DEFS.get(building_type, {})
+	if not def.has("cost"):
+		return  # unknown type, or one players may not construct
+	var player_id: int = int(command["player_id"])
+	var base_cell: Vector2i = command["cell"]
+
+	var footprint: Vector2i = def["footprint"]
+	for dy in range(footprint.y):
+		for dx in range(footprint.x):
+			var cell: Vector2i = base_cell + Vector2i(dx, dy)
+			if not GameManager.world.is_walkable(cell):
+				return
+			if GameManager.world.building_at(cell) != null:
+				return
+			if not GameManager.world.get_resource_at(cell).is_empty():
+				return
+			if not GameManager.has_explored(player_id, cell):
+				return
+	if not GameManager.spend(player_id, def["cost"]):
+		return
+
+	var containers: Array = get_tree().get_nodes_in_group("building_container")
+	if containers.is_empty():
+		return
+	var site: Building = Building.new()
+	site.name = GameManager.claim_entity_name("B")
+	site.setup(building_type, player_id, base_cell, false)
+	containers[0].add_child(site)
+
+	_send_builders(command, site)
+
+func _exec_build(command: Dictionary) -> void:
+	var site: Building = _resolve_target(command.get("building_name", "")) as Building
+	if site == null or site.player_id != int(command["player_id"]) \
+			or site.is_constructed:
+		return
+	_send_builders(command, site)
+
+func _send_builders(command: Dictionary, site: Building) -> void:
+	for unit: UnitBase in _resolve_actors(command):
+		if unit.can_gather:
+			unit.command_build(site)
 
 func _exec_train(command: Dictionary) -> void:
 	var building: Building = _resolve_target(command["building_name"]) as Building

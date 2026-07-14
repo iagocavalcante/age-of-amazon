@@ -16,6 +16,7 @@ signal unit_died(unit: Node2D)
 signal building_selected(building: Node2D)
 signal building_damaged(building: Node2D, attacker: Node2D)
 signal building_destroyed(building: Node2D)
+signal building_constructed(building: Node2D)
 signal training_queued(building: Node2D, unit_type: String)
 signal training_completed(building: Node2D, unit_type: String)
 

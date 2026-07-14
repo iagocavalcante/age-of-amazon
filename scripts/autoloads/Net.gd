@@ -15,7 +15,7 @@ enum Mode { OFFLINE, SERVER, CLIENT, GATEWAY }
 # a stale build get a clear "refresh" error instead of silently dropped RPCs
 # (an argument-count mismatch makes Godot discard the call without a trace —
 # this bit us in production between two builds of the lobby protocol).
-const PROTOCOL_VERSION: int = 3
+const PROTOCOL_VERSION: int = 4
 
 signal match_config_received
 signal join_refused(reason: String)

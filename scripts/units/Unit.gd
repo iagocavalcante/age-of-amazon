@@ -10,7 +10,8 @@ extends CharacterBody2D
 #
 # `_intent` describes what MOVING should do on arrival:
 #   {} | {kind:"gather", cell} | {kind:"deposit"} | {kind:"attack", target}
-enum State { IDLE, MOVING, GATHERING, ATTACKING }
+#      | {kind:"build"}
+enum State { IDLE, MOVING, GATHERING, ATTACKING, BUILDING }
 
 const WAYPOINT_REACHED_DISTANCE: float = 4.0
 const WALK_FRAME_TIME: float = 0.18
@@ -42,6 +43,10 @@ var _path_index: int = 0
 
 # Task intent
 var _intent: Dictionary = {}
+
+# Construction
+var _build_site: Building = null
+var _build_timer: float = 0.0
 
 # Gathering
 var _gather_cell: Vector2i = Vector2i.ZERO
@@ -130,6 +135,9 @@ func _sim_step(delta: float) -> void:
 			_process_gathering(delta)
 		State.ATTACKING:
 			_process_attacking(delta)
+		State.BUILDING:
+			velocity = Vector2.ZERO
+			_process_building(delta)
 
 # Multiplayer client: the unit is a puppet — the server's 10 Hz state ticks
 # land in net_apply(), and _net_step eases the rendered position toward the
@@ -206,6 +214,36 @@ func command_attack(target: Node2D) -> void:
 	else:
 		current_state = State.IDLE
 
+# Walk to a construction site and hammer it up. Villagers only.
+func command_build(site: Building) -> void:
+	if not can_gather or site == null or not is_instance_valid(site):
+		return
+	_build_site = site
+	_attack_target = null
+	var spot: Dictionary = GameManager.pathfinder.adjacent_walkable(
+		site.footprint_cells, Constants.world_to_grid(global_position))
+	if not spot["found"]:
+		current_state = State.IDLE
+		return
+	_intent = { "kind": "build" }
+	var cell: Vector2i = spot["cell"]
+	if _start_path_to(Constants.grid_to_world(cell.x, cell.y)):
+		current_state = State.MOVING
+	else:
+		current_state = State.IDLE
+
+func _process_building(delta: float) -> void:
+	if _build_site == null or not is_instance_valid(_build_site) \
+			or _build_site.is_constructed:
+		_build_site = null
+		current_state = State.IDLE
+		return
+	_build_timer += delta
+	if _build_timer < Constants.BUILD_INTERVAL:
+		return
+	_build_timer = 0.0
+	_build_site.build_tick(Constants.BUILD_HP_PER_SWING)
+
 # --- Movement ---
 
 func _start_path_to(target: Vector2) -> bool:
@@ -257,6 +295,13 @@ func _on_arrival() -> void:
 				_gather_timer = 0.0
 		"deposit":
 			_deposit()
+		"build":
+			if _build_site != null and is_instance_valid(_build_site) \
+					and not _build_site.is_constructed:
+				current_state = State.BUILDING
+				_build_timer = 0.0
+			else:
+				current_state = State.IDLE
 		"attack":
 			if _attack_target != null and is_instance_valid(_attack_target):
 				if _in_attack_range(_attack_target):

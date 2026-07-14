@@ -10,12 +10,21 @@ var is_box_selecting: bool = false
 var box_start: Vector2 = Vector2.ZERO
 var selection_rect: Rect2 = Rect2()
 
+# Building placement mode: HUD calls start_placement(); a ghost snaps to the
+# grid under the cursor until the player confirms (left) or cancels (right).
+var placing_type: String = ""
+var _ghost: Sprite2D = null
+
 # Touch tracking: taps select, drags are camera pans (handled by GameCamera).
 var _touch_start: Dictionary = {}
 var _touch_moved: Dictionary = {}
 var _multi_touch: bool = false
 
 func _unhandled_input(event: InputEvent) -> void:
+	if placing_type != "":
+		_placement_input(event)
+		return
+
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_LEFT:
@@ -187,6 +196,17 @@ func _command_at(screen_pos: Vector2) -> void:
 	var names: Array = selected_units.map(
 		func(u: Node2D) -> String: return String(u.name))
 
+	# A friendly, unfinished site under the cursor: send villagers to build.
+	var site: Building = GameManager.world.building_at(
+		Constants.world_to_grid(world_pos)) as Building
+	if site != null and site.player_id == GameManager.local_player_id \
+			and not site.is_constructed:
+		CommandRouter.submit({
+			"type": "build", "player_id": GameManager.local_player_id,
+			"actor_names": names, "building_name": String(site.name),
+		})
+		return
+
 	var enemy: Node2D = _pick_enemy(screen_pos)
 	if enemy != null:
 		CommandRouter.submit({
@@ -208,6 +228,88 @@ func _command_at(screen_pos: Vector2) -> void:
 		"actor_names": names, "target": world_pos,
 	})
 	EventBus.units_commanded_move.emit(selected_units, world_pos)
+
+# --- Building placement ---
+
+func start_placement(building_type: String) -> void:
+	cancel_placement()
+	placing_type = building_type
+	_ghost = Sprite2D.new()
+	_ghost.texture = AssetLibrary.get_building_texture(
+		building_type, GameManager.local_player_id)
+	_ghost.offset = Vector2(0, -_ghost.texture.get_height() / 2.0 + 24.0)
+	_ghost.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_ghost.z_index = 100
+	get_tree().current_scene.add_child(_ghost)
+	_update_ghost(get_viewport().get_mouse_position())
+
+func cancel_placement() -> void:
+	placing_type = ""
+	if _ghost != null and is_instance_valid(_ghost):
+		_ghost.queue_free()
+	_ghost = null
+
+func _placement_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel"):
+		cancel_placement()
+		get_viewport().set_input_as_handled()
+		return
+	if event is InputEventMouseMotion:
+		_update_ghost((event as InputEventMouseMotion).position)
+	elif event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if not mb.pressed:
+			return
+		if mb.button_index == MOUSE_BUTTON_RIGHT:
+			cancel_placement()
+			get_viewport().set_input_as_handled()
+		elif mb.button_index == MOUSE_BUTTON_LEFT:
+			_confirm_placement(mb.position)
+			get_viewport().set_input_as_handled()
+
+func _base_cell_at(screen_pos: Vector2) -> Vector2i:
+	return Constants.world_to_grid(_screen_to_world(screen_pos))
+
+func _placement_valid(base_cell: Vector2i) -> bool:
+	var def: Dictionary = Constants.BUILDING_DEFS[placing_type]
+	if not GameManager.can_afford(GameManager.local_player_id, def["cost"]):
+		return false
+	var footprint: Vector2i = def["footprint"]
+	for dy in range(footprint.y):
+		for dx in range(footprint.x):
+			var cell: Vector2i = base_cell + Vector2i(dx, dy)
+			if not GameManager.world.is_walkable(cell):
+				return false
+			if GameManager.world.building_at(cell) != null:
+				return false
+			if not GameManager.world.get_resource_at(cell).is_empty():
+				return false
+			if GameManager.fog != null and not GameManager.fog.is_explored(cell):
+				return false
+	return true
+
+func _update_ghost(screen_pos: Vector2) -> void:
+	if _ghost == null:
+		return
+	var base_cell: Vector2i = _base_cell_at(screen_pos)
+	var footprint: Vector2i = Constants.BUILDING_DEFS[placing_type]["footprint"]
+	var south: Vector2i = base_cell + footprint - Vector2i.ONE
+	_ghost.position = Constants.grid_to_world(south.x, south.y)
+	_ghost.modulate = Color(0.55, 1.0, 0.55, 0.65) if _placement_valid(base_cell) \
+		else Color(1.0, 0.45, 0.45, 0.55)
+
+func _confirm_placement(screen_pos: Vector2) -> void:
+	var base_cell: Vector2i = _base_cell_at(screen_pos)
+	if not _placement_valid(base_cell):
+		return
+	var builders: Array = selected_units.filter(is_instance_valid).filter(
+		func(u: Node2D) -> bool: return u.get("can_gather"))
+	CommandRouter.submit({
+		"type": "place", "player_id": GameManager.local_player_id,
+		"building_type": placing_type, "cell": base_cell,
+		"actor_names": builders.map(func(u: Node2D) -> String: return String(u.name)),
+	})
+	cancel_placement()
 
 func clear_selection() -> void:
 	_deselect_all()

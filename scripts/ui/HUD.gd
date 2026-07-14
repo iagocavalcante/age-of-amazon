@@ -16,6 +16,7 @@ var _pause_button: Button
 var _sel_panel: PanelContainer
 var _sel_label: Label
 var _train_box: HBoxContainer
+var _build_box: HBoxContainer
 var _queue_label: Label
 
 var _minimap_rect: TextureRect
@@ -120,7 +121,8 @@ func _icon_rect(texture: Texture2D) -> TextureRect:
 func _refresh_top_bar() -> void:
 	for type: int in _resource_labels:
 		_resource_labels[type].text = str(GameManager.get_resource(GameManager.local_player_id, type))
-	_pop_label.text = "%d/%d" % [GameManager.get_population(GameManager.local_player_id), Constants.POPULATION_CAP]
+	_pop_label.text = "%d/%d" % [GameManager.get_population(GameManager.local_player_id),
+		GameManager.population_cap(GameManager.local_player_id)]
 
 func _on_resources_changed(player_id: int) -> void:
 	if player_id == GameManager.local_player_id:
@@ -167,6 +169,26 @@ func _build_selection_panel() -> void:
 	_queue_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(_queue_label)
 
+	# Construction buttons appear when villagers are selected.
+	_build_box = HBoxContainer.new()
+	_build_box.add_theme_constant_override("separation", 8)
+	_build_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	_build_box.visible = false
+	box.add_child(_build_box)
+	for building_type: String in ["house", "barracks", "watchtower"]:
+		var def: Dictionary = Constants.BUILDING_DEFS[building_type]
+		var parts: Array[String] = []
+		for res_type: int in def["cost"]:
+			parts.append("%d %s" % [def["cost"][res_type],
+				Constants.RESOURCE_NAMES[res_type]])
+		var button: Button = Button.new()
+		button.text = "%s (%s)" % [building_type.capitalize(), ", ".join(parts)]
+		button.focus_mode = Control.FOCUS_NONE
+		var captured: String = building_type
+		button.pressed.connect(func() -> void:
+			SelectionManager.start_placement(captured))
+		_build_box.add_child(button)
+
 func _train(unit_type: String) -> void:
 	var building: Node2D = SelectionManager.selected_building
 	if building == null or not is_instance_valid(building):
@@ -181,9 +203,14 @@ func _refresh_selection_panel() -> void:
 	var building: Node2D = SelectionManager.selected_building
 	if building != null and is_instance_valid(building):
 		_sel_panel.visible = true
-		_train_box.visible = true
-		_queue_label.visible = true
-		_sel_label.text = "Town Center  —  %d/%d HP" % [building.current_hp, building.max_hp]
+		_build_box.visible = false
+		var constructed: bool = bool(building.get("is_constructed"))
+		_train_box.visible = constructed
+		_queue_label.visible = constructed
+		var title: String = String(building.get("building_type")).capitalize().replace("_", " ")
+		if not constructed:
+			title += "  ·  under construction"
+		_sel_label.text = "%s  —  %d/%d HP" % [title, building.current_hp, building.max_hp]
 		var queue: Array = building.train_queue
 		if queue.is_empty():
 			_queue_label.text = "Queue empty"
@@ -196,11 +223,14 @@ func _refresh_selection_panel() -> void:
 	var units: Array = SelectionManager.selected_units.filter(is_instance_valid)
 	if units.is_empty():
 		_sel_panel.visible = false
+		_build_box.visible = false
 		return
 
 	_sel_panel.visible = true
 	_train_box.visible = false
 	_queue_label.visible = false
+	_build_box.visible = units.any(
+		func(u: Node2D) -> bool: return bool(u.get("can_gather")))
 	var counts: Dictionary = {}
 	for unit: Node2D in units:
 		var t: String = unit.get("unit_type")

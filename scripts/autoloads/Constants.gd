@@ -31,8 +31,16 @@ const RESOURCE_NAMES: Dictionary = {
 const GATHER_INTERVAL: float = 1.2  # seconds per resource unit
 const CARRY_CAPACITY: int = 10
 
-# Population
+# Population: every tribe starts at the base cap; each finished house adds
+# HOUSE_POP_BONUS, up to the hard ceiling.
 const POPULATION_CAP: int = 20
+const HOUSE_POP_BONUS: int = 5
+const POPULATION_CEILING: int = 50
+
+# Construction
+const BUILD_INTERVAL: float = 0.5      # seconds between a builder's swings
+const BUILD_HP_PER_SWING: int = 6      # hp added per swing per villager
+const SITE_STARTING_HP_FRACTION: float = 0.1
 
 # Unit definitions
 const UNIT_DEFS: Dictionary = {
@@ -95,12 +103,36 @@ const ANIMAL_DEFS: Dictionary = {
 }
 
 # Building definitions (footprint in tiles)
+# Buildings with a "cost" are player-constructable (villagers build them);
+# the town center exists only from the match start.
 const BUILDING_DEFS: Dictionary = {
 	"town_center": {
 		"max_hp": 600,
 		"footprint": Vector2i(2, 2),
 		"trains": ["villager", "warrior"],
 		"vision_tiles": 9,
+	},
+	"house": {
+		"max_hp": 200,
+		"footprint": Vector2i(1, 1),
+		"trains": [],
+		"vision_tiles": 5,
+		"cost": {ResourceType.WOOD: 30},
+		"pop_bonus": 5,
+	},
+	"barracks": {
+		"max_hp": 400,
+		"footprint": Vector2i(2, 2),
+		"trains": ["warrior"],
+		"vision_tiles": 7,
+		"cost": {ResourceType.WOOD: 60, ResourceType.FOOD: 20},
+	},
+	"watchtower": {
+		"max_hp": 250,
+		"footprint": Vector2i(1, 1),
+		"trains": [],
+		"vision_tiles": 16,
+		"cost": {ResourceType.WOOD: 40},
 	},
 }
 

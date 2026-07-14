@@ -40,6 +40,8 @@ func _ready() -> void:
 		_run_gw_test(args, false)
 	if "--test-seat" in args:
 		_run_seat_test()
+	if "--test-build" in args:
+		_run_build_test()
 	if "--test-victory" in args:
 		_run_victory_test()
 	if "--test-systems" in args:
@@ -192,6 +194,90 @@ func _run_move_test() -> void:
 	await get_tree().create_timer(3.0).timeout
 	for u: Node2D in SelectionManager.selected_units:
 		print("[test-move] unit after 3s: ", u.global_position, " state=", u.current_state)
+	get_tree().quit()
+
+# Find a cell near origin where a building of this type may legally go —
+# the same checks the authority applies, so harnesses don't flake on the
+# random scatter of trees.
+func _find_buildable_cell(origin: Vector2i, building_type: String, player_id: int) -> Vector2i:
+	var footprint: Vector2i = Constants.BUILDING_DEFS[building_type]["footprint"]
+	for radius in range(3, 9):
+		for dy in range(-radius, radius + 1):
+			for dx in range(-radius, radius + 1):
+				var base: Vector2i = origin + Vector2i(dx, dy)
+				var ok: bool = true
+				for fy in range(footprint.y):
+					for fx in range(footprint.x):
+						var cell: Vector2i = base + Vector2i(fx, fy)
+						if not GameManager.world.is_walkable(cell) \
+								or GameManager.world.building_at(cell) != null \
+								or not GameManager.world.get_resource_at(cell).is_empty() \
+								or not GameManager.has_explored(player_id, cell):
+							ok = false
+							break
+					if not ok:
+						break
+				if ok:
+					return base
+	return Vector2i(9999, 9999)
+
+# Prove construction: rejections (occupied, unscouted), a villager-built
+# house that raises the pop cap, and a barracks that trains once finished.
+func _run_build_test() -> void:
+	await get_tree().create_timer(0.5).timeout
+	var villagers: Array = get_tree().get_nodes_in_group("player_0").filter(
+		func(n: Node) -> bool: return n is UnitBase and (n as UnitBase).can_gather)
+	var names: Array = villagers.map(func(u: Node2D) -> String: return String(u.name))
+	var wood_start: int = GameManager.get_resource(0, Constants.ResourceType.WOOD)
+	var cap_before: int = GameManager.population_cap(0)
+
+	CommandRouter.submit({"type": "place", "player_id": 0, "building_type": "house",
+		"cell": Vector2i(-1, -1), "actor_names": names})
+	await get_tree().process_frame
+	print("[test-build] reject-occupied ", "OK"
+		if GameManager.get_resource(0, Constants.ResourceType.WOOD) == wood_start else "FAILED")
+
+	CommandRouter.submit({"type": "place", "player_id": 0, "building_type": "house",
+		"cell": Vector2i(120, 120), "actor_names": names})
+	await get_tree().process_frame
+	print("[test-build] reject-fog ", "OK"
+		if GameManager.get_resource(0, Constants.ResourceType.WOOD) == wood_start else "FAILED")
+
+	var house_cell: Vector2i = _find_buildable_cell(Vector2i.ZERO, "house", 0)
+	CommandRouter.submit({"type": "place", "player_id": 0, "building_type": "house",
+		"cell": house_cell, "actor_names": names})
+	await get_tree().process_frame
+	var site: Building = GameManager.world.building_at(house_cell) as Building
+	var placed: bool = site != null and not site.is_constructed \
+		and GameManager.get_resource(0, Constants.ResourceType.WOOD) == wood_start - 30
+	print("[test-build] place-house ", "OK" if placed else "FAILED")
+	if site == null:
+		get_tree().quit(1)
+		return
+	print("[test-build] train-guard ", "OK" if not site.queue_train("villager") else "FAILED")
+
+	var elapsed: float = 0.0
+	while not site.is_constructed and elapsed < 30.0:
+		await get_tree().create_timer(0.5).timeout
+		elapsed += 0.5
+	print("[test-build] constructed ", "OK" if site.is_constructed else "FAILED",
+		" in ", elapsed, "s")
+	print("[test-build] pop-cap ", "OK"
+		if GameManager.population_cap(0) == cap_before + 5 else "FAILED")
+
+	GameManager.add_resource(0, Constants.ResourceType.WOOD, 100)
+	var barracks_cell: Vector2i = _find_buildable_cell(Vector2i.ZERO, "barracks", 0)
+	CommandRouter.submit({"type": "place", "player_id": 0, "building_type": "barracks",
+		"cell": barracks_cell, "actor_names": names})
+	await get_tree().process_frame
+	var barracks: Building = GameManager.world.building_at(barracks_cell) as Building
+	elapsed = 0.0
+	while barracks != null and not barracks.is_constructed and elapsed < 40.0:
+		await get_tree().create_timer(0.5).timeout
+		elapsed += 0.5
+	var trains: bool = barracks != null and barracks.is_constructed \
+		and barracks.queue_train("warrior")
+	print("[test-build] barracks-trains ", "OK" if trains else "FAILED")
 	get_tree().quit()
 
 # Prove the persisted seat (refresh-rejoin) file layer: save/load roundtrip,
@@ -362,6 +448,22 @@ func _run_mp_client_test() -> void:
 		await get_tree().create_timer(4.0).timeout
 		var unmoved: bool = victim.global_position.distance_to(before) < 60.0
 		print("[test-mp] foreign-command ", "OK" if unmoved else "FAILED")
+
+	# Construction replicates: place a house, watch its site spawn locally.
+	var my_origin: Vector2i = WorldGen.PLAYER_ORIGINS[GameManager.local_player_id]
+	var house_cell: Vector2i = _find_buildable_cell(
+		my_origin, "house", GameManager.local_player_id)
+	CommandRouter.submit({
+		"type": "place", "player_id": GameManager.local_player_id,
+		"building_type": "house", "cell": house_cell,
+		"actor_names": mine.map(func(u: Node2D) -> String: return String(u.name)),
+	})
+	var built: Array = [false]
+	var check: Callable = func() -> bool:
+		var b: Building = GameManager.world.building_at(house_cell) as Building
+		return b != null and b.building_type == "house"
+	await _until(check, 8.0)
+	print("[test-mp] build-sync ", "OK" if check.call() else "FAILED")
 	get_tree().quit()
 
 # Prove N-player victory: with three tribes, losing one town center does NOT

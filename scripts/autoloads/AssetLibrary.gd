@@ -9,6 +9,7 @@ var unit_frames: Array = []
 # Neutral wildlife: species -> frames (idle, walk A, walk B)
 var animal_frames: Dictionary = {}
 var town_center_textures: Array[ImageTexture] = []
+var building_textures: Array[Dictionary] = []  # player_id -> {type -> ImageTexture}
 var selection_ring: ImageTexture
 var unit_shadow: ImageTexture
 var tree_textures: Array[ImageTexture] = []
@@ -73,6 +74,12 @@ func _ready() -> void:
 			"warrior": unit_artist.build_warrior_frames(color),
 		})
 		town_center_textures.append(building_artist.build_town_center(color))
+		building_textures.append({
+			"town_center": town_center_textures.back(),
+			"house": building_artist.build_house(color),
+			"barracks": building_artist.build_barracks(color),
+			"watchtower": building_artist.build_watchtower(color),
+		})
 	selection_ring = unit_artist.build_selection_ring()
 	unit_shadow = unit_artist.build_shadow()
 
@@ -118,6 +125,9 @@ func get_unit_frames(player_id: int, unit_type: String) -> Array:
 
 func get_town_center_texture(player_id: int) -> ImageTexture:
 	return town_center_textures[clampi(player_id, 0, town_center_textures.size() - 1)]
+
+func get_building_texture(building_type: String, player_id: int) -> ImageTexture:
+	return building_textures[clampi(player_id, 0, building_textures.size() - 1)][building_type]
 
 func get_animal_frames(species: String) -> Array:
 	return animal_frames.get(species, [])
