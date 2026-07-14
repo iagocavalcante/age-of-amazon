@@ -11,8 +11,10 @@ var camera_drag_start: Vector2 = Vector2.ZERO
 # Zoom
 @export var zoom_speed: float = 0.1
 @export var min_zoom: float = 0.3
-@export var max_zoom: float = 2.0
-var target_zoom: float = 0.7
+@export var max_zoom: float = 2.5
+# Start close enough that units read clearly on modern displays; players can
+# still wheel/pinch out to min_zoom for the strategic view.
+var target_zoom: float = 1.2
 
 # Pinch zoom
 var touch_points: Dictionary = {}
