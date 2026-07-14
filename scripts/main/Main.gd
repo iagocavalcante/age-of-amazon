@@ -262,7 +262,9 @@ func _run_gw_test(args: PackedStringArray, is_host: bool) -> void:
 		Gateway.join_room(_arg_value(args, "--room="))
 		await _until(func() -> bool: return not updates.is_empty(), 10.0)
 
-	await _until(func() -> bool: return not ports.is_empty(), 30.0)
+	# --patient: wait for a human host instead of harness pacing.
+	var ready_window: float = 300.0 if "--patient" in args else 30.0
+	await _until(func() -> bool: return not ports.is_empty(), ready_window)
 	if ports.is_empty():
 		print("[test-gw] %s match-ready FAILED" % role)
 		get_tree().quit(1)

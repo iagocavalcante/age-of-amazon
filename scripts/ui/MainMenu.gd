@@ -14,6 +14,8 @@ extends Control
 const MAIN_SCENE: String = "res://scenes/main/Main.tscn"
 const CONFIG_PATH: String = "res://server_config.json"
 const BACKDROP_SEED: int = 20260712
+# Invite links from non-web builds point at the public site.
+const FALLBACK_SHARE_URL: String = "https://iagocavalcante.github.io/age-of-amazon/"
 
 # Palette (mirrors the in-game HUD, gold from the town center).
 const COLOR_BG: Color = Color("#0b160d")
@@ -38,6 +40,9 @@ var _code_edit: LineEdit
 var _lobby_panel: PanelContainer
 var _lobby_label: Label
 var _start_button: Button
+var _invite_edit: LineEdit
+var _room_code: String = ""
+var _footer: Label
 var _connected: bool = false
 var _pending_action: Callable = Callable()
 
@@ -65,6 +70,25 @@ func _ready() -> void:
 	# Dev affordance: open the friends page directly for layout review.
 	if "--show-friends" in OS.get_cmdline_user_args():
 		_show_friends(true)
+	if "--mock-lobby" in OS.get_cmdline_user_args():
+		_show_friends(true)
+		_on_room_updated("G75U", 1, 0)
+
+	_check_invite_link()
+
+# Invite links (…/?room=CODE) drop a friend straight into the room.
+func _check_invite_link() -> void:
+	if not OS.has_feature("web"):
+		return
+	var code: Variant = JavaScriptBridge.eval(
+		"new URLSearchParams(window.location.search).get('room') || ''", true)
+	if not (code is String) or String(code).length() != Gateway.CODE_LENGTH:
+		return
+	var room: String = String(code).to_upper()
+	_show_friends(true)
+	_code_edit.text = room
+	_set_status("Joining room %s…" % room)
+	_gateway_action(func() -> void: Gateway.join_room(room))
 
 func _should_skip_menu(args: PackedStringArray) -> bool:
 	for arg: String in args:
@@ -243,9 +267,11 @@ func _build_ui() -> void:
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_status.add_theme_font_size_override("font_size", 13)
 	_status.add_theme_color_override("font_color", COLOR_TEXT_DIM)
-	column.add_child(_status)
+	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	pages.add_child(_status)
 
 	var footer: Label = Label.new()
+	_footer = footer
 	footer.text = "FOG OF WAR  ·  2–4 TRIBES  ·  PLAYS IN YOUR BROWSER"
 	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	footer.add_theme_font_override("font", _display_font(2))
@@ -324,6 +350,29 @@ func _build_friends_page(parent: Control) -> void:
 	_lobby_label.add_theme_font_size_override("font_size", 15)
 	_lobby_label.add_theme_color_override("font_color", COLOR_GOLD)
 	lobby_box.add_child(_lobby_label)
+
+	# One-tap sharing: the invite link is visible (manual copy always works,
+	# even where the clipboard API doesn't) and one button away.
+	var share_row: HBoxContainer = HBoxContainer.new()
+	share_row.add_theme_constant_override("separation", 8)
+	lobby_box.add_child(share_row)
+	_invite_edit = LineEdit.new()
+	_invite_edit.editable = false
+	_invite_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_invite_edit.add_theme_font_size_override("font_size", 11)
+	_style_input(_invite_edit)
+	share_row.add_child(_invite_edit)
+	var copy_link: Button = _secondary_button("Copy Link")
+	copy_link.pressed.connect(func() -> void:
+		DisplayServer.clipboard_set(_invite_edit.text)
+		_set_status("Invite link copied — send it to a friend."))
+	share_row.add_child(copy_link)
+	var copy_code: Button = _text_button("copy just the code")
+	copy_code.pressed.connect(func() -> void:
+		DisplayServer.clipboard_set(_room_code)
+		_set_status("Code %s copied." % _room_code))
+	lobby_box.add_child(copy_code)
+
 	_start_button = _primary_button("Start Match")
 	_start_button.visible = false
 	_start_button.pressed.connect(func() -> void: Gateway.start_match())
@@ -349,6 +398,9 @@ func _build_friends_page(parent: Control) -> void:
 func _show_friends(show_friends: bool) -> void:
 	_friends_page.visible = show_friends
 	_main_page.visible = not show_friends
+	# The lobby card runs tall; give it the footer's breathing room.
+	if _footer != null:
+		_footer.visible = not show_friends
 	_set_status("")
 
 # --- Style helpers ---
@@ -390,6 +442,9 @@ func _primary_button(text: String) -> Button:
 		_flat_style(COLOR_GOLD.lightened(0.12), COLOR_GOLD.lightened(0.2)))
 	button.add_theme_stylebox_override("pressed",
 		_flat_style(COLOR_GOLD.darkened(0.15), COLOR_GOLD.darkened(0.1)))
+	button.add_theme_stylebox_override("disabled",
+		_flat_style(Color(COLOR_GOLD, 0.25), Color(COLOR_GOLD, 0.2)))
+	button.add_theme_color_override("font_disabled_color", Color(COLOR_TEXT_DIM, 0.5))
 	for state: String in ["font_color", "font_hover_color", "font_pressed_color"]:
 		button.add_theme_color_override(state, COLOR_GOLD_DARK)
 	button.add_theme_font_size_override("font_size", 16)
@@ -443,7 +498,18 @@ func _on_gateway_connected() -> void:
 		_pending_action.call()
 		_pending_action = Callable()
 
+func _invite_link(code: String) -> String:
+	var base: String = FALLBACK_SHARE_URL
+	if OS.has_feature("web"):
+		var origin: Variant = JavaScriptBridge.eval(
+			"window.location.origin + window.location.pathname", true)
+		if origin is String and String(origin).begins_with("http"):
+			base = String(origin)
+	return "%s?room=%s" % [base, code]
+
 func _on_room_updated(code: String, player_count: int, my_slot: int) -> void:
+	_room_code = code
+	_invite_edit.text = _invite_link(code)
 	_lobby_panel.visible = true
 	_lobby_label.text = "ROOM %s  —  %d/%d PLAYERS" % [code, player_count, Gateway.MAX_PLAYERS]
 	_start_button.visible = my_slot == 0
