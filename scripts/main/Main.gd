@@ -252,9 +252,12 @@ func _run_gw_test(args: PackedStringArray, is_host: bool) -> void:
 			get_tree().quit(1)
 			return
 		print("[test-gw] code=", updates[0][0])
-		await _until(func() -> bool: return updates.back()[1] >= 2, 30.0)
+		var joiner_window: float = 300.0 if "--patient" in args else 30.0
+		await _until(func() -> bool: return updates.back()[1] >= 2, joiner_window)
 		if updates.back()[1] < 2:
-			print("[test-gw] host waiting-for-joiner FAILED")
+			print("[test-gw] host waiting-for-joiner FAILED (still connected: %s)"
+				% str(multiplayer.multiplayer_peer.get_connection_status()
+					== MultiplayerPeer.CONNECTION_CONNECTED))
 			get_tree().quit(1)
 			return
 		Gateway.start_match()

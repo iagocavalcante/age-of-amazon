@@ -15,6 +15,11 @@ const MAX_PLAYERS: int = 4
 # Grace between spawning the match process and telling clients to connect,
 # so the match socket is listening before anyone dials it.
 const MATCH_BOOT_GRACE: float = 2.0
+# A waiting lobby is otherwise silent, and idle websockets get culled by
+# proxies along the way (Cloudflare's edge kills them after ~100 s). Ping
+# every connected peer well inside that window; the pong keeps traffic
+# flowing in both directions.
+const HEARTBEAT_INTERVAL: float = 40.0
 
 # Client-side signals for the menu UI.
 signal room_updated(code: String, player_count: int, my_slot: int)
@@ -26,6 +31,26 @@ var _rooms: Dictionary = {}
 var _peer_rooms: Dictionary = {}  # peer_id -> code
 var _next_match_port: int = 9100
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var _heartbeat_accum: float = 0.0
+
+func _process(delta: float) -> void:
+	if Net.mode != Net.Mode.GATEWAY:
+		return
+	_heartbeat_accum += delta
+	if _heartbeat_accum < HEARTBEAT_INTERVAL:
+		return
+	_heartbeat_accum = 0.0
+	for peer: int in multiplayer.get_peers():
+		_ping.rpc_id(peer)
+
+@rpc("authority", "call_remote", "reliable")
+func _ping() -> void:
+	# Client side: answer so every proxy hop sees two-way traffic.
+	_pong.rpc_id(1)
+
+@rpc("any_peer", "call_remote", "reliable")
+func _pong() -> void:
+	pass
 
 func host(port: int, match_port_base: int) -> Error:
 	_rng.randomize()
