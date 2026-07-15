@@ -69,7 +69,8 @@ const ICON_POP: Array[String] = [
 func _ready() -> void:
 	var unit_artist: UnitArtist = UnitArtist.new()
 	var building_artist: BuildingArtist = BuildingArtist.new()
-	for color: Color in Constants.PLAYER_COLORS:
+	for player_id in range(Constants.PLAYER_COLORS.size()):
+		var color: Color = Constants.PLAYER_COLORS[player_id]
 		var procedural: Dictionary = {
 			"villager": unit_artist.build_villager_frames(color),
 			"warrior": unit_artist.build_warrior_frames(color),
@@ -77,18 +78,25 @@ func _ready() -> void:
 		}
 		var frame_set: Dictionary = {}
 		for unit_type: String in procedural:
-			var painted: Array = _override_unit_frames(unit_type, color)
+			var painted: Array = _override_unit_frames(unit_type, color, player_id)
 			frame_set[unit_type] = painted if not painted.is_empty() \
 				else procedural[unit_type]
 		unit_frames.append(frame_set)
-		town_center_textures.append(building_artist.build_town_center(color))
-		building_textures.append({
-			"town_center": town_center_textures.back(),
+		var proc_buildings: Dictionary = {
+			"town_center": building_artist.build_town_center(color),
 			"house": building_artist.build_house(color),
 			"barracks": building_artist.build_barracks(color),
 			"watchtower": building_artist.build_watchtower(color),
 			"monument": building_artist.build_monument(color),
-		})
+		}
+		var building_set: Dictionary = {}
+		for building_type: String in proc_buildings:
+			var override: ImageTexture = _override_texture(
+				"building_%s" % building_type, color)
+			building_set[building_type] = override if override != null \
+				else proc_buildings[building_type]
+		town_center_textures.append(building_set["town_center"])
+		building_textures.append(building_set)
 	selection_ring = unit_artist.build_selection_ring()
 	unit_shadow = unit_artist.build_shadow()
 
@@ -106,6 +114,10 @@ func _ready() -> void:
 	animal_frames["tapir"] = animal_artist.build_tapir_frames()
 	animal_frames["bush_dog"] = animal_artist.build_bush_dog_frames()
 	animal_frames["caiman"] = animal_artist.build_caiman_frames()
+	for species: String in animal_frames:
+		var painted: Array = _override_animal_frames(species)
+		if not painted.is_empty():
+			animal_frames[species] = painted
 
 	_build_icons()
 
@@ -139,18 +151,45 @@ func _build_icons() -> void:
 # file can never break the game.
 const SPRITE_DIR: String = "res://assets/sprites/"
 
-func _override_unit_frames(unit_type: String, player_color: Color) -> Array:
+func _override_unit_frames(unit_type: String, player_color: Color,
+		player_id: int) -> Array:
 	var frames: Array = []
 	for frame: String in ["idle", "walk_a", "walk_b"]:
-		var path: String = SPRITE_DIR + "unit_%s_%s.png" % [unit_type, frame]
+		# A per-tribe motif file wins over the shared master.
+		var tribe_path: String = SPRITE_DIR + "unit_%s_%s_t%d.png" % [
+			unit_type, frame, player_id]
+		var generic_path: String = SPRITE_DIR + "unit_%s_%s.png" % [unit_type, frame]
+		var path: String = tribe_path if ResourceLoader.exists(tribe_path) \
+			else generic_path
+		if not ResourceLoader.exists(path):
+			return []
+		frames.append(_load_tinted(path, player_color))
+	return frames
+
+func _override_texture(name: String, player_color: Color) -> ImageTexture:
+	var path: String = SPRITE_DIR + name + ".png"
+	if not ResourceLoader.exists(path):
+		return null
+	return _load_tinted(path, player_color)
+
+func _override_animal_frames(species: String) -> Array:
+	var frames: Array = []
+	for frame: String in ["idle", "walk_a", "walk_b"]:
+		var path: String = SPRITE_DIR + "animal_%s_%s.png" % [species, frame]
 		if not ResourceLoader.exists(path):
 			return []
 		var texture: Texture2D = load(path)
 		var img: Image = texture.get_image()
 		img.convert(Image.FORMAT_RGBA8)
-		_tint_magenta(img, player_color)
 		frames.append(ImageTexture.create_from_image(img))
 	return frames
+
+func _load_tinted(path: String, player_color: Color) -> ImageTexture:
+	var texture: Texture2D = load(path)
+	var img: Image = texture.get_image()
+	img.convert(Image.FORMAT_RGBA8)
+	_tint_magenta(img, player_color)
+	return ImageTexture.create_from_image(img)
 
 # Magenta-family pixels take the tribe color, keeping their shading value.
 # Thresholds match the validated pipeline (quantization darkens magenta).

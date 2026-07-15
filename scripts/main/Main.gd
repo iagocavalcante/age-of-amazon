@@ -917,6 +917,15 @@ func _run_capture_animals() -> void:
 	_spawn_unit("archer", 0, Vector2i(4, 5))
 	_spawn_unit("warrior", 0, Vector2i(5, 4))
 	_spawn_unit("warrior", 1, Vector2i(1, 5))
+	# One of each unit per tribe, in tribe rows, plus the painted buildings.
+	for pid in range(4):
+		_spawn_unit("villager", pid, Vector2i(-2 + pid * 2, 6))
+		_spawn_unit("warrior", pid, Vector2i(-2 + pid * 2, 7))
+		_spawn_unit("archer", pid, Vector2i(-2 + pid * 2, 8))
+	_place_building("house", 0, Vector2i(-5, 2))
+	_place_building("barracks", 1, Vector2i(-6, 4))
+	_place_building("watchtower", 2, Vector2i(-4, 7))
+	_place_building("monument", 3, Vector2i(7, 6))
 	camera.global_position = Constants.grid_to_world(3, 3)
 	camera.target_zoom = 1.9
 	camera.zoom = Vector2(1.9, 1.9)
