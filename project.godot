@@ -13,6 +13,9 @@ config_version=5
 config/name="Age Of Amazon"
 run/main_scene="res://scenes/ui/MainMenu.tscn"
 config/features=PackedStringArray("4.5", "GL Compatibility")
+boot_splash/bg_color=Color(0.043, 0.086, 0.051, 1)
+boot_splash/image="res://assets/splash.png"
+boot_splash/fullsize=true
 config/icon="res://icon.svg"
 
 [autoload]
