@@ -158,4 +158,12 @@ are skipped, or four files when they are not.
 
 ## Validation log
 
-- (pending first generation — record model, prompt used, and outcome here)
+- **2026-07-15:** Attempted first generation (tribe-1 warrior, master +
+  warrior prompt) via the local Gemini MCP tools. Both fail with API 404 —
+  the MCP server pins the retired `imagen-4.0-generate-001` model. The
+  prompts are therefore **written but not yet generation-tested**. They are
+  generator-agnostic: paste the master prompt + an asset prompt into any
+  capable image model (Gemini web, GPT-4o images, Midjourney). The
+  post-processing script is standard Pillow and runs as written. First
+  person to generate: record model + outcome here and check the
+  validation checklist.
