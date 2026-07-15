@@ -278,6 +278,21 @@ func _run_build_test() -> void:
 	var trains: bool = barracks != null and barracks.is_constructed \
 		and barracks.queue_train("warrior")
 	print("[test-build] barracks-trains ", "OK" if trains else "FAILED")
+
+	# Repair: damage the finished house, send villagers, watch hp return at
+	# the cost of wood.
+	site.take_damage(120)
+	var wood_before_repair: int = GameManager.get_resource(0, Constants.ResourceType.WOOD)
+	CommandRouter.submit({"type": "build", "player_id": 0,
+		"building_name": String(site.name), "actor_names": names})
+	elapsed = 0.0
+	while site.current_hp < site.max_hp and elapsed < 30.0:
+		await get_tree().create_timer(0.5).timeout
+		elapsed += 0.5
+	print("[test-build] repair ", "OK" if site.current_hp == site.max_hp else "FAILED")
+	var wood_spent: int = wood_before_repair - GameManager.get_resource(0, Constants.ResourceType.WOOD)
+	print("[test-build] repair-cost ", "OK" if wood_spent > 0 else "FAILED",
+		" (wood spent: ", wood_spent, ")")
 	get_tree().quit()
 
 # Prove the persisted seat (refresh-rejoin) file layer: save/load roundtrip,

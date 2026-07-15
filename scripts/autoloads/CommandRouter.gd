@@ -144,7 +144,7 @@ func _exec_place(command: Dictionary) -> void:
 func _exec_build(command: Dictionary) -> void:
 	var site: Building = _resolve_target(command.get("building_name", "")) as Building
 	if site == null or site.player_id != int(command["player_id"]) \
-			or site.is_constructed:
+			or site.current_hp >= site.max_hp:
 		return
 	_send_builders(command, site)
 

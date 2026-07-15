@@ -218,6 +218,8 @@ func command_attack(target: Node2D) -> void:
 func command_build(site: Building) -> void:
 	if not can_gather or site == null or not is_instance_valid(site):
 		return
+	if site.current_hp >= site.max_hp:
+		return  # nothing to build or repair
 	_build_site = site
 	_attack_target = null
 	var spot: Dictionary = GameManager.pathfinder.adjacent_walkable(
@@ -234,7 +236,7 @@ func command_build(site: Building) -> void:
 
 func _process_building(delta: float) -> void:
 	if _build_site == null or not is_instance_valid(_build_site) \
-			or _build_site.is_constructed:
+			or _build_site.current_hp >= _build_site.max_hp:
 		_build_site = null
 		current_state = State.IDLE
 		return
@@ -297,7 +299,7 @@ func _on_arrival() -> void:
 			_deposit()
 		"build":
 			if _build_site != null and is_instance_valid(_build_site) \
-					and not _build_site.is_constructed:
+					and _build_site.current_hp < _build_site.max_hp:
 				current_state = State.BUILDING
 				_build_timer = 0.0
 			else:

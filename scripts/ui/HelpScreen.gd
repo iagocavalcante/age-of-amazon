@@ -199,7 +199,7 @@ func _build_left(col: VBoxContainer) -> void:
 	_add_control(col, "Right-click a resource", "Send villagers to gather it")
 	_add_control(col, "Right-click an enemy", "Attack it")
 	_add_control(col, "Right-click an animal", "Hunt it for food")
-	_add_control(col, "Right-click your unfinished site", "Send villagers to build it")
+	_add_control(col, "Right-click your damaged building", "Villagers build or repair it")
 
 func _build_right(col: VBoxContainer) -> void:
 	_add_section(col, "Your people")
@@ -212,7 +212,7 @@ func _build_right(col: VBoxContainer) -> void:
 	_add_body(col, "•  House (30 wood) — +5 population.")
 	_add_body(col, "•  Barracks (60 wood, 20 food) — trains warriors.")
 	_add_body(col, "•  Watchtower (40 wood) — watches far into the fog.")
-	_add_body(col, "Unfinished sites are fragile and can be razed — guard them.")
+	_add_body(col, "Unfinished sites are fragile and can be razed — guard them. Villagers also repair damaged buildings (1 wood per swing).")
 
 	_add_section(col, "Resources")
 	_add_resource(col, Constants.ResourceType.FOOD, "Food", "trains villagers and warriors")

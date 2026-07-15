@@ -1,106 +1,3 @@
-# Plain-HTTP front for the Cloudflare tunnel 
-2026-07-13 09:31:36|Bash|ssh -f -N -L 8081:localhost:8081 -L 9100:localhost:9100 -L 9101:localhost:9101 ssh-tron && cd /Users
-2026-07-13 09:31:49|Bash|curl -s -o /dev/null -w "m-route: %{http_code}\n" http://127.0.0.1:8081/m/9155; curl -s -o /dev/null
-2026-07-13 09:32:08|Edit|/Users/iagocavalcante/Workspaces/IagoCavalcante/age-of-amazon-mp/docs/deploy-multiplayer.md
-2026-07-13 09:32:17|Bash|cd /Users/iagocavalcante/Workspaces/IagoCavalcante/age-of-amazon-mp && git add -A && git commit -q -
-2026-07-13 09:32:32|Edit|/Users/iagocavalcante/.claude/projects/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/memory/age-of-amazon-tooling.md
-2026-07-13 09:47:05|Bash|ssh ssh-tron 'ls -la ~/media-stack/.token 2>/dev/null || find ~ -maxdepth 3 -name ".token" -path "*m
-2026-07-13 09:47:22|Bash|ls -la ~/Workspaces/IagoCavalcante/media-stack/.token 2>/dev/null || find ~/Workspaces -maxdepth 3 -
-2026-07-13 09:47:34|Bash|ls -la /Users/iagocavalcante/Workspaces/IagoCavalcante/media-stack/ | head; TOK=$(cat /Users/iagocav
-2026-07-13 09:47:50|Bash|grep -oE "^[A-Z_]+" /Users/iagocavalcante/Workspaces/IagoCavalcante/media-stack/.env; echo ---; TOK=
-2026-07-13 09:48:06|Read|/Users/iagocavalcante/Workspaces/IagoCavalcante/media-stack/CLOUDFLARE-TUNNEL-FIX.txt
-2026-07-13 09:48:29|Bash|ssh ssh-tron 'ls -la ~/media-stack/ 2>/dev/null | head -15; echo "--- .cloudflared:"; ls -la ~/.clou
-2026-07-13 09:49:15|Bash|ssh ssh-tron 'cloudflared tunnel create aoa-game 2>&1 | tail -2; cloudflared tunnel list 2>/dev/null
-2026-07-13 09:49:54|Bash|ssh ssh-tron 'cat > ~/.cloudflared/aoa-game-config.yml << "EOF"
-# Dedicated tunnel for Age of Amazon
-2026-07-13 09:50:26|Bash|ssh ssh-tron 'head -3 ~/.cloudflared/config.yml; cloudflared tunnel --config ~/.cloudflared/aoa-game
-2026-07-13 09:50:54|Edit|/Users/iagocavalcante/Workspaces/IagoCavalcante/age-of-amazon-mp/scripts/main/Main.gd
-2026-07-13 09:50:57|Edit|/Users/iagocavalcante/Workspaces/IagoCavalcante/age-of-amazon-mp/scripts/main/Main.gd
-2026-07-13 09:51:00|Edit|/Users/iagocavalcante/Workspaces/IagoCavalcante/age-of-amazon-mp/scripts/main/Main.gd
-2026-07-13 09:51:02|Edit|/Users/iagocavalcante/Workspaces/IagoCavalcante/age-of-amazon-mp/scripts/main/Main.gd
-2026-07-13 09:51:35|Bash|curl -s -o /dev/null -w "public https check: %{http_code}\n" https://game.iagocavalcante.com/nope; c
-2026-07-13 09:52:13|Edit|/Users/iagocavalcante/Workspaces/IagoCavalcante/age-of-amazon-mp/docs/deploy-multiplayer.md
-2026-07-13 09:52:15|Bash|cd /Users/iagocavalcante/Workspaces/IagoCavalcante/age-of-amazon-mp && git add -A && git commit -q -
-2026-07-13 09:53:15|Edit|/Users/iagocavalcante/.claude/projects/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/memory/age-of-amazon-tooling.md
-2026-07-14 18:02:50|Bash|git status --short | head -3; git merge --ff-only feature/multiplayer && git log --oneline -3 && /Ap
-2026-07-14 18:03:11|Bash|git push origin main feature/multiplayer 2>&1 | tail -3
-2026-07-14 18:03:24|Bash|cat > server_config.json << 'EOF'
-{
-	"gateway_url": "wss://game.iagocavalcante.com/ws",
-	"match_url_
-2026-07-14 18:03:39|Bash|cd build/web && rm -rf .git && git init -q && git checkout -q -b gh-pages && git add -A && git commi
-2026-07-14 18:03:56|Bash|until curl -s -o /dev/null -w "%{http_code}" "https://iagocavalcante.github.io/age-of-amazon/index.h
-2026-07-14 18:04:52|Bash|ls -la build/web/ | grep -E "pck|wasm"; gh run watch 29368087297 --repo iagocavalcante/age-of-amazon
-2026-07-14 18:05:17|Bash|gh run view 29368087297 --repo iagocavalcante/age-of-amazon 2>&1 | head -12; ls build 2>/dev/null ||
-2026-07-14 18:05:34|Bash|curl -sI "https://iagocavalcante.github.io/age-of-amazon/index.wasm?v=mp1" | grep -i content-length
-2026-07-14 18:49:08|Read|scripts/camera/GameCamera.gd
-2026-07-14 18:49:28|Edit|scripts/camera/GameCamera.gd
-2026-07-14 18:49:42|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
-2026-07-14 18:49:51|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/zoom/f00000020.png
-2026-07-14 18:50:31|Bash|cd /Users/iagocavalcante/Workspaces/IagoCavalcante/age-of-amazon && SC=/private/tmp/claude-501/-User
-2026-07-14 18:50:41|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/zoom/f00000020.png
-2026-07-14 18:51:32|Bash|G=/Applications/Godot.app/Contents/MacOS/Godot && echo "systems: $($G --headless --path . ++ --test-
-2026-07-14 18:51:50|Bash|cat > server_config.json << 'EOF'
-{
-	"gateway_url": "wss://game.iagocavalcante.com/ws",
-	"match_url_
-2026-07-14 18:57:34|Bash|gh run list --repo iagocavalcante/age-of-amazon --limit 3 2>/dev/null; echo ---; LOCAL_PCK=$(stat -f
-2026-07-14 19:01:12|Skill|
-2026-07-14 19:01:56|Bash|grep -n "^func \|^var \|^const " scripts/autoloads/AssetLibrary.gd | head -30; echo ---; grep -n "fu
-2026-07-14 19:02:18|Bash|grep -n "^func \|^# \|class_name" scripts/art/TerrainArtist.gd | head -20; grep -n "TILE_WIDTH\|TILE
-2026-07-14 19:02:30|Bash|grep -n "func _init\|CHUNK_SIZE\|class_name" scripts/world/ChunkData.gd scripts/world/WorldGen.gd | 
-2026-07-14 19:04:31|Bash|wc -l scripts/ui/MainMenu.gd && head -5 scripts/ui/MainMenu.gd
-2026-07-14 19:04:40|Read|scripts/ui/MainMenu.gd
-2026-07-14 19:05:56|Write|scripts/ui/MainMenu.gd
-2026-07-14 19:06:12|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
-2026-07-14 19:06:18|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/menu2/f00000012.png
-2026-07-14 19:06:36|Edit|scripts/ui/MainMenu.gd
-2026-07-14 19:06:50|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
-2026-07-14 19:06:58|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/menu3/f00000012.png
-2026-07-14 19:07:15|Edit|scripts/ui/MainMenu.gd
-2026-07-14 19:07:22|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
-2026-07-14 19:07:31|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/menu4/f00000012.png
-2026-07-14 19:08:01|Bash|G=/Applications/Godot.app/Contents/MacOS/Godot && echo "commands: $($G --headless --path . ++ --test
-2026-07-14 19:08:18|Bash|git add scripts/ui/MainMenu.gd && git commit -q -m "feat: professional main menu
-
-The backdrop IS th
-2026-07-14 19:08:42|Bash|cat > server_config.json << 'EOF'
-{
-	"gateway_url": "wss://game.iagocavalcante.com/ws",
-	"match_url_
-2026-07-14 19:09:19|Bash|LOCAL_PCK=$(stat -f%z build/web/index.pck); until REMOTE_PCK=$(curl -sI "https://iagocavalcante.gith
-2026-07-14 19:09:56|Bash|gh run watch 29371992268 --repo iagocavalcante/age-of-amazon --exit-status > /dev/null 2>&1 && echo 
-2026-07-14 19:13:09|Read|scripts/ui/MainMenu.gd
-2026-07-14 19:13:32|Bash|/Applications/Godot.app/Contents/MacOS/Godot --headless --path . ++ --test-gw-join --gateway-url=wss
-2026-07-14 19:13:55|Edit|scripts/ui/MainMenu.gd
-2026-07-14 19:13:57|Edit|scripts/ui/MainMenu.gd
-2026-07-14 19:14:02|Edit|scripts/ui/MainMenu.gd
-2026-07-14 19:14:17|Edit|scripts/ui/MainMenu.gd
-2026-07-14 19:14:21|Edit|scripts/ui/MainMenu.gd
-2026-07-14 19:14:29|Bash|cat /private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-2
-2026-07-14 19:14:52|Edit|scripts/main/Main.gd
-2026-07-14 19:15:02|Bash|/Applications/Godot.app/Contents/MacOS/Godot --headless --path . ++ --test-gw-join --patient --gatew
-2026-07-14 19:15:17|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
-2026-07-14 19:15:25|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/menu5/f00000012.png
-2026-07-14 19:15:43|Edit|scripts/ui/MainMenu.gd
-2026-07-14 19:15:47|Edit|scripts/ui/MainMenu.gd
-2026-07-14 19:16:00|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
-2026-07-14 19:16:10|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/menu6/f00000012.png
-2026-07-14 19:16:34|Bash|grep -n "var footer\|_footer" scripts/ui/MainMenu.gd | head -5
-2026-07-14 19:16:43|Edit|scripts/ui/MainMenu.gd
-2026-07-14 19:16:48|Edit|scripts/ui/MainMenu.gd
-2026-07-14 19:16:49|Edit|scripts/ui/MainMenu.gd
-2026-07-14 19:17:01|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
-2026-07-14 19:17:10|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/menu7/f00000012.png
-2026-07-14 19:17:43|Bash|G=/Applications/Godot.app/Contents/MacOS/Godot && echo "commands: $($G --headless --path . ++ --test
-2026-07-14 19:18:45|Bash|cat > server_config.json << 'EOF'
-{
-	"gateway_url": "wss://game.iagocavalcante.com/ws",
-	"match_url_
-2026-07-14 19:19:02|Bash|cat /private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-2
-2026-07-14 19:20:20|Bash|cat /private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-2
-2026-07-14 19:26:03|Read|scripts/autoloads/Gateway.gd
-2026-07-14 19:26:04|Read|scripts/autoloads/Net.gd
 2026-07-14 19:26:14|Edit|scripts/autoloads/Gateway.gd
 2026-07-14 19:26:18|Edit|scripts/autoloads/Gateway.gd
 2026-07-14 19:26:19|Edit|scripts/autoloads/Net.gd
@@ -187,3 +84,36 @@ s=open(p).read()
 old = """	_pop_label.text = "%d/%d" % [Gam
 2026-07-14 19:53:10|Bash|G=/Applications/Godot.app/Contents/MacOS/Godot && echo "build: $($G --headless --path . ++ --test-bu
 2026-07-14 19:53:59|Bash|echo "mp2: $(bash tools/test_mp.sh 2>&1 | tail -1)" && echo "mp4: $(PLAYERS=4 PORT=9111 bash tools/t
+2026-07-14 19:54:30|Bash|python3 - << 'EOF'
+p='tools/test_mp.sh'
+s=open(p).read()
+s=s.replace("# (snapshot, move-sync, foreig
+2026-07-14 19:56:15|Bash|G=/Applications/Godot.app/Contents/MacOS/Godot && mkdir -p build/server && $G --headless --path . --
+2026-07-14 19:56:40|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
+2026-07-14 22:16:30|Bash|grep -n "Villager\|Warrior\|population\|Command\|gather\|Goal\|Tips\|section\|_add" scripts/ui/HelpS
+2026-07-14 22:16:39|Bash|sed -n '219,230p' scripts/ui/HelpScreen.gd
+2026-07-14 22:16:58|Bash|python3 - << 'EOF'
+p='scripts/ui/HelpScreen.gd'
+s=open(p).read()
+
+dash="—"
+old='	_add_body(col, "D
+2026-07-14 22:17:14|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
+2026-07-14 22:17:22|Read|/Users/iagocavalcante/Library/Application Support/Godot/app_userdata/Age Of Amazon/help_capture.png
+2026-07-14 22:17:55|Bash|G=/Applications/Godot.app/Contents/MacOS/Godot && echo "commands: $($G --headless --path . ++ --test
+2026-07-14 22:19:55|Bash|python3 - << 'EOF'
+p='scripts/buildings/Building.gd'
+s=open(p).read()
+
+old = """# One builder swing 
+2026-07-14 22:20:36|Bash|python3 - << 'EOF'
+p='scripts/main/Main.gd'
+s=open(p).read()
+old = """	var trains: bool = barracks !
+2026-07-14 22:21:44|Bash|G=/Applications/Godot.app/Contents/MacOS/Godot && echo "commands: $($G --headless --path . ++ --test
+2026-07-14 22:22:23|Bash|sed -n "$(grep -n '\[display\]' project.godot | cut -d: -f1),+10p" project.godot
+2026-07-14 22:22:47|Read|project.godot
+2026-07-14 22:22:56|Edit|project.godot
+2026-07-14 22:23:14|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
+2026-07-14 22:23:24|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/resp/small/f00000038.png
+2026-07-14 22:23:25|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/resp/wide/f00000010.png

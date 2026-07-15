@@ -112,14 +112,19 @@ func queue_train(unit_type: String) -> bool:
 	EventBus.training_queued.emit(self, unit_type)
 	return true
 
-# One builder swing (authority only). Completion flips the site to a real
-# building — training unlocks and any pop bonus starts counting.
+# One builder swing (authority only). On a site, completion flips it to a
+# real building — training unlocks and any pop bonus starts counting. On a
+# damaged finished building this is a REPAIR: each swing costs 1 wood, so
+# healing mid-fight drains the stockpile instead of being free.
 func build_tick(amount: int) -> void:
-	if is_constructed:
+	if current_hp >= max_hp:
+		return
+	if is_constructed and not GameManager.spend(player_id,
+			{Constants.ResourceType.WOOD: 1}):
 		return
 	current_hp = mini(max_hp, current_hp + amount)
 	_update_health_bar()
-	if current_hp >= max_hp:
+	if not is_constructed and current_hp >= max_hp:
 		is_constructed = true
 		_update_construction_look()
 		EventBus.building_constructed.emit(self)

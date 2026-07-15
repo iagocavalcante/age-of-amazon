@@ -47,7 +47,7 @@ jobs:
           $G --headless --path . ++ --test-seat 2>&1 | tee /tmp/seat.log
           grep -c " OK" /tmp/seat.log | grep -q "^4$"
           $G --headless --path . ++ --test-build 2>&1 | tee /tmp/build.log
-          grep -c " OK" /tmp/build.log | grep -q "^7$"
+          grep -c " OK" /tmp/build.log | grep -q "^9$"
 
       - name: Multiplayer harness (2 players)
         run: GODOT=~/godot/godot bash tools/test_mp.sh

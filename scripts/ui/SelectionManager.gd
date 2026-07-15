@@ -196,11 +196,11 @@ func _command_at(screen_pos: Vector2) -> void:
 	var names: Array = selected_units.map(
 		func(u: Node2D) -> String: return String(u.name))
 
-	# A friendly, unfinished site under the cursor: send villagers to build.
+	# A friendly site or damaged building under the cursor: build / repair.
 	var site: Building = GameManager.world.building_at(
 		Constants.world_to_grid(world_pos)) as Building
 	if site != null and site.player_id == GameManager.local_player_id \
-			and not site.is_constructed:
+			and site.current_hp < site.max_hp:
 		CommandRouter.submit({
 			"type": "build", "player_id": GameManager.local_player_id,
 			"actor_names": names, "building_name": String(site.name),
