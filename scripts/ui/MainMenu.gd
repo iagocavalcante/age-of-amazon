@@ -28,6 +28,9 @@ const COLOR_TEXT_DIM: Color = Color(0.72, 0.78, 0.70, 0.65)
 
 var _gateway_url: String = "ws://127.0.0.1:9000"
 var _match_url_template: String = "ws://127.0.0.1:{port}"
+# Stamped into server_config.json at deploy time; "dev" when absent, so any
+# screenshot of the menu tells us exactly which build someone is running.
+var _build_stamp: String = "dev"
 
 var _backdrop: Node2D
 var _drift_time: float = 0.0
@@ -104,6 +107,7 @@ func _load_config() -> void:
 	if parsed is Dictionary:
 		_gateway_url = parsed.get("gateway_url", _gateway_url)
 		_match_url_template = parsed.get("match_url_template", _match_url_template)
+		_build_stamp = parsed.get("build", _build_stamp)
 
 # --- Backdrop: a real slice of the game world ---
 
@@ -272,7 +276,7 @@ func _build_ui() -> void:
 
 	var footer: Label = Label.new()
 	_footer = footer
-	footer.text = "FOG OF WAR  ·  2–4 TRIBES  ·  PLAYS IN YOUR BROWSER"
+	footer.text = "FOG OF WAR  ·  2–4 TRIBES  ·  BUILD %s" % _build_stamp.to_upper()
 	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	footer.add_theme_font_override("font", _display_font(2))
 	footer.add_theme_font_size_override("font_size", 10)
