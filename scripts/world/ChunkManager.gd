@@ -34,6 +34,7 @@ func setup(p_camera: Camera2D, p_doodad_parent: Node2D) -> void:
 	_water_material.shader = shader
 
 	world.resource_depleted.connect(_on_resource_depleted)
+	EventBus.resource_worked.connect(_on_resource_worked)
 
 func _process(_delta: float) -> void:
 	if camera == null:
@@ -172,6 +173,18 @@ func _unload_visual(chunk: ChunkData) -> void:
 		chunk.doodad_visual.queue_free()
 		chunk.doodad_visual = null
 	chunk.resource_sprites.clear()
+
+# A swing landed: give the resource sprite a little shake so chopping a
+# tree looks like chopping a tree.
+func _on_resource_worked(cell: Vector2i) -> void:
+	var chunk: ChunkData = world.get_chunk(Constants.tile_to_chunk(cell))
+	var sprite: Sprite2D = chunk.resource_sprites.get(cell)
+	if sprite == null or not is_instance_valid(sprite):
+		return
+	var tween: Tween = sprite.create_tween()
+	tween.tween_property(sprite, "offset:x", 2.0, 0.05)
+	tween.tween_property(sprite, "offset:x", -1.5, 0.06)
+	tween.tween_property(sprite, "offset:x", 0.0, 0.06)
 
 func _on_resource_depleted(cell: Vector2i) -> void:
 	var chunk: ChunkData = world.get_chunk(Constants.tile_to_chunk(cell))

@@ -179,6 +179,15 @@ func _view_step(delta: float) -> void:
 			and _attack_target != null and is_instance_valid(_attack_target):
 		sprite.flip_h = _attack_target.global_position.x < global_position.x
 	_set_idle_frame()
+	# Working villagers visibly work: a rhythmic chopping lean. Driven purely
+	# by replicated state, so multiplayer clients see it too.
+	if current_state == State.GATHERING or current_state == State.BUILDING:
+		_anim_time += delta
+		sprite.rotation = sin(_anim_time * 9.0) * 0.14
+		sprite.position.x = maxf(0.0, sin(_anim_time * 9.0)) * 2.0 * (-1.0 if sprite.flip_h else 1.0)
+	elif sprite.rotation != 0.0:
+		sprite.rotation = 0.0
+		sprite.position.x = 0.0
 
 # --- Commands (issued by SelectionManager / AI) ---
 
@@ -245,6 +254,8 @@ func _process_building(delta: float) -> void:
 		return
 	_build_timer = 0.0
 	_build_site.build_tick(Constants.BUILD_HP_PER_SWING)
+	if not Net.is_headless_server() and is_instance_valid(_build_site):
+		WorkFx.dust(get_parent(), _build_site.global_position + Vector2(0, -12))
 
 # --- Movement ---
 
@@ -339,6 +350,10 @@ func _process_gathering(delta: float) -> void:
 	var taken: int = GameManager.world.take_resource(_gather_cell, 1)
 	if taken > 0:
 		_carrying += taken
+		if not Net.is_headless_server():
+			var work_pos: Vector2 = Constants.grid_to_world(_gather_cell.x, _gather_cell.y)
+			WorkFx.chips_for_resource(get_parent(), work_pos + Vector2(0, -10), _gather_type)
+			EventBus.resource_worked.emit(_gather_cell)
 
 	var node_gone: bool = GameManager.world.get_resource_at(_gather_cell).is_empty()
 	if _carrying >= Constants.CARRY_CAPACITY or (node_gone and _carrying > 0):
@@ -365,6 +380,9 @@ func _go_deposit() -> void:
 func _deposit() -> void:
 	if _carrying > 0 and _gather_type >= 0:
 		GameManager.add_resource(player_id, _gather_type, _carrying)
+		if not Net.is_headless_server() and player_id == GameManager.local_player_id:
+			WorkFx.float_text(get_parent(), global_position, "+%d %s" % [
+				_carrying, Constants.RESOURCE_NAMES[_gather_type]])
 		_carrying = 0
 	# Resume the cycle: same node if alive, otherwise a nearby one.
 	if not GameManager.world.get_resource_at(_gather_cell).is_empty():
