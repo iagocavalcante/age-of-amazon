@@ -97,9 +97,14 @@ Only ports 80/443 need to be open in the firewall; game traffic never hits
 ```json
 {
 	"gateway_url": "wss://game.example.com/ws",
-	"match_url_template": "wss://game.example.com/m/{port}"
+	"match_url_template": "wss://game.example.com/m/{port}",
+	"build": "<git rev-parse --short HEAD>"
 }
 ```
+
+Always stamp `build` at export time — the menu footer displays it, so a user
+screenshot immediately identifies a stale cached build (GitHub Pages caches
+for 600 s; a hard refresh clears the client side).
 
 Set these before exporting the Web build; the local-dev defaults are
 `ws://127.0.0.1:9000` / `ws://127.0.0.1:{port}`. The Web deploy itself is
