@@ -365,3 +365,22 @@ never crosses the wire; both sides generate it from `map_seed`.
 - Rejoin is slot-reuse (a returning player gets the lowest free tribe slot,
   whose units persisted). If two players drop at once they may swap tribes on
   return — accepted until session tokens (v2).
+
+## ADR 16 — Hybrid art: procedural baseline, painted overrides
+
+**Context.** All art has been procedural since ADR 1. Generated pixel-art
+sprites (docs/art/ai-sprite-generation.md) offer richer shapes and per-tribe
+identity, but generation is external, occasional, and must never become a
+build dependency.
+
+**Decision.** `AssetLibrary` prefers a painted sprite when every frame of a
+unit exists under `assets/sprites/` (magenta masters, remapped to the tribe
+color at load), and silently falls back to the procedural builders
+otherwise. The procedural system remains canonical: deleting every PNG
+yields a fully working game.
+
+**Consequences.** Art can improve piecemeal (the warrior shipped first)
+without a flag day; the repo carries small PNGs; painted and procedural
+sprites coexist at different sizes, which is accepted — bigger units read
+as more dangerous. First shipped asset: the tribal warrior (idle + 2 walk
+frames), generated with gpt-image-1 and chained via image edits.

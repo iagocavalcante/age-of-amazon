@@ -134,3 +134,39 @@ old='''	_add_control(col
 2026-07-15 17:39:12|Bash|G=/Applications/Godot.app/Contents/MacOS/Godot && echo "systems: $($G --headless --path . ++ --test-
 2026-07-15 17:39:24|Bash|grep -h "test-gw\|health" /var/folders/d1/gxfhj5d904l06frh12t1_wjh0000gn/T/tmp.uLIAm7vM4u/*.log 2>/d
 2026-07-15 17:40:17|Bash|pgrep -fl "x86_64|Godot" | grep -v grep | wc -l; sleep 2; bash tools/test_gateway.sh 2>&1 | tail -9
+2026-07-15 17:43:46|Bash|git add -A && git commit -q -m "feat: the enhancement pack â€” Monument victory, tactics, smarter AI
+2026-07-15 17:44:59|Bash|HASH=$(git rev-parse --short HEAD) && G=/Applications/Godot.app/Contents/MacOS/Godot && cat > server
+2026-07-15 18:06:05|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
+2026-07-15 18:06:14|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/hud2/f00000012.png
+2026-07-15 18:46:13|Bash|grep -n '"O": Color8\|"S": Color8\|"T": player' scripts/art/UnitArtist.gd | head -4; mkdir -p docs/a
+2026-07-15 18:47:12|Write|docs/art/ai-sprite-generation.md
+2026-07-15 18:47:29|Bash|git add docs/art/ai-sprite-generation.md && git commit -q -m "docs(art): AI sprite generation spec â
+2026-07-15 18:47:38|ToolSearch|
+2026-07-15 18:47:55|mcp__gemini__geminiGenerateImageToFile|
+2026-07-15 18:48:11|ToolSearch|
+2026-07-15 18:48:22|mcp__gemini__geminiGenerateImage|
+2026-07-15 18:48:44|Bash|python3 - << 'EOF'
+p='docs/art/ai-sprite-generation.md'
+s=open(p).read()
+old="""## Validation log
+
+-
+2026-07-15 18:49:04|Bash|python3 - << 'EOF'
+p='docs/art/ai-sprite-generation.md'
+s=open(p).read()
+old="> **Status:** spec + v
+2026-07-15 19:02:39|Bash|ls -la .token 2>/dev/null && (grep -q "^\.token$" .gitignore 2>/dev/null && echo "already ignored" |
+2026-07-15 19:03:21|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
+2026-07-15 19:03:35|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/gen_warrior_raw.png
+2026-07-15 19:03:59|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
+2026-07-15 19:04:12|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/warrior_16x24_swatch.png
+2026-07-15 19:04:12|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/warrior_20x30_swatch.png
+2026-07-15 19:04:34|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
+2026-07-15 19:04:45|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/warrior_tribes.png
+2026-07-15 19:05:40|Bash|mkdir -p assets/sprites/reference && cp /private/tmp/claude-501/-Users-iagocavalcante-Workspaces-Iag
+2026-07-15 19:11:17|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
+2026-07-15 19:11:37|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
+2026-07-15 19:11:48|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/frames_strip.png
+2026-07-15 19:12:09|Bash|grep -n "default_texture_filter" project.godot; SC=/private/tmp/claude-501/-Users-iagocavalcante-Wor
+2026-07-15 19:13:05|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
+2026-07-15 19:13:16|Read|/Users/iagocavalcante/Library/Application Support/Godot/app_userdata/Age Of Amazon/animals_capture.png

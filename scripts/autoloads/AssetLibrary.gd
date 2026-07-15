@@ -70,11 +70,17 @@ func _ready() -> void:
 	var unit_artist: UnitArtist = UnitArtist.new()
 	var building_artist: BuildingArtist = BuildingArtist.new()
 	for color: Color in Constants.PLAYER_COLORS:
-		unit_frames.append({
+		var procedural: Dictionary = {
 			"villager": unit_artist.build_villager_frames(color),
 			"warrior": unit_artist.build_warrior_frames(color),
 			"archer": unit_artist.build_archer_frames(color),
-		})
+		}
+		var frame_set: Dictionary = {}
+		for unit_type: String in procedural:
+			var painted: Array = _override_unit_frames(unit_type, color)
+			frame_set[unit_type] = painted if not painted.is_empty() \
+				else procedural[unit_type]
+		unit_frames.append(frame_set)
 		town_center_textures.append(building_artist.build_town_center(color))
 		building_textures.append({
 			"town_center": town_center_textures.back(),
@@ -125,6 +131,37 @@ func _build_icons() -> void:
 	icons["wood"] = PixelArt.sprite_from_rows(ICON_WOOD, palette)
 	icons["jade"] = PixelArt.sprite_from_rows(ICON_JADE, palette)
 	icons["pop"] = PixelArt.sprite_from_rows(ICON_POP, palette)
+
+# Painted sprite overrides (see docs/art/ai-sprite-generation.md): magenta
+# masters in assets/sprites/ are preferred over procedural art when every
+# frame of a unit exists; magenta remaps to the tribe color at load. The
+# procedural builders remain the permanent fallback — a missing or deleted
+# file can never break the game.
+const SPRITE_DIR: String = "res://assets/sprites/"
+
+func _override_unit_frames(unit_type: String, player_color: Color) -> Array:
+	var frames: Array = []
+	for frame: String in ["idle", "walk_a", "walk_b"]:
+		var path: String = SPRITE_DIR + "unit_%s_%s.png" % [unit_type, frame]
+		if not ResourceLoader.exists(path):
+			return []
+		var texture: Texture2D = load(path)
+		var img: Image = texture.get_image()
+		img.convert(Image.FORMAT_RGBA8)
+		_tint_magenta(img, player_color)
+		frames.append(ImageTexture.create_from_image(img))
+	return frames
+
+# Magenta-family pixels take the tribe color, keeping their shading value.
+# Thresholds match the validated pipeline (quantization darkens magenta).
+func _tint_magenta(img: Image, color: Color) -> void:
+	for y in range(img.get_height()):
+		for x in range(img.get_width()):
+			var p: Color = img.get_pixel(x, y)
+			if p.a > 0.0 and p.r8 > 140 and p.b8 > 90 and p.g8 < 110:
+				var value: float = (p.r + p.b) / 2.0
+				img.set_pixel(x, y, Color(
+					color.r * value, color.g * value, color.b * value, p.a))
 
 func get_unit_frames(player_id: int, unit_type: String) -> Array:
 	var idx: int = clampi(player_id, 0, unit_frames.size() - 1)

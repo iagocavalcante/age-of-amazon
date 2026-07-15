@@ -175,4 +175,9 @@ are skipped, or four files when they are not.
     `r > 140 and b > 90 and g < 110` (value-preserving remap verified
     across all four tribe colors).
   - Reference master: `assets/sprites/reference/warrior_idle_magenta_20x30.png`.
-  Remaining untested: walk-frame chaining via the images/edits endpoint.
+  Walk-frame chaining: **VALIDATED** same day via `/v1/images/edits` with
+  the raw idle as input image — character, palette, and props held across
+  both walk frames; feet anchored by compositing each frame bottom-center
+  onto a fixed 20x30 canvas (do this instead of naive bbox cropping, or the
+  gait jitters). The warrior is live in-game via the AssetLibrary override
+  loader (see ADR 16).

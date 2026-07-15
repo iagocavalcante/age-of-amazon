@@ -915,6 +915,8 @@ func _run_capture_animals() -> void:
 	animals.spawn_at("bush_dog", Vector2i(5, 3))
 	animals.spawn_at("caiman", Vector2i(2, 6))
 	_spawn_unit("archer", 0, Vector2i(4, 5))
+	_spawn_unit("warrior", 0, Vector2i(5, 4))
+	_spawn_unit("warrior", 1, Vector2i(1, 5))
 	camera.global_position = Constants.grid_to_world(3, 3)
 	camera.target_zoom = 1.9
 	camera.zoom = Vector2(1.9, 1.9)
