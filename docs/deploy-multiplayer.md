@@ -107,8 +107,13 @@ screenshot immediately identifies a stale cached build (GitHub Pages caches
 for 600 s; a hard refresh clears the client side).
 
 Set these before exporting the Web build; the local-dev defaults are
-`ws://127.0.0.1:9000` / `ws://127.0.0.1:{port}`. The Web deploy itself is
-unchanged (export preset "Web" → `build/web` → `gh-pages`).
+`ws://127.0.0.1:9000` / `ws://127.0.0.1:{port}`.
+
+**Web deploys: always `bash tools/deploy_web.sh`.** It stamps the build,
+bakes the production config, and ships the `CNAME` file for
+`aoa.iagocavalcante.com` — a force-push without that file silently un-sets
+the custom domain (Cloudflare CNAME `aoa` → `iagocavalcante.github.io`,
+DNS-only so GitHub provisions the certificate).
 
 ## 5. Browser caveats
 
