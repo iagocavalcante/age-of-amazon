@@ -72,6 +72,7 @@ func _ready() -> void:
 		unit_frames.append({
 			"villager": unit_artist.build_villager_frames(color),
 			"warrior": unit_artist.build_warrior_frames(color),
+			"archer": unit_artist.build_archer_frames(color),
 		})
 		town_center_textures.append(building_artist.build_town_center(color))
 		building_textures.append({
@@ -93,6 +94,9 @@ func _ready() -> void:
 	var animal_artist: AnimalArtist = AnimalArtist.new()
 	animal_frames["capybara"] = animal_artist.build_capybara_frames()
 	animal_frames["jaguar"] = animal_artist.build_jaguar_frames()
+	animal_frames["tapir"] = animal_artist.build_tapir_frames()
+	animal_frames["bush_dog"] = animal_artist.build_bush_dog_frames()
+	animal_frames["caiman"] = animal_artist.build_caiman_frames()
 
 	_build_icons()
 

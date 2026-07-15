@@ -70,6 +70,20 @@ const UNIT_DEFS: Dictionary = {
 		"cost": { ResourceType.FOOD: 40, ResourceType.WOOD: 20 },
 		"train_time": 9.0,
 	},
+	# Glass cannon: outranges everything, melts if anything reaches it.
+	"archer": {
+		"max_hp": 45,
+		"move_speed": 95.0,
+		"attack_power": 8,
+		"armor": 0,
+		"attack_range": 110.0,
+		"attack_cooldown": 1.6,
+		"vision_range": 300.0,
+		"aggressive": true,
+		"can_gather": false,
+		"cost": { ResourceType.FOOD: 50, ResourceType.WOOD: 30 },
+		"train_time": 10.0,
+	},
 }
 
 # Neutral wildlife. `food` is the one-time bounty paid to whoever lands the
@@ -87,6 +101,42 @@ const ANIMAL_DEFS: Dictionary = {
 		"predator": false,
 		"flee_radius": 150.0,      # bolts when a unit comes this close
 		"food": 100,
+	},
+	# The Amazon's 'elephant': huge, placid, and worth a feast.
+	"tapir": {
+		"max_hp": 120,
+		"armor": 1,
+		"move_speed": 44.0,
+		"flee_speed": 58.0,
+		"predator": false,
+		"flee_radius": 130.0,
+		"food": 250,
+	},
+	# Pack hunter — individually weak, dangerous in numbers.
+	"bush_dog": {
+		"max_hp": 45,
+		"armor": 0,
+		"move_speed": 80.0,
+		"flee_speed": 80.0,
+		"predator": true,
+		"aggro_radius": 150.0,
+		"attack_power": 4,
+		"attack_range": 26.0,
+		"attack_cooldown": 0.9,
+		"food": 60,
+	},
+	# Water-edge ambusher: barely moves, hits like a log trap.
+	"caiman": {
+		"max_hp": 130,
+		"armor": 3,
+		"move_speed": 30.0,
+		"flee_speed": 30.0,
+		"predator": true,
+		"aggro_radius": 90.0,
+		"attack_power": 12,
+		"attack_range": 30.0,
+		"attack_cooldown": 1.4,
+		"food": 220,
 	},
 	"jaguar": {
 		"max_hp": 95,
@@ -123,7 +173,7 @@ const BUILDING_DEFS: Dictionary = {
 	"barracks": {
 		"max_hp": 400,
 		"footprint": Vector2i(2, 2),
-		"trains": ["warrior"],
+		"trains": ["warrior", "archer"],
 		"vision_tiles": 7,
 		"cost": {ResourceType.WOOD: 60, ResourceType.FOOD: 20},
 	},

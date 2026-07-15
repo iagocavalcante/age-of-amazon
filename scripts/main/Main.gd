@@ -278,6 +278,11 @@ func _run_build_test() -> void:
 	var trains: bool = barracks != null and barracks.is_constructed \
 		and barracks.queue_train("warrior")
 	print("[test-build] barracks-trains ", "OK" if trains else "FAILED")
+	GameManager.add_resource(0, Constants.ResourceType.FOOD, 100)
+	GameManager.add_resource(0, Constants.ResourceType.WOOD, 100)
+	var archer_ok: bool = barracks != null and barracks.queue_train("archer") \
+		and not _find_tc(0).queue_train("archer")
+	print("[test-build] archer-at-barracks-only ", "OK" if archer_ok else "FAILED")
 
 	# Repair: damage the finished house, send villagers, watch hp return at
 	# the cost of wood.
@@ -621,6 +626,13 @@ func _run_hunt_test() -> void:
 	print("[test-hunt] capybara killed=", killed, " food ", food_before, "->", food_after,
 		" (hunt ", "OK" if killed and food_after > food_before else "FAILED", ")")
 
+	# New species: spawn one of each and make sure they live and behave.
+	for species: String in ["tapir", "bush_dog", "caiman"]:
+		var beast: Animal = animals.spawn_at(species, Vector2i(6, 6))
+		print("[test-hunt] spawn-%s " % species,
+			"OK" if is_instance_valid(beast) and beast.max_hp > 0 else "FAILED")
+		beast.queue_free()
+
 	var victim: UnitBase = _spawn_unit("villager", 0, Vector2i(-3, -3))
 	var vhp_before: int = victim.current_hp
 	animals.spawn_at("jaguar", Vector2i(-1, -3))
@@ -636,6 +648,10 @@ func _run_capture_animals() -> void:
 	animals.spawn_at("capybara", Vector2i(2, 2))
 	animals.spawn_at("capybara", Vector2i(4, 1))
 	animals.spawn_at("jaguar", Vector2i(3, 4))
+	animals.spawn_at("tapir", Vector2i(1, 4))
+	animals.spawn_at("bush_dog", Vector2i(5, 3))
+	animals.spawn_at("caiman", Vector2i(2, 6))
+	_spawn_unit("archer", 0, Vector2i(4, 5))
 	camera.global_position = Constants.grid_to_world(3, 3)
 	camera.target_zoom = 1.9
 	camera.zoom = Vector2(1.9, 1.9)

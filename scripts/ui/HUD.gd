@@ -153,17 +153,6 @@ func _build_selection_panel() -> void:
 	_train_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_child(_train_box)
 
-	var villager_btn: Button = Button.new()
-	villager_btn.text = "Train Villager (50 food)"
-	villager_btn.focus_mode = Control.FOCUS_NONE
-	villager_btn.pressed.connect(func() -> void: _train("villager"))
-	_train_box.add_child(villager_btn)
-
-	var warrior_btn: Button = Button.new()
-	warrior_btn.text = "Train Warrior (40 food, 20 wood)"
-	warrior_btn.focus_mode = Control.FOCUS_NONE
-	warrior_btn.pressed.connect(func() -> void: _train("warrior"))
-	_train_box.add_child(warrior_btn)
 
 	_queue_label = Label.new()
 	_queue_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -189,6 +178,23 @@ func _build_selection_panel() -> void:
 			SelectionManager.start_placement(captured))
 		_build_box.add_child(button)
 
+# The train row mirrors whatever the selected building can produce.
+func _populate_train_buttons(building_type: String) -> void:
+	for child: Node in _train_box.get_children():
+		child.queue_free()
+	for unit_type: String in Constants.BUILDING_DEFS[building_type]["trains"]:
+		var def: Dictionary = Constants.UNIT_DEFS[unit_type]
+		var parts: Array[String] = []
+		for res_type: int in def["cost"]:
+			parts.append("%d %s" % [def["cost"][res_type],
+				Constants.RESOURCE_NAMES[res_type]])
+		var button: Button = Button.new()
+		button.text = "Train %s (%s)" % [unit_type.capitalize(), ", ".join(parts)]
+		button.focus_mode = Control.FOCUS_NONE
+		var captured: String = unit_type
+		button.pressed.connect(func() -> void: _train(captured))
+		_train_box.add_child(button)
+
 func _train(unit_type: String) -> void:
 	var building: Node2D = SelectionManager.selected_building
 	if building == null or not is_instance_valid(building):
@@ -207,6 +213,7 @@ func _refresh_selection_panel() -> void:
 		var constructed: bool = bool(building.get("is_constructed"))
 		_train_box.visible = constructed
 		_queue_label.visible = constructed
+		_populate_train_buttons(String(building.get("building_type")))
 		var title: String = String(building.get("building_type")).capitalize().replace("_", " ")
 		if not constructed:
 			title += "  ·  under construction"

@@ -14,6 +14,15 @@ const CAPYBARA_RAMP: Array[Color] = [
 const JAGUAR_RAMP: Array[Color] = [
 	Color8(150, 104, 40), Color8(180, 134, 58), Color8(206, 160, 82), Color8(226, 186, 108),
 ]
+const TAPIR_RAMP: Array[Color] = [
+	Color8(52, 44, 42), Color8(74, 64, 60), Color8(96, 84, 78), Color8(120, 106, 98),
+]
+const BUSH_DOG_RAMP: Array[Color] = [
+	Color8(92, 58, 30), Color8(120, 78, 40), Color8(146, 100, 52), Color8(170, 122, 66),
+]
+const CAIMAN_RAMP: Array[Color] = [
+	Color8(46, 66, 34), Color8(62, 88, 44), Color8(80, 108, 54), Color8(100, 128, 66),
+]
 
 func build_capybara_frames() -> Array[ImageTexture]:
 	var cfg: Dictionary = {
@@ -35,6 +44,39 @@ func build_jaguar_frames() -> Array[ImageTexture]:
 	}
 	return _frames(cfg)
 
+# The Amazon's heavyweight browser — big, dark, unhurried.
+func build_tapir_frames() -> Array[ImageTexture]:
+	var cfg: Dictionary = {
+		"ramp": TAPIR_RAMP, "w": 36, "h": 26,
+		"body_rx": 11.0, "body_ry": 6.2,
+		"head_dx": 10.5, "head_dy": -1.0, "head_rx": 5.2, "head_ry": 4.4,
+		"leg_len": 4.2, "ear_dx": 2.2, "salt": 311,
+		"tail": false, "tail_len": 0, "spots": false, "spot_color": Color.BLACK,
+	}
+	return _frames(cfg)
+
+# Small rusty pack hunter.
+func build_bush_dog_frames() -> Array[ImageTexture]:
+	var cfg: Dictionary = {
+		"ramp": BUSH_DOG_RAMP, "w": 26, "h": 20,
+		"body_rx": 7.0, "body_ry": 3.6,
+		"head_dx": 7.0, "head_dy": 0.0, "head_rx": 3.4, "head_ry": 3.0,
+		"leg_len": 3.8, "ear_dx": 1.8, "salt": 419,
+		"tail": true, "tail_len": 6, "spots": false, "spot_color": Color.BLACK,
+	}
+	return _frames(cfg)
+
+# Long, low, armored — scute speckles instead of rosettes, no ears.
+func build_caiman_frames() -> Array[ImageTexture]:
+	var cfg: Dictionary = {
+		"ramp": CAIMAN_RAMP, "w": 40, "h": 16,
+		"body_rx": 13.0, "body_ry": 3.0,
+		"head_dx": 13.0, "head_dy": 0.8, "head_rx": 6.0, "head_ry": 2.0,
+		"leg_len": 2.0, "ear_dx": 0.0, "ear": false, "salt": 523,
+		"tail": true, "tail_len": 14, "spots": true, "spot_color": Color8(30, 44, 24),
+	}
+	return _frames(cfg)
+
 func _frames(cfg: Dictionary) -> Array[ImageTexture]:
 	var frames: Array[ImageTexture] = []
 	for frame in range(3):
@@ -42,8 +84,8 @@ func _frames(cfg: Dictionary) -> Array[ImageTexture]:
 	return frames
 
 func _build(cfg: Dictionary, frame: int) -> ImageTexture:
-	var w: int = 30
-	var h: int = 22
+	var w: int = cfg.get("w", 30)
+	var h: int = cfg.get("h", 22)
 	var img: Image = Image.create(w, h, false, Image.FORMAT_RGBA8)
 
 	var ramp: Array = cfg["ramp"]
@@ -106,8 +148,9 @@ func _build(cfg: Dictionary, frame: int) -> ImageTexture:
 				if img.get_pixel(sx, sy).a > 0.0 and PixelArt.hash2(sx, sy, 707) > 0.87:
 					img.set_pixel(sx, sy, spot)
 
-	# Ear, eye, nose.
-	PixelArt.draw_ellipse(img, head_x + cfg["ear_dx"], head_y - hry * 0.85, 1.8, 2.1, ramp[0])
+	# Ear (skipped for reptiles), eye, nose.
+	if cfg.get("ear", true):
+		PixelArt.draw_ellipse(img, head_x + cfg["ear_dx"], head_y - hry * 0.85, 1.8, 2.1, ramp[0])
 	_px(img, int(head_x + hrx * 0.55), int(head_y - hry * 0.1), Color8(20, 16, 12))
 	_px(img, int(head_x + hrx), int(head_y + hry * 0.25), Color8(32, 22, 18))
 

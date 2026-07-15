@@ -13,7 +13,6 @@ const MAX_SPAWNS_PER_TICK: int = 2
 const SPAWN_MIN_TILES: int = 16   # just off-screen at default zoom
 const SPAWN_MAX_TILES: int = 34
 const DESPAWN_TILES: int = 64     # cull only well beyond the spawn ring
-const JAGUAR_CHANCE: float = 0.22
 const INITIAL_SEED_COUNT: int = 7
 
 var camera: Camera2D
@@ -65,9 +64,30 @@ func _try_spawn() -> bool:
 		var angle: float = _rng.randf() * TAU
 		var cell: Vector2i = base + Vector2i(int(cos(angle) * dist), int(sin(angle) * dist))
 		if GameManager.world.is_walkable(cell):
-			var species: String = "jaguar" if _rng.randf() < JAGUAR_CHANCE else "capybara"
-			spawn_at(species, cell)
+			spawn_at(_pick_species(cell), cell)
 			return true
+	return false
+
+# Caimans haunt the water's edge; everything else follows a weighted table
+# that keeps prey more common than predators.
+func _pick_species(cell: Vector2i) -> String:
+	if _near_water(cell) and _rng.randf() < 0.4:
+		return "caiman"
+	var roll: float = _rng.randf()
+	if roll < 0.12:
+		return "jaguar"
+	if roll < 0.28:
+		return "bush_dog"
+	if roll < 0.46:
+		return "tapir"
+	return "capybara"
+
+func _near_water(cell: Vector2i) -> bool:
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			var biome: int = GameManager.world.get_biome(cell + Vector2i(dx, dy))
+			if biome == Constants.Biome.WATER_SHALLOW or biome == Constants.Biome.WATER_DEEP:
+				return true
 	return false
 
 # Public: deterministic spawn used by the test harness.

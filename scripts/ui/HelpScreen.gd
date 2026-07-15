@@ -205,6 +205,7 @@ func _build_right(col: VBoxContainer) -> void:
 	_add_section(col, "Your people")
 	_add_unit(col, "villager", "Gathers food, wood and jade and carries it back to the Town Center. Fragile in a fight — keep them working. Costs 50 food.")
 	_add_unit(col, "warrior", "Your muscle — auto-attacks enemies it can see and defends itself when struck. Costs 40 food and 20 wood.")
+	_add_unit(col, "archer", "Shoots from four times a warrior's reach but folds in melee. Trains at the Barracks. Costs 50 food and 30 wood.")
 	_add_body(col, "Select your Town Center to train more. Population starts capped at %d — build houses to raise it (up to %d)." % [Constants.POPULATION_CAP, Constants.POPULATION_CEILING])
 
 	_add_section(col, "Build")
@@ -224,7 +225,7 @@ func _build_right(col: VBoxContainer) -> void:
 
 	_add_section(col, "Tips")
 	_add_body(col, "•  Keep every villager gathering — idle villagers lose games.")
-	_add_body(col, "•  Hunt capybaras for food — but beware prowling jaguars.")
+	_add_body(col, "•  Hunt capybaras and tapirs for food — but beware jaguars, bush dog packs, and caimans lurking at the water's edge.")
 	_add_body(col, "•  Scout before you strike — you can't hit what you can't see.")
 	_add_body(col, "•  A watchtower on a border ridge is worth three patrols.")
 

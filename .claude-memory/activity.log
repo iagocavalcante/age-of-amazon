@@ -117,3 +117,54 @@ old = """	var trains: bool = barracks !
 2026-07-14 22:23:14|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
 2026-07-14 22:23:24|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/resp/small/f00000038.png
 2026-07-14 22:23:25|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/resp/wide/f00000010.png
+2026-07-14 22:24:10|Bash|git add -A && git commit -q -m "feat: repair + responsive viewport
+
+- Villagers repair damaged finis
+2026-07-14 22:25:26|Bash|cat > server_config.json << 'EOF'
+{
+	"gateway_url": "wss://game.iagocavalcante.com/ws",
+	"match_url_
+2026-07-14 22:29:23|AskUserQuestion|
+2026-07-14 22:29:52|Bash|grep -n "SPECIES\|const \|func setup\|predator\|aggressive\|food" scripts/units/Animal.gd | head -25
+2026-07-14 22:30:02|Bash|grep -n "ANIMAL_DEFS" -A 30 scripts/autoloads/Constants.gd | head -36; sed -n '18,44p' scripts/art/A
+2026-07-14 22:31:17|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
+2026-07-14 22:31:26|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/selp/f00000012.png
+2026-07-14 22:32:10|Bash|LOCAL=$(stat -f%z build/web/index.pck); BARE=$(curl -sI "https://iagocavalcante.github.io/age-of-ama
+2026-07-14 22:32:42|Bash|python3 - << 'EOF'
+p='scripts/ui/MainMenu.gd'
+s=open(p).read()
+
+old = """var _gateway_url: String = 
+2026-07-14 22:33:51|Bash|HASH=$(git rev-parse --short HEAD) && cat > server_config.json << EOF
+{
+	"gateway_url": "wss://game.
+2026-07-14 22:34:18|Bash|grep -n "match_url_template" docs/deploy-multiplayer.md
+2026-07-14 22:34:35|Bash|python3 - << 'EOF'
+p='docs/deploy-multiplayer.md'
+s=open(p).read()
+old='''	"match_url_template": "ws
+2026-07-14 22:36:06|Bash|sed -n '1,60p' scripts/art/AnimalArtist.gd && sed -n '60,116p' scripts/art/AnimalArtist.gd
+2026-07-14 22:36:23|Bash|sed -n '1,50p' scripts/art/UnitArtist.gd; sed -n '138,180p' scripts/art/UnitArtist.gd
+2026-07-14 22:36:49|Bash|grep -n "WARRIOR_IDLE_ROWS" -A 20 scripts/art/UnitArtist.gd | head -24; sed -n '1,60p' scripts/world
+2026-07-14 22:36:57|Bash|sed -n '56,100p' scripts/world/AnimalManager.gd
+2026-07-14 22:37:12|Bash|grep -n "enum Biome" scripts/autoloads/Constants.gd && grep -n "WATER\|RIVER\|LAKE" scripts/autoload
+2026-07-14 22:38:16|Bash|python3 - << 'EOF'
+# 1. Constants: archer + 3 animals + barracks trains archer
+p='scripts/autoloads/
+2026-07-14 22:38:48|Bash|python3 - << 'EOF'
+# 2. AnimalArtist: optional canvas/ear + three new species
+p='scripts/art/AnimalA
+2026-07-14 22:39:19|Bash|python3 - << 'EOF'
+# 4. AssetLibrary: register archer + new animals
+p='scripts/autoloads/AssetLibrar
+2026-07-14 22:39:47|Bash|python3 - << 'EOF'
+# 7. HUD: train buttons built from the selected building's def
+p='scripts/ui/HUD.
+2026-07-14 22:40:25|Bash|G=/Applications/Godot.app/Contents/MacOS/Godot && $G --headless --path . --import 2>&1 | grep -icE "
+2026-07-14 22:40:58|Bash|G=/Applications/Godot.app/Contents/MacOS/Godot && $G --headless --path . ++ --test-hunt 2>&1 | grep 
+2026-07-14 22:41:16|Bash|python3 - << 'EOF'
+p='scripts/main/Main.gd'
+s=open(p).read()
+old="""	animals.spawn_at("capybara", Ve
+2026-07-14 22:41:25|Read|/Users/iagocavalcante/Library/Application Support/Godot/app_userdata/Age Of Amazon/animals_capture.png
+2026-07-14 22:43:15|Bash|G=/Applications/Godot.app/Contents/MacOS/Godot && echo "build: $($G --headless --path . ++ --test-bu

@@ -422,14 +422,33 @@ func _process_attacking(delta: float) -> void:
 
 func _strike(target: Node2D) -> void:
 	if not Net.is_headless_server():
-		# Lunge toward the victim for readability.
-		var toward: Vector2 = (target.global_position - global_position).normalized() * 4.0
-		var tween: Tween = create_tween()
-		tween.tween_property(sprite, "position", Vector2(toward), 0.08)
-		tween.tween_property(sprite, "position", Vector2.ZERO, 0.10)
+		if attack_range > 60.0:
+			_fire_arrow_visual(target)
+		else:
+			# Lunge toward the victim for readability.
+			var toward: Vector2 = (target.global_position - global_position).normalized() * 4.0
+			var tween: Tween = create_tween()
+			tween.tween_property(sprite, "position", Vector2(toward), 0.08)
+			tween.tween_property(sprite, "position", Vector2.ZERO, 0.10)
 
 	if target.has_method("take_damage"):
 		target.take_damage(attack_power, self)
+
+# Purely cosmetic: damage is instant on the authority; the arrow just sells
+# the shot on whatever screen is watching.
+func _fire_arrow_visual(target: Node2D) -> void:
+	var direction: Vector2 = (target.global_position - global_position).normalized()
+	var arrow: Line2D = Line2D.new()
+	arrow.points = PackedVector2Array([Vector2.ZERO, direction * 9.0])
+	arrow.width = 1.6
+	arrow.default_color = Color8(226, 216, 192)
+	arrow.z_index = 20
+	arrow.position = global_position + Vector2(0, -10) + direction * 6.0
+	get_parent().add_child(arrow)
+	var tween: Tween = arrow.create_tween()
+	tween.tween_property(arrow, "position",
+		target.global_position + Vector2(0, -8), 0.14)
+	tween.tween_callback(arrow.queue_free)
 
 func _in_attack_range(target: Node2D) -> bool:
 	var target_radius: float = BODY_RADIUS
