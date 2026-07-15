@@ -262,6 +262,25 @@ func _build_ui() -> void:
 		get_tree().change_scene_to_file(MAIN_SCENE))
 	_main_page.add_child(single)
 
+	# Difficulty: three small toggles under the solo button.
+	var diff_row: HBoxContainer = HBoxContainer.new()
+	diff_row.add_theme_constant_override("separation", 8)
+	diff_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_main_page.add_child(diff_row)
+	var diff_buttons: Dictionary = {}
+	for diff: String in ["easy", "normal", "hard"]:
+		var toggle: Button = _text_button(diff.capitalize())
+		diff_buttons[diff] = toggle
+		var captured: String = diff
+		toggle.pressed.connect(func() -> void:
+			GameManager.ai_difficulty = captured
+			for other: String in diff_buttons:
+				diff_buttons[other].add_theme_color_override("font_color",
+					COLOR_GOLD if other == captured else COLOR_TEXT_DIM))
+		diff_row.add_child(toggle)
+	diff_buttons[GameManager.ai_difficulty].add_theme_color_override(
+		"font_color", COLOR_GOLD)
+
 	var friends: Button = _secondary_button("Play with Friends")
 	friends.pressed.connect(func() -> void: _show_friends(true))
 	_main_page.add_child(friends)

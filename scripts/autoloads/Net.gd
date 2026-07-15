@@ -15,7 +15,7 @@ enum Mode { OFFLINE, SERVER, CLIENT, GATEWAY }
 # a stale build get a clear "refresh" error instead of silently dropped RPCs
 # (an argument-count mismatch makes Godot discard the call without a trace —
 # this bit us in production between two builds of the lobby protocol).
-const PROTOCOL_VERSION: int = 4
+const PROTOCOL_VERSION: int = 5
 
 signal match_config_received
 signal join_refused(reason: String)
@@ -30,12 +30,54 @@ var expected_players: int = 2
 # after EMPTY_SHUTDOWN_SECS with no peers connected (which also reaps matches
 # nobody ever joined), or GAME_OVER_SHUTDOWN_SECS after the match ends.
 const EMPTY_SHUTDOWN_SECS: float = 60.0
-const GAME_OVER_SHUTDOWN_SECS: float = 30.0
+const GAME_OVER_SHUTDOWN_SECS: float = 90.0  # long enough to vote a rematch
 var _shutdown_accum: float = 0.0
 
 # Set by the lobby flow before switching to the match scene; Main's client
 # boot uses it when no --join= CLI arg is present.
 var pending_match_url: String = ""
+# The URL of the match we're in (rematch reconnects to it).
+var current_match_url: String = ""
+
+# --- Rematch: everyone votes, the server rebuilds itself in place, and
+# clients reconnect with their existing seat tokens. ---
+var rematch_seed: int = 0            # server: consumed by the reload boot
+var _rematch_votes: Dictionary = {}  # server: peer_id -> true
+var _rematch_pending: bool = false   # client: reconnect instead of menu
+
+func request_rematch() -> void:
+	if mode == Mode.CLIENT:
+		_request_rematch.rpc_id(1)
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_rematch() -> void:
+	if mode != Mode.SERVER or GameManager.state != GameManager.GameState.GAME_OVER:
+		return
+	var sender: int = multiplayer.get_remote_sender_id()
+	if not peer_players.has(sender):
+		return
+	_rematch_votes[sender] = true
+	print("[net] rematch votes: %d/%d" % [_rematch_votes.size(), peer_players.size()])
+	for peer: int in peer_players:
+		if not _rematch_votes.has(peer):
+			return
+	# Unanimous: warn everyone, then rebuild this process around a new seed.
+	_rematch_votes.clear()
+	rematch_seed = randi()
+	if rematch_seed == 0:
+		rematch_seed = 1
+	_rematch_starting.rpc()
+	await get_tree().create_timer(0.6).timeout
+	if multiplayer.multiplayer_peer != null:
+		multiplayer.multiplayer_peer.close()
+	peer_players.clear()
+	_shutdown_accum = 0.0
+	GameManager.state = GameManager.GameState.LOADING
+	get_tree().reload_current_scene()
+
+@rpc("authority", "call_remote", "reliable")
+func _rematch_starting() -> void:
+	_rematch_pending = true
 
 # One-shot message for the main menu (why the last session ended).
 var last_status: String = ""
@@ -115,9 +157,28 @@ func back_to_menu(status: String = "") -> void:
 func _on_server_disconnected() -> void:
 	if mode != Mode.CLIENT:
 		return
+	if _rematch_pending:
+		_rematch_pending = false
+		_reconnect_for_rematch()
+		return
 	push_warning("[net] connection to the match server was lost")
 	if auto_return_to_menu:
 		back_to_menu("Connection to the match was lost.")
+
+# The server is rebuilding; ride the normal join path back in with the same
+# seat token once it has had time to come up.
+func _reconnect_for_rematch() -> void:
+	get_tree().paused = false
+	mode = Mode.OFFLINE
+	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
+	GameManager.world = null
+	GameManager.pathfinder = null
+	GameManager.fog = null
+	GameManager.state = GameManager.GameState.LOADING
+	Replication.reset_client()
+	pending_match_url = current_match_url
+	await get_tree().create_timer(2.5).timeout
+	get_tree().change_scene_to_file("res://scenes/main/Main.tscn")
 
 func _on_connection_failed() -> void:
 	if mode != Mode.CLIENT:
@@ -163,7 +224,8 @@ func host(port: int, players: int) -> Error:
 	multiplayer.multiplayer_peer = peer
 	mode = Mode.SERVER
 	expected_players = players
-	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
+	if not multiplayer.peer_disconnected.is_connected(_on_peer_disconnected):
+		multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	print("[net] match server listening on port %d for %d players" % [port, players])
 	return OK
 
@@ -175,6 +237,7 @@ func join(url: String) -> Error:
 		return err
 	multiplayer.multiplayer_peer = peer
 	mode = Mode.CLIENT
+	current_match_url = url
 	if not multiplayer.connected_to_server.is_connected(_on_connected_to_server):
 		multiplayer.connected_to_server.connect(_on_connected_to_server)
 	return OK

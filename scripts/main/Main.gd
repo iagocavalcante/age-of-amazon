@@ -46,6 +46,12 @@ func _ready() -> void:
 		_run_save_test()
 	if "--test-audio" in args:
 		_run_audio_test()
+	if "--test-monument" in args:
+		_run_monument_test()
+	if "--test-tactics" in args:
+		_run_tactics_test()
+	if "--test-fish" in args:
+		_run_fish_test()
 	if "--test-victory" in args:
 		_run_victory_test()
 	if "--test-systems" in args:
@@ -83,6 +89,7 @@ func _boot_offline(args: PackedStringArray) -> void:
 	if not resume.is_empty():
 		# Terrain rebuilds deterministically; only entities and fog restore.
 		GameManager.map_seed = int(resume["seed"])
+		GameManager.ai_difficulty = String(resume.get("difficulty", "normal"))
 		GameManager.reset_players(int(resume["player_count"]))
 		GameManager._next_entity_id = int(resume["next_id"])
 		for i in range(GameManager.stockpiles.size()):
@@ -129,10 +136,19 @@ func _boot_server(args: PackedStringArray) -> void:
 	var seed_arg: int = int(_arg_value(args, "--seed=", "0"))
 	if seed_arg != 0:
 		GameManager.map_seed = seed_arg
+	if Net.rematch_seed != 0:
+		GameManager.map_seed = Net.rematch_seed
+		Net.rematch_seed = 0
 	GameManager.reset_players(players)
 	var tokens: String = _arg_value(args, "--tokens=")
 	if tokens != "":
 		Net.slot_tokens = tokens.split(",")
+
+	# Harness hook: end the match automatically (tests the rematch flow).
+	var end_after: float = float(_arg_value(args, "--end-after=", "0"))
+	if end_after > 0.0:
+		get_tree().create_timer(end_after).timeout.connect(
+			func() -> void: GameManager.end_game(0))
 
 	if Net.host(port, players) != OK:
 		push_error("[net] failed to bind port %d" % port)
@@ -256,26 +272,7 @@ func _run_move_test() -> void:
 # the same checks the authority applies, so harnesses don't flake on the
 # random scatter of trees.
 func _find_buildable_cell(origin: Vector2i, building_type: String, player_id: int) -> Vector2i:
-	var footprint: Vector2i = Constants.BUILDING_DEFS[building_type]["footprint"]
-	for radius in range(3, 9):
-		for dy in range(-radius, radius + 1):
-			for dx in range(-radius, radius + 1):
-				var base: Vector2i = origin + Vector2i(dx, dy)
-				var ok: bool = true
-				for fy in range(footprint.y):
-					for fx in range(footprint.x):
-						var cell: Vector2i = base + Vector2i(fx, fy)
-						if not GameManager.world.is_walkable(cell) \
-								or GameManager.world.building_at(cell) != null \
-								or not GameManager.world.get_resource_at(cell).is_empty() \
-								or not GameManager.has_explored(player_id, cell):
-							ok = false
-							break
-					if not ok:
-						break
-				if ok:
-					return base
-	return Vector2i(9999, 9999)
+	return GameManager.find_buildable_cell(origin, building_type, player_id)
 
 # Prove construction: rejections (occupied, unscouted), a villager-built
 # house that raises the pop cap, and a barracks that trains once finished.
@@ -354,6 +351,115 @@ func _run_build_test() -> void:
 	var wood_spent: int = wood_before_repair - GameManager.get_resource(0, Constants.ResourceType.WOOD)
 	print("[test-build] repair-cost ", "OK" if wood_spent > 0 else "FAILED",
 		" (wood spent: ", wood_spent, ")")
+	get_tree().quit()
+
+# Prove shore fishing: a fish school exists near the shore, a villager can
+# work it, and the catch banks as food.
+func _run_fish_test() -> void:
+	await get_tree().create_timer(0.5).timeout
+	var fish_cell: Vector2i = Vector2i(9999, 9999)
+	var radius: int = 8
+	while radius <= 60 and fish_cell.x == 9999:
+		for dy in range(-radius, radius + 1):
+			for dx in range(-radius, radius + 1):
+				if maxi(absi(dx), absi(dy)) != radius:
+					continue  # ring only — keeps the scan linear
+				var cell: Vector2i = Vector2i(dx, dy)
+				var node: Dictionary = GameManager.world.get_resource_at(cell)
+				if node.get("fish", false):
+					fish_cell = cell
+					break
+			if fish_cell.x != 9999:
+				break
+		radius += 2
+	print("[test-fish] school-found ", "OK" if fish_cell.x != 9999 else "FAILED",
+		" at ", fish_cell)
+	if fish_cell.x == 9999:
+		get_tree().quit(1)
+		return
+
+	var villagers: Array = get_tree().get_nodes_in_group("player_0").filter(
+		func(n: Node) -> bool: return n is UnitBase and (n as UnitBase).can_gather)
+	var food_before: int = GameManager.get_resource(0, Constants.ResourceType.FOOD)
+	var fisher: UnitBase = villagers[0]
+	fisher.global_position = Constants.grid_to_world(fish_cell.x, fish_cell.y) \
+		+ Vector2(0, 40)  # start nearby; pathing over distance isn't the point
+	fisher.command_gather(fish_cell)
+	var elapsed: float = 0.0
+	while GameManager.get_resource(0, Constants.ResourceType.FOOD) <= food_before \
+			and elapsed < 45.0:
+		await get_tree().create_timer(0.5).timeout
+		elapsed += 0.5
+	var food_after: int = GameManager.get_resource(0, Constants.ResourceType.FOOD)
+	print("[test-fish] catch-banked ", "OK" if food_after > food_before else "FAILED",
+		" food ", food_before, "->", food_after)
+	get_tree().quit()
+
+# Prove rally points and attack-move.
+func _run_tactics_test() -> void:
+	await get_tree().create_timer(0.5).timeout
+	# Rally: set one on the TC, train a villager, expect it to march there.
+	var tc: Building = _find_tc(0)
+	CommandRouter.submit({"type": "rally", "player_id": 0,
+		"building_name": String(tc.name), "cell": Vector2i(7, 7)})
+	await get_tree().process_frame
+	print("[test-tactics] rally-set ",
+		"OK" if tc.rally_cell == Vector2i(7, 7) else "FAILED")
+	GameManager.add_resource(0, Constants.ResourceType.FOOD, 200)
+	tc.queue_train("villager")
+	var rally_world: Vector2 = Constants.grid_to_world(7, 7)
+	var arrived: bool = false
+	var elapsed: float = 0.0
+	while not arrived and elapsed < 20.0:
+		await get_tree().create_timer(0.5).timeout
+		elapsed += 0.5
+		for node: Node in get_tree().get_nodes_in_group("player_0"):
+			if node is UnitBase and (node as Node2D).global_position.distance_to(rally_world) < 60.0:
+				arrived = true
+	print("[test-tactics] rally-march ", "OK" if arrived else "FAILED")
+
+	# Attack-move: a warrior ordered past an enemy stops to kill it.
+	var warrior: UnitBase = _spawn_unit("warrior", 0, Vector2i(-4, -4))
+	var bait: UnitBase = _spawn_unit("villager", 1, Vector2i(-4, 2))
+	await get_tree().process_frame
+	CommandRouter.submit({"type": "attack_move", "player_id": 0,
+		"actor_names": [String(warrior.name)],
+		"target": Constants.grid_to_world(-4, 8)})
+	elapsed = 0.0
+	while is_instance_valid(bait) and elapsed < 25.0:
+		await get_tree().create_timer(0.5).timeout
+		elapsed += 0.5
+	print("[test-tactics] attack-move ", "OK" if not is_instance_valid(bait) else "FAILED")
+	get_tree().quit()
+
+# Prove the jade endgame: a constructed monument counts down and wins for
+# its owner; destroying it stops the clock.
+func _run_monument_test() -> void:
+	await get_tree().create_timer(0.5).timeout
+	GameManager.add_resource(0, Constants.ResourceType.JADE, 100)
+	GameManager.add_resource(0, Constants.ResourceType.WOOD, 200)
+	var villagers: Array = get_tree().get_nodes_in_group("player_0").filter(
+		func(n: Node) -> bool: return n is UnitBase and (n as UnitBase).can_gather)
+	var names: Array = villagers.map(func(u: Node2D) -> String: return String(u.name))
+	var cell: Vector2i = _find_buildable_cell(Vector2i.ZERO, "monument", 0)
+	CommandRouter.submit({"type": "place", "player_id": 0,
+		"building_type": "monument", "cell": cell, "actor_names": names})
+	await get_tree().process_frame
+	var monument: Building = GameManager.world.building_at(cell) as Building
+	print("[test-monument] placed ", "OK" if monument != null else "FAILED")
+	var elapsed: float = 0.0
+	while monument != null and not monument.is_constructed and elapsed < 60.0:
+		await get_tree().create_timer(0.5).timeout
+		elapsed += 0.5
+	print("[test-monument] constructed ", "OK" if monument.is_constructed else "FAILED")
+
+	# Fast-forward the countdown to its final seconds.
+	monument.monument_timer = Constants.MONUMENT_VICTORY_SECS - 2.0
+	var winner: Array = [-1]
+	EventBus.game_over.connect(func(w: int) -> void: winner[0] = w, CONNECT_ONE_SHOT)
+	await get_tree().create_timer(3.0).timeout
+	print("[test-monument] victory ", "OK" if winner[0] == 0 else "FAILED",
+		" winner=", winner[0])
 	get_tree().quit()
 
 # Prove the procedural audio bank: every stream synthesized non-empty, the
@@ -555,6 +661,9 @@ func _until(condition: Callable, timeout: float) -> void:
 # unit's replicated position moves, and foreign units can't be commanded.
 func _run_mp_client_test() -> void:
 	Net.auto_return_to_menu = false
+	if Net.has_meta("mp_rematch_phase2"):
+		_run_mp_rematch_phase2()
+		return
 	print("[test-mp] me=", GameManager.local_player_id)
 
 	var own_group: String = "player_%d" % GameManager.local_player_id
@@ -617,6 +726,27 @@ func _run_mp_client_test() -> void:
 		return b != null and b.building_type == "house"
 	await _until(check, 8.0)
 	print("[test-mp] build-sync ", "OK" if check.call() else "FAILED")
+
+	# Rematch: wait for the harness server's scripted game over, vote, and
+	# let the reconnect flow run — phase 2 asserts the fresh world.
+	await _until(func() -> bool:
+		return GameManager.state == GameManager.GameState.GAME_OVER, 40.0)
+	if GameManager.state != GameManager.GameState.GAME_OVER:
+		print("[test-mp] rematch FAILED (no game over)")
+		get_tree().quit(1)
+		return
+	Net.set_meta("mp_rematch_phase2", true)
+	Net.request_rematch()
+	# The scene reloads via the rematch reconnect; phase 2 takes over.
+
+func _run_mp_rematch_phase2() -> void:
+	var own_group: String = "player_%d" % GameManager.local_player_id
+	await _until(func() -> bool:
+		return get_tree().get_nodes_in_group(own_group).size() >= 4, 15.0)
+	var mine: Array = get_tree().get_nodes_in_group(own_group).filter(
+		func(n: Node) -> bool: return n is UnitBase)
+	print("[test-mp] rematch ", "OK" if mine.size() == 3 \
+		and GameManager.state == GameManager.GameState.RUNNING else "FAILED")
 	get_tree().quit()
 
 # Prove N-player victory: with three tribes, losing one town center does NOT

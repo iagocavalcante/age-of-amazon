@@ -39,12 +39,18 @@ func reset_client() -> void:
 func _on_world_ready() -> void:
 	match Net.mode:
 		Net.Mode.SERVER:
-			EventBus.entity_spawned.connect(_on_entity_spawned)
-			EventBus.unit_died.connect(_on_entity_gone)
-			EventBus.building_destroyed.connect(_on_entity_gone)
+			# A rematch reloads the scene and re-fires world_ready: state
+			# resets, and every connect stays idempotent.
+			_live_peers.clear()
+			_depleted_cells.clear()
+			_entities.clear()
+			if not EventBus.entity_spawned.is_connected(_on_entity_spawned):
+				EventBus.entity_spawned.connect(_on_entity_spawned)
+				EventBus.unit_died.connect(_on_entity_gone)
+				EventBus.building_destroyed.connect(_on_entity_gone)
+				multiplayer.peer_disconnected.connect(
+					func(peer_id: int) -> void: _live_peers.erase(peer_id))
 			GameManager.world.resource_depleted.connect(_on_resource_depleted)
-			multiplayer.peer_disconnected.connect(
-				func(peer_id: int) -> void: _live_peers.erase(peer_id))
 		Net.Mode.CLIENT:
 			_client_world_ready.rpc_id(1)
 
@@ -115,7 +121,7 @@ func _process(delta: float) -> void:
 		if building != null:
 			building_states.append([String(building.name), building.current_hp,
 				building.train_queue.duplicate(), building.train_progress,
-				building.is_constructed])
+				building.is_constructed, building.monument_timer])
 
 	for peer: int in _live_peers:
 		var player_id: int = Net.peer_players.get(peer, -1)
@@ -223,4 +229,5 @@ func _tick(unit_states: Array, building_states: Array) -> void:
 	for s: Array in building_states:
 		var building: Building = _entities.get(s[0]) as Building
 		if building != null and is_instance_valid(building):
-			building.net_apply(s[1], s[2], s[3], s[4] if s.size() > 4 else true)
+			building.net_apply(s[1], s[2], s[3], s[4] if s.size() > 4 else true,
+				s[5] if s.size() > 5 else 0.0)

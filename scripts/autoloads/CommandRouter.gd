@@ -41,6 +41,10 @@ func _validate_and_execute(command: Dictionary) -> void:
 			_exec_train(command)
 		"place":
 			_exec_place(command)
+		"rally":
+			_exec_rally(command)
+		"attack_move":
+			_exec_attack_move(command)
 		"build":
 			_exec_build(command)
 		_:
@@ -104,6 +108,25 @@ func _exec_attack(command: Dictionary) -> void:
 		return
 	for unit: UnitBase in _resolve_actors(command):
 		unit.command_attack(target)
+
+func _exec_rally(command: Dictionary) -> void:
+	var building: Building = _resolve_target(command.get("building_name", "")) as Building
+	if building == null or building.player_id != int(command["player_id"]):
+		return
+	building.rally_cell = command["cell"]
+
+# March toward a point, engaging anything hostile met on the way.
+func _exec_attack_move(command: Dictionary) -> void:
+	var target: Vector2 = command["target"]
+	var cells: Array[Vector2i] = []
+	var actors: Array[UnitBase] = _resolve_actors(command)
+	if GameManager.pathfinder != null:
+		cells = GameManager.pathfinder.formation_cells(target, actors.size())
+	for i in range(actors.size()):
+		var spot: Vector2 = target
+		if i < cells.size():
+			spot = Constants.grid_to_world(cells[i].x, cells[i].y)
+		actors[i].command_attack_move(spot)
 
 # Place a construction site: pay the cost, occupy the cells, then send the
 # issuing villagers to build it. Every rule a client could bend is checked

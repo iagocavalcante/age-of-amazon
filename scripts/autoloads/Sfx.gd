@@ -126,6 +126,7 @@ func _build_streams() -> void:
 		return sin(TAU * (110.0 - 50.0 * p) * t) * 0.6 * pow(1.0 - p, 1.5))
 	_streams["click"] = _render(0.035, func(t: float, p: float) -> float:
 		return sin(TAU * 1100.0 * t) * 0.35 * (1.0 - p))
+	_streams["alarm"] = _chime([880.0, 587.33, 880.0, 587.33], 0.11)
 	_streams["built"] = _chime([523.25, 659.25, 783.99], 0.14)
 	_streams["victory"] = _chime([523.25, 659.25, 783.99, 1046.5], 0.2)
 	_streams["defeat"] = _chime([392.0, 311.13, 261.63], 0.24)

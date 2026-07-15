@@ -104,6 +104,33 @@ func population_cap(player_id: int) -> int:
 func has_population_room(player_id: int) -> bool:
 	return get_population(player_id) < population_cap(player_id)
 
+# First cell near origin where this building may legally go — used by the
+# build harnesses and the AI. Mirrors CommandRouter's placement validation.
+func find_buildable_cell(origin: Vector2i, building_type: String, player_id: int) -> Vector2i:
+	var footprint: Vector2i = Constants.BUILDING_DEFS[building_type]["footprint"]
+	for radius in range(3, 10):
+		for dy in range(-radius, radius + 1):
+			for dx in range(-radius, radius + 1):
+				var base: Vector2i = origin + Vector2i(dx, dy)
+				var ok: bool = true
+				for fy in range(footprint.y):
+					for fx in range(footprint.x):
+						var cell: Vector2i = base + Vector2i(fx, fy)
+						if not world.is_walkable(cell) \
+								or world.building_at(cell) != null \
+								or not world.get_resource_at(cell).is_empty() \
+								or not has_explored(player_id, cell):
+							ok = false
+							break
+					if not ok:
+						break
+				if ok:
+					return base
+	return Vector2i(9999, 9999)
+
+# Difficulty of the forest AI for offline matches ("easy"/"normal"/"hard").
+var ai_difficulty: String = "normal"
+
 func change_state(new_state: GameState) -> void:
 	state = new_state
 	EventBus.game_state_changed.emit(GameState.keys()[new_state])

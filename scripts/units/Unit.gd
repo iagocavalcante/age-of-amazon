@@ -48,6 +48,9 @@ var _intent: Dictionary = {}
 var _build_site: Building = null
 var _build_timer: float = 0.0
 
+# Attack-move: keep marching here between fights.
+var _attack_move_target: Vector2 = Vector2.INF
+
 # Gathering
 var _gather_cell: Vector2i = Vector2i.ZERO
 var _gather_type: int = -1
@@ -126,8 +129,25 @@ func _sim_step(delta: float) -> void:
 					_aggro_timer = AGGRO_SCAN_INTERVAL
 					var enemy: Node2D = _find_enemy_in_range(vision_range)
 					if enemy != null:
+						var resume: Vector2 = _attack_move_target
 						command_attack(enemy)
+						_attack_move_target = resume
+					elif _attack_move_target != Vector2.INF:
+						# Fight's over: resume the march.
+						var target: Vector2 = _attack_move_target
+						move_to(target)
+						_attack_move_target = target
 		State.MOVING:
+			# Attack-movers scan for trouble while marching.
+			if _attack_move_target != Vector2.INF and aggressive:
+				_aggro_timer -= delta
+				if _aggro_timer <= 0.0:
+					_aggro_timer = AGGRO_SCAN_INTERVAL
+					var threat: Node2D = _find_enemy_in_range(vision_range)
+					if threat != null:
+						var resume: Vector2 = _attack_move_target
+						command_attack(threat)
+						_attack_move_target = resume
 			if _follow_path(delta):
 				_on_arrival()
 		State.GATHERING:
@@ -194,6 +214,7 @@ func _view_step(delta: float) -> void:
 func move_to(target: Vector2) -> void:
 	_intent = {}
 	_attack_target = null
+	_attack_move_target = Vector2.INF
 	if _start_path_to(target):
 		current_state = State.MOVING
 	else:
@@ -222,6 +243,16 @@ func command_attack(target: Node2D) -> void:
 		current_state = State.MOVING
 	else:
 		current_state = State.IDLE
+
+# March to a point, engaging hostiles seen on the way and resuming the
+# march after each fight. Aggressive units only; villagers just move.
+func command_attack_move(target: Vector2) -> void:
+	if not aggressive:
+		move_to(target)
+		return
+	move_to(target)
+	_attack_move_target = target
+	_aggro_timer = 0.0
 
 # Walk to a construction site and hammer it up. Villagers only.
 func command_build(site: Building) -> void:
@@ -300,6 +331,9 @@ func _terrain_cost() -> float:
 	return cost
 
 func _on_arrival() -> void:
+	if _intent.get("kind", "") == "" and _attack_move_target != Vector2.INF \
+			and global_position.distance_to(_attack_move_target) < 40.0:
+		_attack_move_target = Vector2.INF  # arrived; stand down to plain idle
 	match _intent.get("kind", ""):
 		"gather":
 			if GameManager.world.get_resource_at(_gather_cell).is_empty():

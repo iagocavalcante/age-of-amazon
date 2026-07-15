@@ -153,7 +153,20 @@ func resource_at(x: int, y: int, biome: int) -> Dictionary:
 		Constants.Biome.HIGH_GROUND:
 			if h < 0.055:
 				return { "type": Constants.ResourceType.JADE, "amount": 80 }
+		Constants.Biome.WATER_SHALLOW:
+			# Fish school along the shore: rivers become worth fighting over
+			# (and the caimans agree).
+			if h < 0.11 and _has_land_neighbor(x, y):
+				return { "type": Constants.ResourceType.FOOD, "amount": 130, "fish": true }
 	return {}
+
+func _has_land_neighbor(x: int, y: int) -> bool:
+	for offset: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		var biome: int = biome_at(x + offset.x, y + offset.y)
+		if biome != Constants.Biome.WATER_SHALLOW and biome != Constants.Biome.WATER_DEEP \
+				and Constants.WALKABLE.get(biome, false):
+			return true
+	return false
 
 # Pure decoration (not harvestable): reeds on swamp, rocks on cliffs.
 # Returns "" or a decor id.

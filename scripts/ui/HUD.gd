@@ -25,6 +25,11 @@ var _minimap_image: Image
 var _game_over: Control
 var _game_over_label: Label
 var _restart_button: Button
+var _rematch_button: Button
+var _monument_banner: Label
+var _alert_label: Label
+var _alert_cooldown: float = 0.0
+var _minimap_ping: ColorRect
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -32,6 +37,16 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	_build_top_bar()
+	_monument_banner = Label.new()
+	_monument_banner.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_monument_banner.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_monument_banner.offset_top = 46
+	_monument_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_monument_banner.add_theme_font_size_override("font_size", 16)
+	_monument_banner.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
+	_monument_banner.add_theme_constant_override("shadow_offset_y", 1)
+	_monument_banner.visible = false
+	add_child(_monument_banner)
 	_build_selection_panel()
 	_build_minimap()
 	_build_game_over()
@@ -43,6 +58,7 @@ func _ready() -> void:
 	EventBus.training_queued.connect(func(_b: Node2D, _t: String) -> void: _refresh_selection_panel())
 	EventBus.training_completed.connect(func(_b: Node2D, _t: String) -> void: _refresh_selection_panel())
 	EventBus.game_over.connect(_on_game_over)
+	EventBus.building_damaged.connect(_on_building_damaged_alert)
 	# Pausing is meaningless in multiplayer — the server marches on. Mode is
 	# only known after Main's boot, so decide at world_ready.
 	EventBus.world_ready.connect(func() -> void:
@@ -185,7 +201,7 @@ func _build_selection_panel() -> void:
 	_build_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	_build_box.visible = false
 	box.add_child(_build_box)
-	for building_type: String in ["house", "barracks", "watchtower"]:
+	for building_type: String in ["house", "barracks", "watchtower", "monument"]:
 		var def: Dictionary = Constants.BUILDING_DEFS[building_type]
 		var parts: Array[String] = []
 		for res_type: int in def["cost"]:
@@ -291,8 +307,81 @@ func _build_minimap() -> void:
 
 	_minimap_image = Image.create(MINIMAP_TILES, MINIMAP_TILES, false, Image.FORMAT_RGBA8)
 
+# "Your base is under attack!" — sound + banner + minimap ping, at most
+# once per 12 seconds so a siege doesn't become a siren.
+func _on_building_damaged_alert(building: Node2D, _attacker: Node2D) -> void:
+	if building.get("player_id") != GameManager.local_player_id:
+		return
+	var now: float = Time.get_ticks_msec() / 1000.0
+	if now - _alert_cooldown < 12.0:
+		return
+	_alert_cooldown = now
+	Sfx.play("alarm")
+	if _alert_label == null:
+		_alert_label = Label.new()
+		_alert_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
+		_alert_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+		_alert_label.offset_top = 70
+		_alert_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_alert_label.add_theme_font_size_override("font_size", 15)
+		_alert_label.add_theme_color_override("font_color", Color(1.0, 0.4, 0.35))
+		_alert_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
+		add_child(_alert_label)
+	_alert_label.text = "Your base is under attack!"
+	_alert_label.modulate.a = 1.0
+	var tween: Tween = _alert_label.create_tween()
+	tween.tween_interval(2.5)
+	tween.tween_property(_alert_label, "modulate:a", 0.0, 0.8)
+	_ping_minimap((building as Node2D).global_position)
+
+func _ping_minimap(world_pos: Vector2) -> void:
+	if _minimap_rect == null:
+		return
+	var center: Vector2i = Constants.world_to_grid(
+		get_viewport().get_camera_2d().global_position if get_viewport().get_camera_2d() != null else Vector2.ZERO)
+	var cell: Vector2i = Constants.world_to_grid(world_pos)
+	var scale_px: float = float(MINIMAP_DISPLAY) / float(MINIMAP_TILES)
+	var offset: Vector2 = Vector2(cell - center) * scale_px + Vector2(MINIMAP_DISPLAY, MINIMAP_DISPLAY) / 2.0
+	if offset.x < 0 or offset.y < 0 or offset.x > MINIMAP_DISPLAY or offset.y > MINIMAP_DISPLAY:
+		offset = offset.clamp(Vector2(4, 4), Vector2(MINIMAP_DISPLAY - 4, MINIMAP_DISPLAY - 4))
+	if _minimap_ping == null or not is_instance_valid(_minimap_ping):
+		_minimap_ping = ColorRect.new()
+		_minimap_ping.size = Vector2(8, 8)
+		_minimap_ping.color = Color(1.0, 0.25, 0.2, 0.95)
+		_minimap_ping.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_minimap_rect.add_child(_minimap_ping)
+	_minimap_ping.position = offset - Vector2(4, 4)
+	_minimap_ping.visible = true
+	var ping_tween: Tween = _minimap_ping.create_tween()
+	ping_tween.set_loops(4)
+	ping_tween.tween_property(_minimap_ping, "modulate:a", 0.15, 0.3)
+	ping_tween.tween_property(_minimap_ping, "modulate:a", 1.0, 0.3)
+	ping_tween.chain().tween_callback(func() -> void: _minimap_ping.visible = false)
+
+# The wonder-timer rule: everyone gets warned, fog or not.
+func _refresh_monument_banner() -> void:
+	var best: Building = null
+	for node: Node in get_tree().get_nodes_in_group("buildings"):
+		var building: Building = node as Building
+		if building != null and building.building_type == "monument" \
+				and building.is_constructed:
+			if best == null or building.monument_timer > best.monument_timer:
+				best = building
+	if best == null:
+		_monument_banner.visible = false
+		return
+	var remaining: int = maxi(0, int(ceil(Constants.MONUMENT_VICTORY_SECS - best.monument_timer)))
+	_monument_banner.visible = true
+	if best.player_id == GameManager.local_player_id:
+		_monument_banner.text = "Your Monument stands — victory in %ds" % remaining
+		_monument_banner.add_theme_color_override("font_color", Color(0.6, 0.95, 0.75))
+	else:
+		_monument_banner.text = "A rival Monument rises! Raze it within %ds" % remaining
+		_monument_banner.add_theme_color_override("font_color", Color(1.0, 0.55, 0.45))
+
 func _on_refresh_tick() -> void:
 	_redraw_minimap()
+	_refresh_monument_banner()
 	if _sel_panel.visible:
 		_refresh_selection_panel()
 
@@ -426,10 +515,23 @@ func _build_game_over() -> void:
 	_restart_button.pressed.connect(_on_restart_pressed)
 	box.add_child(_restart_button)
 
+	_rematch_button = Button.new()
+	_rematch_button.text = "Rematch"
+	_rematch_button.focus_mode = Control.FOCUS_NONE
+	_rematch_button.visible = false
+	_rematch_button.pressed.connect(func() -> void:
+		Net.request_rematch()
+		_rematch_button.text = "Waiting for the others…"
+		_rematch_button.disabled = true)
+	box.add_child(_rematch_button)
+
 func _on_game_over(winner_player_id: int) -> void:
 	get_tree().paused = true
 	_game_over_label.text = "Victory!" if winner_player_id == GameManager.local_player_id else "Defeat"
 	_restart_button.text = "Back to Menu" if Net.mode == Net.Mode.CLIENT else "Play Again"
+	_rematch_button.visible = Net.mode == Net.Mode.CLIENT
+	_rematch_button.disabled = false
+	_rematch_button.text = "Rematch"
 	_game_over.visible = true
 
 func _on_restart_pressed() -> void:

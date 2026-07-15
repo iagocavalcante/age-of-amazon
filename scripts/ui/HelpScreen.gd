@@ -200,6 +200,8 @@ func _build_left(col: VBoxContainer) -> void:
 	_add_control(col, "Right-click an enemy", "Attack it")
 	_add_control(col, "Right-click an animal", "Hunt it for food")
 	_add_control(col, "Right-click your damaged building", "Villagers build or repair it")
+	_add_control(col, "Shift + right-click", "Attack-move: march there, engaging foes on the way")
+	_add_control(col, "Right-click with a building selected", "Set its rally point")
 
 func _build_right(col: VBoxContainer) -> void:
 	_add_section(col, "Your people")
@@ -213,6 +215,7 @@ func _build_right(col: VBoxContainer) -> void:
 	_add_body(col, "•  House (30 wood) — +5 population.")
 	_add_body(col, "•  Barracks (60 wood, 20 food) — trains warriors.")
 	_add_body(col, "•  Watchtower (40 wood) — watches far into the fog.")
+	_add_body(col, "•  Monument (40 jade, 100 wood) — stand it for 90 seconds to WIN. Everyone is warned when one rises.")
 	_add_body(col, "Unfinished sites are fragile and can be razed — guard them. Villagers also repair damaged buildings (1 wood per swing).")
 
 	_add_section(col, "Resources")
@@ -226,6 +229,8 @@ func _build_right(col: VBoxContainer) -> void:
 	_add_section(col, "Tips")
 	_add_body(col, "•  Keep every villager gathering — idle villagers lose games.")
 	_add_body(col, "•  Hunt capybaras and tapirs for food — but beware jaguars, bush dog packs, and caimans lurking at the water's edge.")
+	_add_body(col, "•  Fish schools shimmer along riverbanks — villagers can work them like berry bushes.")
+	_add_body(col, "•  Mine jade early if you dream of a Monument victory.")
 	_add_body(col, "•  Scout before you strike — you can't hit what you can't see.")
 	_add_body(col, "•  A watchtower on a border ridge is worth three patrols.")
 	_add_body(col, "•  Solo battles autosave every few seconds — closing the tab is safe; pick Continue when you return.")

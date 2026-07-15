@@ -184,7 +184,17 @@ const BUILDING_DEFS: Dictionary = {
 		"vision_tiles": 16,
 		"cost": {ResourceType.WOOD: 40},
 	},
+	# The jade endgame: finish it, defend it for MONUMENT_VICTORY_SECS, win.
+	"monument": {
+		"max_hp": 800,
+		"footprint": Vector2i(2, 2),
+		"trains": [],
+		"vision_tiles": 6,
+		"cost": {ResourceType.JADE: 40, ResourceType.WOOD: 100},
+	},
 }
+
+const MONUMENT_VICTORY_SECS: float = 90.0
 
 # Movement costs per biome (keyed by int)
 var MOVEMENT_COST: Dictionary = {}

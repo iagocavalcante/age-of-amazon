@@ -1,104 +1,3 @@
-2026-07-14 22:17:22|Read|/Users/iagocavalcante/Library/Application Support/Godot/app_userdata/Age Of Amazon/help_capture.png
-2026-07-14 22:17:55|Bash|G=/Applications/Godot.app/Contents/MacOS/Godot && echo "commands: $($G --headless --path . ++ --test
-2026-07-14 22:19:55|Bash|python3 - << 'EOF'
-p='scripts/buildings/Building.gd'
-s=open(p).read()
-
-old = """# One builder swing 
-2026-07-14 22:20:36|Bash|python3 - << 'EOF'
-p='scripts/main/Main.gd'
-s=open(p).read()
-old = """	var trains: bool = barracks !
-2026-07-14 22:21:44|Bash|G=/Applications/Godot.app/Contents/MacOS/Godot && echo "commands: $($G --headless --path . ++ --test
-2026-07-14 22:22:23|Bash|sed -n "$(grep -n '\[display\]' project.godot | cut -d: -f1),+10p" project.godot
-2026-07-14 22:22:47|Read|project.godot
-2026-07-14 22:22:56|Edit|project.godot
-2026-07-14 22:23:14|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
-2026-07-14 22:23:24|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/resp/small/f00000038.png
-2026-07-14 22:23:25|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/resp/wide/f00000010.png
-2026-07-14 22:24:10|Bash|git add -A && git commit -q -m "feat: repair + responsive viewport
-
-- Villagers repair damaged finis
-2026-07-14 22:25:26|Bash|cat > server_config.json << 'EOF'
-{
-	"gateway_url": "wss://game.iagocavalcante.com/ws",
-	"match_url_
-2026-07-14 22:29:23|AskUserQuestion|
-2026-07-14 22:29:52|Bash|grep -n "SPECIES\|const \|func setup\|predator\|aggressive\|food" scripts/units/Animal.gd | head -25
-2026-07-14 22:30:02|Bash|grep -n "ANIMAL_DEFS" -A 30 scripts/autoloads/Constants.gd | head -36; sed -n '18,44p' scripts/art/A
-2026-07-14 22:31:17|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
-2026-07-14 22:31:26|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/selp/f00000012.png
-2026-07-14 22:32:10|Bash|LOCAL=$(stat -f%z build/web/index.pck); BARE=$(curl -sI "https://iagocavalcante.github.io/age-of-ama
-2026-07-14 22:32:42|Bash|python3 - << 'EOF'
-p='scripts/ui/MainMenu.gd'
-s=open(p).read()
-
-old = """var _gateway_url: String = 
-2026-07-14 22:33:51|Bash|HASH=$(git rev-parse --short HEAD) && cat > server_config.json << EOF
-{
-	"gateway_url": "wss://game.
-2026-07-14 22:34:18|Bash|grep -n "match_url_template" docs/deploy-multiplayer.md
-2026-07-14 22:34:35|Bash|python3 - << 'EOF'
-p='docs/deploy-multiplayer.md'
-s=open(p).read()
-old='''	"match_url_template": "ws
-2026-07-14 22:36:06|Bash|sed -n '1,60p' scripts/art/AnimalArtist.gd && sed -n '60,116p' scripts/art/AnimalArtist.gd
-2026-07-14 22:36:23|Bash|sed -n '1,50p' scripts/art/UnitArtist.gd; sed -n '138,180p' scripts/art/UnitArtist.gd
-2026-07-14 22:36:49|Bash|grep -n "WARRIOR_IDLE_ROWS" -A 20 scripts/art/UnitArtist.gd | head -24; sed -n '1,60p' scripts/world
-2026-07-14 22:36:57|Bash|sed -n '56,100p' scripts/world/AnimalManager.gd
-2026-07-14 22:37:12|Bash|grep -n "enum Biome" scripts/autoloads/Constants.gd && grep -n "WATER\|RIVER\|LAKE" scripts/autoload
-2026-07-14 22:38:16|Bash|python3 - << 'EOF'
-# 1. Constants: archer + 3 animals + barracks trains archer
-p='scripts/autoloads/
-2026-07-14 22:38:48|Bash|python3 - << 'EOF'
-# 2. AnimalArtist: optional canvas/ear + three new species
-p='scripts/art/AnimalA
-2026-07-14 22:39:19|Bash|python3 - << 'EOF'
-# 4. AssetLibrary: register archer + new animals
-p='scripts/autoloads/AssetLibrar
-2026-07-14 22:39:47|Bash|python3 - << 'EOF'
-# 7. HUD: train buttons built from the selected building's def
-p='scripts/ui/HUD.
-2026-07-14 22:40:25|Bash|G=/Applications/Godot.app/Contents/MacOS/Godot && $G --headless --path . --import 2>&1 | grep -icE "
-2026-07-14 22:40:58|Bash|G=/Applications/Godot.app/Contents/MacOS/Godot && $G --headless --path . ++ --test-hunt 2>&1 | grep 
-2026-07-14 22:41:16|Bash|python3 - << 'EOF'
-p='scripts/main/Main.gd'
-s=open(p).read()
-old="""	animals.spawn_at("capybara", Ve
-2026-07-14 22:41:25|Read|/Users/iagocavalcante/Library/Application Support/Godot/app_userdata/Age Of Amazon/animals_capture.png
-2026-07-14 22:43:15|Bash|G=/Applications/Godot.app/Contents/MacOS/Godot && echo "build: $($G --headless --path . ++ --test-bu
-2026-07-14 22:43:35|Bash|python3 - << 'EOF'
-p='.github/workflows/tests.yml'
-s=open(p).read()
-old='grep -c " OK" /tmp/build.lo
-2026-07-14 22:45:23|Bash|HASH=$(git rev-parse --short HEAD) && G=/Applications/Godot.app/Contents/MacOS/Godot && mkdir -p bui
-2026-07-14 22:52:45|mcp__claude-in-chrome__tabs_context_mcp|
-2026-07-14 22:52:55|mcp__claude-in-chrome__navigate|
-2026-07-14 22:53:04|mcp__claude-in-chrome__computer|
-2026-07-14 22:53:05|mcp__claude-in-chrome__computer|
-2026-07-14 22:53:23|mcp__claude-in-chrome__computer|
-2026-07-14 22:53:27|mcp__claude-in-chrome__computer|
-2026-07-14 22:53:28|mcp__claude-in-chrome__computer|
-2026-07-14 22:53:41|mcp__claude-in-chrome__computer|
-2026-07-14 22:53:46|mcp__claude-in-chrome__computer|
-2026-07-14 22:53:47|mcp__claude-in-chrome__computer|
-2026-07-14 22:54:04|mcp__claude-in-chrome__computer|
-2026-07-14 22:54:05|mcp__claude-in-chrome__computer|
-2026-07-14 23:00:39|Write|scripts/art/WorkFx.gd
-2026-07-14 23:00:58|Bash|python3 - << 'EOF'
-# Unit: work bob + swing chips + deposit popup
-p='scripts/units/Unit.gd'
-s=open(p
-2026-07-14 23:01:11|Bash|grep -n "func setup\|resource_sprites\|func _chunk_coords\|world.get_chunk\|_on_resource_depleted" s
-2026-07-14 23:01:55|Bash|python3 - << 'EOF'
-p='scripts/world/ChunkManager.gd'
-s=open(p).read()
-old="""	world.resource_deplete
-2026-07-14 23:02:23|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
-2026-07-14 23:02:34|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
-2026-07-14 23:02:43|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/fx/f00000064.png
-2026-07-14 23:03:02|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
-2026-07-14 23:03:14|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/fx_crop_64.png
 2026-07-14 23:03:15|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/fx_crop_66.png
 2026-07-14 23:04:30|Bash|G=/Applications/Godot.app/Contents/MacOS/Godot && echo "build: $($G --headless --path . ++ --test-bu
 2026-07-14 23:05:40|Bash|HASH=$(git rev-parse --short HEAD) && G=/Applications/Godot.app/Contents/MacOS/Godot && cat > server
@@ -161,3 +60,77 @@ old="""var _heartbeat_accum: f
 2026-07-15 10:11:48|Bash|cat > tools/healthcheck_remote.sh << 'EOF'
 #!/usr/bin/env bash
 # Runs ON the box via a user systemd 
+2026-07-15 10:12:30|Bash|mkdir -p .github/workflows && cat > .github/workflows/uptime.yml << 'EOF'
+name: uptime
+
+on:
+  schedu
+2026-07-15 10:12:45|Edit|/Users/iagocavalcante/.claude/projects/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/memory/age-of-amazon-tooling.md
+2026-07-15 10:15:46|Bash|echo "public health: $(curl -sf -m 15 https://game.iagocavalcante.com/health)" && ssh ssh-tron 'echo
+2026-07-15 10:16:05|Bash|until gh run list --repo iagocavalcante/age-of-amazon --workflow=uptime.yml --limit 1 2>/dev/null | 
+2026-07-15 17:18:09|Bash|python3 - << 'EOF'
+# A1. Monument definition + victory timer constant
+p='scripts/autoloads/Constants
+2026-07-15 17:18:44|Bash|python3 - << 'EOF'
+# A4. Monument art: tall jade-and-gold stela, unmistakable silhouette
+p='scripts/
+2026-07-15 17:18:54|Bash|sed -n '326,332p' scripts/ui/HUD.gd
+2026-07-15 17:19:43|Bash|python3 - << 'EOF'
+p='scripts/ui/HUD.gd'
+s=open(p).read()
+old="""func _on_refresh_tick() -> void:
+	_
+2026-07-15 17:20:28|Bash|python3 - << 'EOF'
+p='scripts/art/BuildingArtist.gd'
+s=open(p).read()
+old="""func build_monument(pla
+2026-07-15 17:20:59|Bash|python3 - << 'EOF'
+# B1. Alarm sound
+p='scripts/autoloads/Sfx.gd'
+s=open(p).read()
+old="""	_streams[
+2026-07-15 17:21:31|Bash|grep -n "containers\[0\].add_child(unit)" scripts/buildings/Building.gd; sed -n "$(($(grep -n 'conta
+2026-07-15 17:22:03|Bash|python3 - << 'EOF'
+p='scripts/buildings/Building.gd'
+s=open(p).read()
+old="""	var cell: Vector2i = s
+2026-07-15 17:28:16|Bash|python3 - << 'EOF'
+p='scripts/buildings/Building.gd'
+s=open(p).read()
+assert "INVALID_RALLY" in s  #
+2026-07-15 17:28:27|Bash|sed -n '19,42p' scripts/world/ChunkData.gd; sed -n "$(grep -n '_resource_texture' scripts/world/Chun
+2026-07-15 17:28:40|Bash|grep -n "func resource_at" -A 20 scripts/world/WorldGen.gd | head -26
+2026-07-15 17:29:13|Bash|python3 - << 'EOF'
+# Fish spots in worldgen
+p='scripts/world/WorldGen.gd'
+s=open(p).read()
+old="""		
+2026-07-15 17:30:05|Bash|python3 - << 'EOF'
+p='scripts/main/Main.gd'
+s=open(p).read()
+old="""	if "--test-tactics" in args:
+		
+2026-07-15 17:31:14|Bash|python3 - << 'EOF'
+# Shared buildable-cell finder moves to GameManager (AI needs it too)
+p='scripts/
+2026-07-15 17:33:07|Bash|python3 - << 'EOF'
+# EnemyAI: difficulties, building, archers, self-building sites
+p='scripts/ai/Ene
+2026-07-15 17:34:03|Bash|python3 - << 'EOF'
+p='scripts/autoloads/Net.gd'
+s=open(p).read()
+
+old="const PROTOCOL_VERSION: int =
+2026-07-15 17:35:03|Bash|python3 - << 'EOF'
+# HUD rematch button
+p='scripts/ui/HUD.gd'
+s=open(p).read()
+old="""	_restart_butt
+2026-07-15 17:37:14|Bash|python3 - << 'EOF'
+p='scripts/ui/HelpScreen.gd'
+s=open(p).read()
+dash="—"
+old='''	_add_control(col
+2026-07-15 17:39:12|Bash|G=/Applications/Godot.app/Contents/MacOS/Godot && echo "systems: $($G --headless --path . ++ --test-
+2026-07-15 17:39:24|Bash|grep -h "test-gw\|health" /var/folders/d1/gxfhj5d904l06frh12t1_wjh0000gn/T/tmp.uLIAm7vM4u/*.log 2>/d
+2026-07-15 17:40:17|Bash|pgrep -fl "x86_64|Godot" | grep -v grep | wc -l; sleep 2; bash tools/test_gateway.sh 2>&1 | tail -9

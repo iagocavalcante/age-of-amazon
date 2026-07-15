@@ -11,7 +11,7 @@ PLAYERS="${PLAYERS:-2}"
 DIR="$(mktemp -d)"
 cd "$(dirname "$0")/.."
 
-"$GODOT" --headless --path . ++ --server --port="$PORT" --players="$PLAYERS" --seed=42 \
+"$GODOT" --headless --path . ++ --server --port="$PORT" --players="$PLAYERS" --seed=42 --end-after=25 \
   > "$DIR/server.log" 2>&1 &
 SERVER_PID=$!
 trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
@@ -36,7 +36,7 @@ if grep -h "\[test-mp\]" "$DIR"/client*.log | grep -q FAILED; then
   exit 1
 fi
 OKS=$(grep -h "\[test-mp\].* OK" "$DIR"/client*.log | wc -l | tr -d ' ')
-NEED=$((PLAYERS * 4))
+NEED=$((PLAYERS * 5))
 if [ "$OKS" -lt "$NEED" ]; then
   echo "RESULT: INCOMPLETE ($OKS/$NEED OK verdicts; logs in $DIR)"
   exit 1

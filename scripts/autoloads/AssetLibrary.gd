@@ -17,6 +17,7 @@ var rock_texture: ImageTexture
 var reeds_texture: ImageTexture
 var berry_texture: ImageTexture
 var jade_texture: ImageTexture
+var fish_texture: ImageTexture
 
 var icons: Dictionary = {}  # "food"/"wood"/"jade"/"pop" -> ImageTexture
 
@@ -80,6 +81,7 @@ func _ready() -> void:
 			"house": building_artist.build_house(color),
 			"barracks": building_artist.build_barracks(color),
 			"watchtower": building_artist.build_watchtower(color),
+			"monument": building_artist.build_monument(color),
 		})
 	selection_ring = unit_artist.build_selection_ring()
 	unit_shadow = unit_artist.build_shadow()
@@ -90,6 +92,7 @@ func _ready() -> void:
 	reeds_texture = doodad_artist.build_reeds()
 	berry_texture = doodad_artist.build_berry_bush()
 	jade_texture = doodad_artist.build_jade_deposit()
+	fish_texture = doodad_artist.build_fish_school()
 
 	var animal_artist: AnimalArtist = AnimalArtist.new()
 	animal_frames["capybara"] = animal_artist.build_capybara_frames()

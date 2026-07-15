@@ -69,6 +69,7 @@ func save_now() -> void:
 	var camera: Camera2D = tree.current_scene.get_node_or_null("GameCamera")
 	var data: Dictionary = {
 		"seed": GameManager.map_seed,
+		"difficulty": GameManager.ai_difficulty,
 		"next_id": GameManager._next_entity_id,
 		"player_count": GameManager.player_count,
 		"stockpiles": GameManager.stockpiles.map(_stockpile_out),

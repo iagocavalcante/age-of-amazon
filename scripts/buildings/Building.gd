@@ -24,6 +24,14 @@ var is_constructed: bool = true
 var train_queue: Array[String] = []
 var train_progress: float = 0.0
 
+# Rally point: freshly trained units march here. INVALID_RALLY = none.
+const INVALID_RALLY: Vector2i = Vector2i(-999999, -999999)
+var rally_cell: Vector2i = INVALID_RALLY
+
+# Monument endgame: seconds this constructed monument has stood. Reaching
+# Constants.MONUMENT_VICTORY_SECS wins the game for its owner.
+var monument_timer: float = 0.0
+
 var _sprite: Sprite2D
 var _health_bar: ProgressBar
 
@@ -79,9 +87,14 @@ func _ready() -> void:
 	_update_health_bar()
 
 func _process(delta: float) -> void:
-	# Training is simulation — authority only.
+	# Training and the monument countdown are simulation — authority only.
 	if not Net.is_authority():
 		return
+	if building_type == "monument" and is_constructed \
+			and GameManager.state == GameManager.GameState.RUNNING:
+		monument_timer += delta
+		if monument_timer >= Constants.MONUMENT_VICTORY_SECS:
+			GameManager.end_game(player_id)
 	if train_queue.is_empty():
 		return
 	train_progress += delta
@@ -155,6 +168,8 @@ func _spawn_unit(unit_type: String) -> void:
 	var cell: Vector2i = spot["cell"]
 	unit.position = Constants.grid_to_world(cell.x, cell.y)
 	containers[0].add_child(unit)
+	if rally_cell != INVALID_RALLY:
+		unit.move_to(Constants.grid_to_world(rally_cell.x, rally_cell.y))
 
 func take_damage(amount: int, attacker: Node2D = null) -> void:
 	current_hp = maxi(0, current_hp - amount)
@@ -187,8 +202,14 @@ func _die() -> void:
 
 # Multiplayer client: server state ticks land here (the building never
 # simulates locally — _process is authority-gated).
-func net_apply(hp: int, queue: Array, progress: float, constructed: bool) -> void:
+func net_apply(hp: int, queue: Array, progress: float, constructed: bool,
+		p_monument_timer: float = 0.0) -> void:
+	monument_timer = p_monument_timer
 	if hp != current_hp:
+		if hp < current_hp:
+			# Replicated damage: raise the same local signal the authority
+			# raises, so under-attack alerts work on multiplayer clients.
+			EventBus.building_damaged.emit(self, null)
 		current_hp = hp
 		_update_health_bar()
 	if constructed != is_constructed:

@@ -110,6 +110,26 @@ func build_berry_bush() -> ImageTexture:
 
 	return ImageTexture.create_from_image(img)
 
+# Shore fish school: ripple rings and darting silver fish.
+func build_fish_school() -> ImageTexture:
+	var w: int = 34
+	var h: int = 18
+	var img: Image = Image.create(w, h, false, Image.FORMAT_RGBA8)
+	var ripple: Color = Color(0.85, 0.95, 1.0, 0.5)
+	var fish: Color = Color8(214, 218, 224)
+	var fin: Color = Color8(150, 160, 175)
+	PixelArt.draw_ellipse_ring(img, 12.0, 9.0, 9.0, 4.0, 1.1, ripple)
+	PixelArt.draw_ellipse_ring(img, 23.0, 12.0, 6.0, 2.8, 1.0, Color(ripple, 0.35))
+	for f: Array in [[10, 8, 1], [16, 11, -1], [22, 6, 1]]:
+		var fx: int = f[0]
+		var fy: int = f[1]
+		var dir: int = f[2]
+		for i in range(4):
+			img.set_pixel(fx + i * dir, fy, fish)
+		img.set_pixel(fx - dir, fy, fin)
+		img.set_pixel(fx + 4 * dir, fy - 1, fin)
+	return ImageTexture.create_from_image(img)
+
 func build_jade_deposit() -> ImageTexture:
 	var w: int = 20
 	var h: int = 16

@@ -134,7 +134,7 @@ func _build_visual(chunk: ChunkData) -> void:
 	chunk.resource_sprites.clear()
 	for cell: Vector2i in chunk.resources:
 		var node: Dictionary = chunk.resources[cell]
-		var sprite: Sprite2D = _doodad_sprite(_resource_texture(node["type"], cell), cell)
+		var sprite: Sprite2D = _doodad_sprite(_resource_texture(node, cell), cell)
 		doodads.add_child(sprite)
 		chunk.resource_sprites[cell] = sprite
 
@@ -145,8 +145,10 @@ func _build_visual(chunk: ChunkData) -> void:
 	doodad_parent.add_child(doodads)
 	chunk.doodad_visual = doodads
 
-func _resource_texture(type: int, cell: Vector2i) -> Texture2D:
-	match type:
+func _resource_texture(node: Dictionary, cell: Vector2i) -> Texture2D:
+	if node.get("fish", false):
+		return AssetLibrary.fish_texture
+	match int(node["type"]):
 		Constants.ResourceType.WOOD:
 			var idx: int = int(PixelArt.hash2(cell.x, cell.y, 31) * AssetLibrary.tree_textures.size())
 			return AssetLibrary.tree_textures[idx % AssetLibrary.tree_textures.size()]

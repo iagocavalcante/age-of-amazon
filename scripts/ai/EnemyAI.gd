@@ -16,7 +16,20 @@ extends Node
 const ENEMY_ID: int = 1
 const TICK_INTERVAL: float = 1.0
 const WAVE_MIN_WARRIORS: int = 3
-const MAX_WARRIORS: int = 8
+
+# Filled from DIFFICULTY_PRESETS in _ready.
+var max_military: int = 8
+var archer_ratio: float = 0.3
+var builds: bool = true
+
+const DIFFICULTY_PRESETS: Dictionary = {
+	"easy": {"wave": 110.0, "max": 5, "archers": 0.0, "builds": false,
+		"trickle": {Constants.ResourceType.FOOD: 2, Constants.ResourceType.WOOD: 1}},
+	"normal": {"wave": 75.0, "max": 8, "archers": 0.3, "builds": true,
+		"trickle": {Constants.ResourceType.FOOD: 3, Constants.ResourceType.WOOD: 2}},
+	"hard": {"wave": 55.0, "max": 14, "archers": 0.4, "builds": true,
+		"trickle": {Constants.ResourceType.FOOD: 5, Constants.ResourceType.WOOD: 3}},
+}
 const SCOUT_DISTANCE_STEP: int = 12
 const SCOUT_DISTANCE_MAX: int = 80
 const HUNT_RANGE_TILES: int = 26
@@ -26,7 +39,7 @@ const HUNT_RANGE_TILES: int = 26
 @export var scout_interval: float = 18.0
 @export var hunt_interval: float = 22.0
 
-const TRICKLE: Dictionary = {
+var trickle: Dictionary = {
 	Constants.ResourceType.FOOD: 3,
 	Constants.ResourceType.WOOD: 2,
 }
@@ -42,6 +55,13 @@ var _hunt_accum: float = 0.0
 
 func _ready() -> void:
 	EventBus.building_damaged.connect(_on_building_damaged)
+	var preset: Dictionary = DIFFICULTY_PRESETS.get(
+		GameManager.ai_difficulty, DIFFICULTY_PRESETS["normal"])
+	wave_interval = preset["wave"]
+	max_military = preset["max"]
+	archer_ratio = preset["archers"]
+	builds = preset["builds"]
+	trickle = preset["trickle"]
 
 func _process(delta: float) -> void:
 	if GameManager.state != GameManager.GameState.RUNNING:
@@ -61,8 +81,8 @@ func _tick() -> void:
 	vision.update(get_tree(), GameManager.world)
 	vision.changed_chunks.clear()  # only the fog renderer needs these
 
-	for type: int in TRICKLE:
-		GameManager.add_resource(ENEMY_ID, type, TRICKLE[type])
+	for type: int in trickle:
+		GameManager.add_resource(ENEMY_ID, type, trickle[type])
 
 	var tc: Building = _own_town_center()
 	if tc == null:
@@ -70,11 +90,24 @@ func _tick() -> void:
 
 	var warriors: Array[UnitBase] = _own_warriors()
 
-	if warriors.size() + tc.train_queue.size() < MAX_WARRIORS:
-		if GameManager.can_afford(ENEMY_ID, Constants.UNIT_DEFS["warrior"]["cost"]):
+	# The AI has no builders, so it raises its own sites at one-villager pace
+	# — the same concession as its trickle economy.
+	_advance_sites()
+	if builds:
+		_consider_building(tc)
+
+	var barracks: Building = _own_constructed("barracks")
+	var queued: int = tc.train_queue.size() \
+		+ (barracks.train_queue.size() if barracks != null else 0)
+	if warriors.size() + queued < max_military:
+		var want_archer: bool = barracks != null \
+			and PixelArt.hash2(int(_wave_accum), warriors.size(), 77) < archer_ratio
+		var unit_type: String = "archer" if want_archer else "warrior"
+		var trainer: Building = barracks if want_archer else tc
+		if GameManager.can_afford(ENEMY_ID, Constants.UNIT_DEFS[unit_type]["cost"]):
 			CommandRouter.submit({
 				"type": "train", "player_id": ENEMY_ID,
-				"building_name": String(tc.name), "unit_type": "warrior",
+				"building_name": String(trainer.name), "unit_type": unit_type,
 			})
 
 	# Opportunistic hunting for extra food, under the AI's own fog.
@@ -97,6 +130,52 @@ func _tick() -> void:
 				"type": "attack", "player_id": ENEMY_ID,
 				"actor_names": _names_of(idle), "target_name": String(target.name),
 			})
+
+func _advance_sites() -> void:
+	for node: Node in get_tree().get_nodes_in_group("player_%d" % ENEMY_ID):
+		var site: Building = node as Building
+		if site != null and not site.is_constructed:
+			site.build_tick(Constants.BUILD_HP_PER_SWING * 2)
+
+func _own_constructed(building_type: String) -> Building:
+	for node: Node in get_tree().get_nodes_in_group("player_%d" % ENEMY_ID):
+		var building: Building = node as Building
+		if building != null and building.building_type == building_type \
+				and building.is_constructed:
+			return building
+	return null
+
+func _has_any(building_type: String) -> Building:
+	for node: Node in get_tree().get_nodes_in_group("player_%d" % ENEMY_ID):
+		var building: Building = node as Building
+		if building != null and building.building_type == building_type:
+			return building
+	return null
+
+# Economy goals, in priority order: a barracks, then houses whenever the
+# army is near the cap, then one watchtower.
+func _consider_building(tc: Building) -> void:
+	var home: Vector2i = Constants.world_to_grid(tc.global_position)
+	if _has_any("barracks") == null:
+		_try_place("barracks", home)
+		return
+	if GameManager.get_population(ENEMY_ID) >= GameManager.population_cap(ENEMY_ID) - 1:
+		_try_place("house", home)
+		return
+	if _has_any("watchtower") == null and GameManager.ai_difficulty == "hard":
+		_try_place("watchtower", home)
+
+func _try_place(building_type: String, origin: Vector2i) -> void:
+	var def: Dictionary = Constants.BUILDING_DEFS[building_type]
+	if not GameManager.can_afford(ENEMY_ID, def["cost"]):
+		return
+	var cell: Vector2i = GameManager.find_buildable_cell(origin, building_type, ENEMY_ID)
+	if cell.x == 9999:
+		return
+	CommandRouter.submit({
+		"type": "place", "player_id": ENEMY_ID, "building_type": building_type,
+		"cell": cell, "actor_names": [],
+	})
 
 # Only targets this AI has legitimately discovered through its own vision.
 func _known_player_target(tc: Building) -> Node2D:
@@ -209,6 +288,6 @@ func _own_warriors() -> Array[UnitBase]:
 	var result: Array[UnitBase] = []
 	for node: Node in get_tree().get_nodes_in_group("player_%d" % ENEMY_ID):
 		var unit: UnitBase = node as UnitBase
-		if unit != null and unit.unit_type == "warrior":
+		if unit != null and (unit.unit_type == "warrior" or unit.unit_type == "archer"):
 			result.append(unit)
 	return result

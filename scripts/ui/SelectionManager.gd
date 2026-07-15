@@ -36,6 +36,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed:
 			if selected_units.size() > 0:
 				_command_at(mb.position)
+			elif selected_building != null and is_instance_valid(selected_building) \
+					and selected_building.get("player_id") == GameManager.local_player_id:
+				_set_rally(mb.position)
 
 	elif event is InputEventMouseMotion and is_box_selecting:
 		var mm := event as InputEventMouseMotion
@@ -196,6 +199,15 @@ func _command_at(screen_pos: Vector2) -> void:
 	var names: Array = selected_units.map(
 		func(u: Node2D) -> String: return String(u.name))
 
+	# Shift + right-click: attack-move — march there, engaging on the way.
+	if Input.is_key_pressed(KEY_SHIFT):
+		CommandRouter.submit({
+			"type": "attack_move", "player_id": GameManager.local_player_id,
+			"actor_names": names, "target": world_pos,
+		})
+		EventBus.units_commanded_move.emit(selected_units, world_pos)
+		return
+
 	# A friendly site or damaged building under the cursor: build / repair.
 	var site: Building = GameManager.world.building_at(
 		Constants.world_to_grid(world_pos)) as Building
@@ -310,6 +322,16 @@ func _confirm_placement(screen_pos: Vector2) -> void:
 		"actor_names": builders.map(func(u: Node2D) -> String: return String(u.name)),
 	})
 	cancel_placement()
+
+func _set_rally(screen_pos: Vector2) -> void:
+	var world_pos: Vector2 = _screen_to_world(screen_pos)
+	var cell: Vector2i = Constants.world_to_grid(world_pos)
+	CommandRouter.submit({
+		"type": "rally", "player_id": GameManager.local_player_id,
+		"building_name": String(selected_building.name), "cell": cell,
+	})
+	WorkFx.float_text(get_tree().current_scene,
+		Constants.grid_to_world(cell.x, cell.y), "rally point", Color(0.6, 0.95, 0.75))
 
 func clear_selection() -> void:
 	_deselect_all()

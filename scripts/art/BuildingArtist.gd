@@ -201,6 +201,69 @@ func build_barracks(player_color: Color) -> ImageTexture:
 
 	return ImageTexture.create_from_image(img)
 
+# 2x2 jade monument: a carved green monolith on a stone base with gold
+# inlays and a jade capstone — the endgame made visible.
+func build_monument(player_color: Color) -> ImageTexture:
+	var w: int = 96
+	var h: int = 120
+	var img: Image = Image.create(w, h, false, Image.FORMAT_RGBA8)
+
+	var stone_dark: Color = Color8(96, 104, 96)
+	var stone_mid: Color = Color8(128, 138, 126)
+	var jade_dark: Color = Color8(38, 120, 96)
+	var jade_mid: Color = Color8(56, 158, 126)
+	var jade_light: Color = Color8(96, 200, 164)
+	var gold: Color = Color8(228, 180, 92)
+	var outline: Color = Color8(30, 44, 38)
+
+	var cx: float = w / 2.0
+	var base_y: int = h - 10
+
+	PixelArt.draw_ellipse(img, cx, float(base_y), 42.0, 15.0, Color(0, 0, 0, 0.3), true)
+
+	# Stone plinth (two steps).
+	for step: Array in [[40, base_y - 10, base_y], [30, base_y - 18, base_y - 8]]:
+		for y in range(int(step[1]), int(step[2]) + 1):
+			for x in range(int(cx) - int(step[0]), int(cx) + int(step[0]) + 1):
+				var speckle: float = PixelArt.hash2(x, y, 811)
+				img.set_pixel(x, y, stone_dark if speckle < 0.4 else stone_mid)
+			img.set_pixel(int(cx) - int(step[0]), y, outline)
+			img.set_pixel(int(cx) + int(step[0]), y, outline)
+
+	# The monolith, tapering upward.
+	for y in range(base_y - 86, base_y - 16):
+		var t: float = float(y - (base_y - 86)) / 70.0
+		var half: int = int(10.0 + t * 12.0)
+		for x in range(int(cx) - half, int(cx) + half + 1):
+			var speckle: float = PixelArt.hash2(x, y, 813)
+			var value: float = clampf(0.3 + speckle * 0.4 + (1.0 - t) * 0.25, 0.0, 1.0)
+			img.set_pixel(x, y, PixelArt.ramp_shade(
+				[jade_dark, jade_mid, jade_light], value, x, y))
+		img.set_pixel(int(cx) - half, y, outline)
+		img.set_pixel(int(cx) + half, y, outline)
+	# Gold inlay bands + carved glyph column.
+	for band_y: int in [base_y - 30, base_y - 50, base_y - 70]:
+		var t2: float = float(band_y - (base_y - 86)) / 70.0
+		var half2: int = int(10.0 + t2 * 12.0)
+		for x in range(int(cx) - half2 + 1, int(cx) + half2):
+			img.set_pixel(x, band_y, gold)
+	for y in range(base_y - 80, base_y - 20, 4):
+		img.set_pixel(int(cx), y, jade_dark)
+		img.set_pixel(int(cx) + 1, y + 1, jade_dark)
+
+	# Jade capstone with a gold tip, plus the owner's pennant.
+	PixelArt.draw_ellipse(img, cx, float(base_y - 88), 7.0, 5.0, jade_light)
+	img.set_pixel(int(cx), base_y - 93, gold)
+	img.set_pixel(int(cx), base_y - 94, gold)
+	for fy in range(base_y - 104, base_y - 96):
+		for fx in range(1, 10):
+			img.set_pixel(clampi(int(cx) + fx, 0, w - 1), fy,
+				player_color if (fx + fy) % 5 != 0 else player_color.darkened(0.25))
+	for y in range(base_y - 104, base_y - 88):
+		img.set_pixel(int(cx), y, outline)
+
+	return ImageTexture.create_from_image(img)
+
 # 1x1 stilted lookout: long legs, a railed platform, thatch cap, and a tall
 # player-color pennant — reads far vision at a glance.
 func build_watchtower(player_color: Color) -> ImageTexture:
