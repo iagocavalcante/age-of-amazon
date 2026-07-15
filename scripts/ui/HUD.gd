@@ -98,6 +98,27 @@ func _build_top_bar() -> void:
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(spacer)
 
+	# Sound controls: slider + mute toggle, persisted by Sfx.
+	var volume_slider: HSlider = HSlider.new()
+	volume_slider.min_value = 0.0
+	volume_slider.max_value = 1.0
+	volume_slider.step = 0.05
+	volume_slider.value = Sfx.volume
+	volume_slider.custom_minimum_size = Vector2(90, 0)
+	volume_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	volume_slider.focus_mode = Control.FOCUS_NONE
+	volume_slider.value_changed.connect(func(v: float) -> void: Sfx.set_volume(v))
+	row.add_child(volume_slider)
+	var mute_button: Button = Button.new()
+	mute_button.text = "Mute" if not Sfx.muted else "Unmute"
+	mute_button.focus_mode = Control.FOCUS_NONE
+	mute_button.pressed.connect(func() -> void:
+		Sfx.set_muted(not Sfx.muted)
+		mute_button.text = "Mute" if not Sfx.muted else "Unmute"
+		if not Sfx.muted:
+			Sfx.ambience_start())
+	row.add_child(mute_button)
+
 	var help_button: Button = Button.new()
 	help_button.text = "Help"
 	help_button.focus_mode = Control.FOCUS_NONE

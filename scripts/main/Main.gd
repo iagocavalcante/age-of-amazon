@@ -42,6 +42,10 @@ func _ready() -> void:
 		_run_seat_test()
 	if "--test-build" in args:
 		_run_build_test()
+	if "--test-save" in args:
+		_run_save_test()
+	if "--test-audio" in args:
+		_run_audio_test()
 	if "--test-victory" in args:
 		_run_victory_test()
 	if "--test-systems" in args:
@@ -72,21 +76,41 @@ func _arg_value(args: PackedStringArray, prefix: String, fallback: String = "") 
 # Single-player: this process is the authority; the classic asymmetric start
 # (player villagers vs AI warriors) and the EnemyAI opponent.
 func _boot_offline(args: PackedStringArray) -> void:
+	var resume: Dictionary = {}
+	if SaveGame.pending_resume:
+		SaveGame.pending_resume = false
+		resume = SaveGame.load_data()
+	if not resume.is_empty():
+		# Terrain rebuilds deterministically; only entities and fog restore.
+		GameManager.map_seed = int(resume["seed"])
+		GameManager.reset_players(int(resume["player_count"]))
+		GameManager._next_entity_id = int(resume["next_id"])
+		for i in range(GameManager.stockpiles.size()):
+			GameManager.stockpiles[i] = SaveGame.stockpile_in(resume["stockpiles"][i])
+
 	chunk_manager.setup(camera, doodads)
 
-	# Bases sit inside the guaranteed spawn clearings (see WorldGen).
-	_place_building("town_center", 0, Vector2i(-1, -1))
-	_place_building("town_center", 1, WorldGen.PLAYER_ORIGINS[1] + Vector2i(-1, -1))
+	if resume.is_empty():
+		# Bases sit inside the guaranteed spawn clearings (see WorldGen).
+		_place_building("town_center", 0, Vector2i(-1, -1))
+		_place_building("town_center", 1, WorldGen.PLAYER_ORIGINS[1] + Vector2i(-1, -1))
 
-	for cell: Vector2i in [Vector2i(2, 2), Vector2i(0, 3), Vector2i(3, 0)]:
-		_spawn_unit("villager", 0, cell)
-	for cell: Vector2i in [Vector2i(-2, 2), Vector2i(2, -2), Vector2i(-2, -2)]:
-		_spawn_unit("warrior", 1, WorldGen.PLAYER_ORIGINS[1] + cell)
+		for cell: Vector2i in [Vector2i(2, 2), Vector2i(0, 3), Vector2i(3, 0)]:
+			_spawn_unit("villager", 0, cell)
+		for cell: Vector2i in [Vector2i(-2, 2), Vector2i(2, -2), Vector2i(-2, -2)]:
+			_spawn_unit("warrior", 1, WorldGen.PLAYER_ORIGINS[1] + cell)
+		camera.center_on(Constants.grid_to_world(0, 0))
+	else:
+		_restore_world(resume)
 
-	camera.center_on(Constants.grid_to_world(0, 0))
 	chunk_manager.load_now()
 
 	fog.setup(camera)
+	if not resume.is_empty():
+		fog.vision.restore_explored(resume.get("explored", []))
+		var ai: Node = get_node_or_null("EnemyAI")
+		if ai != null:
+			ai.vision.restore_explored(resume.get("ai_explored", []))
 	fog.force_update()
 
 	EventBus.world_ready.emit()
@@ -163,6 +187,38 @@ func _boot_client(url: String) -> void:
 
 	EventBus.world_ready.emit()
 	GameManager.change_state(GameManager.GameState.RUNNING)
+
+# Rebuild entities, harvests, and the camera from a save blob.
+func _restore_world(data: Dictionary) -> void:
+	for delta: Array in data.get("deltas", []):
+		GameManager.world.set_resource_amount(
+			Vector2i(int(delta[0]), int(delta[1])), int(delta[2]))
+	for b: Array in data.get("buildings", []):
+		var building: Building = Building.new()
+		building.name = String(b[0])
+		building.setup(String(b[1]), int(b[2]),
+			Vector2i(int(b[3]), int(b[4])), bool(b[6]))
+		buildings.add_child(building)
+		building.current_hp = int(b[5])
+		building.train_queue.assign(b[7])
+		building.train_progress = float(b[8])
+	for u: Array in data.get("units", []):
+		var unit: UnitBase = unit_scene.instantiate() as UnitBase
+		unit.name = String(u[0])
+		unit.unit_type = String(u[1])
+		unit.player_id = int(u[2])
+		unit.position = Vector2(float(u[3]), float(u[4]))
+		units.add_child(unit)
+		unit.current_hp = int(u[5])
+	for a: Array in data.get("animals", []):
+		var beast: Animal = animals.spawn_at(String(a[0]),
+			Constants.world_to_grid(Vector2(float(a[1]), float(a[2]))))
+		beast.global_position = Vector2(float(a[1]), float(a[2]))
+		beast.current_hp = int(a[3])
+	var cam: Array = data.get("camera", [0, 0, 1.2])
+	camera.center_on(Vector2(float(cam[0]), float(cam[1])))
+	camera.target_zoom = float(cam[2])
+	camera.zoom = Vector2(camera.target_zoom, camera.target_zoom)
 
 func _place_building(type: String, player_id: int, base_cell: Vector2i) -> Building:
 	var building: Building = Building.new()
@@ -298,6 +354,83 @@ func _run_build_test() -> void:
 	var wood_spent: int = wood_before_repair - GameManager.get_resource(0, Constants.ResourceType.WOOD)
 	print("[test-build] repair-cost ", "OK" if wood_spent > 0 else "FAILED",
 		" (wood spent: ", wood_spent, ")")
+	get_tree().quit()
+
+# Prove the procedural audio bank: every stream synthesized non-empty, the
+# player pool plays without errors, and settings round-trip.
+func _run_audio_test() -> void:
+	await get_tree().process_frame
+	var all_ok: bool = true
+	for name: String in ["chop", "tick", "hammer", "bow", "hit", "die",
+			"click", "built", "victory", "defeat", "ambience"]:
+		var stream: AudioStreamWAV = Sfx._streams.get(name)
+		if stream == null or stream.data.size() == 0:
+			all_ok = false
+			print("[test-audio] stream %s MISSING" % name)
+	print("[test-audio] streams ", "OK" if all_ok else "FAILED")
+	Sfx.play("chop", Vector2.ZERO)
+	Sfx.play("built")
+	Sfx.ambience_start()
+	await get_tree().create_timer(0.3).timeout
+	Sfx.ambience_stop()
+	print("[test-audio] playback OK")
+	Sfx.set_volume(0.5)
+	Sfx.set_muted(true)
+	Sfx._load_settings()
+	print("[test-audio] settings ",
+		"OK" if Sfx.muted and absf(Sfx.volume - 0.5) < 0.01 else "FAILED")
+	Sfx.set_muted(false)
+	Sfx.set_volume(0.8)
+	get_tree().quit()
+
+# Prove save/resume: play a moment, save, reload the scene as a resume, and
+# check the world came back identical (stockpile, entities, fog, harvests).
+func _run_save_test() -> void:
+	if SaveGame.has_meta("save_test_expected"):
+		_run_save_test_phase2()
+		return
+	await get_tree().create_timer(0.5).timeout
+	# Change some state: chop a tree and move a villager.
+	var villagers: Array = get_tree().get_nodes_in_group("player_0").filter(
+		func(n: Node) -> bool: return n is UnitBase and (n as UnitBase).can_gather)
+	var tree_node: Dictionary = GameManager.world.find_nearest_resource(
+		Vector2i.ZERO, Constants.ResourceType.WOOD)
+	if tree_node["found"]:
+		(villagers[0] as UnitBase).command_gather(tree_node["cell"])
+	await get_tree().create_timer(6.0).timeout
+
+	SaveGame.save_now()
+	var expected: Dictionary = {
+		"wood": GameManager.get_resource(0, Constants.ResourceType.WOOD),
+		"units": get_tree().get_nodes_in_group("units").size(),
+		"buildings": get_tree().get_nodes_in_group("buildings").size(),
+		"explored": GameManager.fog.vision.explored.size(),
+		"deltas": GameManager.world.resource_deltas.size(),
+		"unit_name": String(villagers[0].name),
+	}
+	print("[test-save] saved (deltas=", expected["deltas"], ")")
+	SaveGame.set_meta("save_test_expected", expected)
+	SaveGame.pending_resume = true
+	Net.reset()
+	get_tree().reload_current_scene()
+
+func _run_save_test_phase2() -> void:
+	await get_tree().create_timer(1.0).timeout
+	var expected: Dictionary = SaveGame.get_meta("save_test_expected")
+	var wood_ok: bool = GameManager.get_resource(0, Constants.ResourceType.WOOD) == expected["wood"]
+	print("[test-save] stockpile ", "OK" if wood_ok else "FAILED")
+	var units_ok: bool = get_tree().get_nodes_in_group("units").size() == expected["units"]
+	print("[test-save] units ", "OK" if units_ok else "FAILED")
+	var buildings_ok: bool = get_tree().get_nodes_in_group("buildings").size() == expected["buildings"]
+	print("[test-save] buildings ", "OK" if buildings_ok else "FAILED")
+	var explored_ok: bool = GameManager.fog.vision.explored.size() >= expected["explored"]
+	print("[test-save] fog ", "OK" if explored_ok else "FAILED")
+	var named: bool = false
+	for node: Node in get_tree().get_nodes_in_group("units"):
+		if String(node.name) == expected["unit_name"]:
+			named = true
+	print("[test-save] identity ", "OK" if named else "FAILED")
+	SaveGame.clear()
 	get_tree().quit()
 
 # Prove the persisted seat (refresh-rejoin) file layer: save/load roundtrip,

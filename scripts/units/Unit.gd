@@ -256,6 +256,7 @@ func _process_building(delta: float) -> void:
 	_build_site.build_tick(Constants.BUILD_HP_PER_SWING)
 	if not Net.is_headless_server() and is_instance_valid(_build_site):
 		WorkFx.dust(get_parent(), _build_site.global_position + Vector2(0, -12))
+		Sfx.play("hammer", _build_site.global_position)
 
 # --- Movement ---
 
@@ -354,6 +355,7 @@ func _process_gathering(delta: float) -> void:
 			var work_pos: Vector2 = Constants.grid_to_world(_gather_cell.x, _gather_cell.y)
 			WorkFx.chips_for_resource(get_parent(), work_pos + Vector2(0, -10), _gather_type)
 			EventBus.resource_worked.emit(_gather_cell)
+			Sfx.play("chop" if _gather_type == Constants.ResourceType.WOOD else "tick", work_pos)
 
 	var node_gone: bool = GameManager.world.get_resource_at(_gather_cell).is_empty()
 	if _carrying >= Constants.CARRY_CAPACITY or (node_gone and _carrying > 0):
@@ -440,6 +442,7 @@ func _process_attacking(delta: float) -> void:
 
 func _strike(target: Node2D) -> void:
 	if not Net.is_headless_server():
+		Sfx.play("bow" if attack_range > 60.0 else "hit", global_position)
 		if attack_range > 60.0:
 			_fire_arrow_visual(target)
 		else:

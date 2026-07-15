@@ -100,3 +100,44 @@ old="""	world.resource_deplete
 2026-07-14 23:03:02|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
 2026-07-14 23:03:14|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/fx_crop_64.png
 2026-07-14 23:03:15|Read|/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-222e-4e9f-a848-27f25d36436a/scratchpad/fx_crop_66.png
+2026-07-14 23:04:30|Bash|G=/Applications/Godot.app/Contents/MacOS/Godot && echo "build: $($G --headless --path . ++ --test-bu
+2026-07-14 23:05:40|Bash|HASH=$(git rev-parse --short HEAD) && G=/Applications/Godot.app/Contents/MacOS/Godot && cat > server
+2026-07-14 23:08:41|Bash|sed -n '1,30p' scripts/world/PlayerVision.gd | grep -n "var \|explored" ; grep -n "var \|func is_exp
+2026-07-14 23:09:48|Bash|python3 - << 'EOF'
+# WorldData: track harvest deltas for saves
+p='scripts/world/WorldData.gd'
+s=open
+2026-07-14 23:10:10|Bash|python3 - << 'EOF'
+p='scripts/world/WorldData.gd'
+s=open(p).read()
+old="""	var taken: int = mini(amo
+2026-07-14 23:10:49|Write|scripts/autoloads/SaveGame.gd
+2026-07-14 23:11:14|Bash|grep -n "var species\|var current_hp\|func setup" scripts/units/Animal.gd | head -4; python3 - << 'E
+2026-07-14 23:11:55|Bash|python3 - << 'EOF'
+p='scripts/main/Main.gd'
+s=open(p).read()
+
+old="""func _boot_offline(args: Packed
+2026-07-14 23:12:47|Bash|python3 - << 'EOF'
+p='scripts/main/Main.gd'
+s=open(p).read()
+old="""	if "--test-build" in args:
+		_r
+2026-07-14 23:13:11|Bash|python3 - << 'EOF'
+p='scripts/main/Main.gd'
+s=open(p).read()
+old='	if SaveGame.get_meta("save_test_e
+2026-07-14 23:14:06|Write|scripts/autoloads/Sfx.gd
+2026-07-14 23:14:49|Bash|python3 - << 'EOF'
+p='project.godot'
+s=open(p).read()
+old='SaveGame="*res://scripts/autoloads/SaveGa
+2026-07-14 23:15:30|Bash|python3 - << 'EOF'
+p='scripts/ui/HUD.gd'
+s=open(p).read()
+old="""	var help_button: Button = Button.n
+2026-07-14 23:17:29|Bash|python3 - << 'EOF'
+p='.github/workflows/tests.yml'
+s=open(p).read()
+old="""          $G --headless -
+2026-07-14 23:18:18|Bash|/Applications/Godot.app/Contents/MacOS/Godot --headless --path . ++ --test-systems 2>&1 | grep -E "O

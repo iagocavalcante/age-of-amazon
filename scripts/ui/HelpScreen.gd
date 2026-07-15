@@ -228,6 +228,7 @@ func _build_right(col: VBoxContainer) -> void:
 	_add_body(col, "•  Hunt capybaras and tapirs for food — but beware jaguars, bush dog packs, and caimans lurking at the water's edge.")
 	_add_body(col, "•  Scout before you strike — you can't hit what you can't see.")
 	_add_body(col, "•  A watchtower on a border ridge is worth three patrols.")
+	_add_body(col, "•  Solo battles autosave every few seconds — closing the tab is safe; pick Continue when you return.")
 
 # --- Builders ---
 

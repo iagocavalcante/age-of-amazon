@@ -59,6 +59,14 @@ func _reveal_circle(world: WorldData, center: Vector2i, radius: int) -> void:
 func is_visible(cell: Vector2i) -> bool:
 	return visible_cells.has(cell)
 
+# Save-game restore: refill the explored set and mark every touched chunk
+# dirty so the fog renderer redraws it.
+func restore_explored(cells: Array) -> void:
+	for pair: Array in cells:
+		var cell: Vector2i = Vector2i(int(pair[0]), int(pair[1]))
+		explored[cell] = true
+		changed_chunks[Constants.tile_to_chunk(cell)] = true
+
 func is_explored(cell: Vector2i) -> bool:
 	return explored.has(cell)
 

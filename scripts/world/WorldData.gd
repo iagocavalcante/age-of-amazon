@@ -45,6 +45,22 @@ func get_resource_at(cell: Vector2i) -> Dictionary:
 	return chunk.resources.get(cell, {})
 
 # Removes up to `amount` from the node; returns how much was taken.
+# Every harvested cell's remaining amount, so a saved game can rebuild the
+# world from (seed + deltas) instead of serializing every chunk.
+var resource_deltas: Dictionary = {}
+
+# Force amount on a cell (save restore). 0 erases the node.
+func set_resource_amount(cell: Vector2i, amount: int) -> void:
+	var chunk: ChunkData = get_chunk(Constants.tile_to_chunk(cell))
+	if not chunk.resources.has(cell):
+		return
+	resource_deltas[cell] = amount
+	if amount <= 0:
+		chunk.resources.erase(cell)
+		resource_depleted.emit(cell)
+	else:
+		chunk.resources[cell]["amount"] = amount
+
 func take_resource(cell: Vector2i, amount: int) -> int:
 	var chunk: ChunkData = get_chunk(Constants.tile_to_chunk(cell))
 	var node: Dictionary = chunk.resources.get(cell, {})
@@ -52,6 +68,7 @@ func take_resource(cell: Vector2i, amount: int) -> int:
 		return 0
 	var taken: int = mini(amount, node["amount"])
 	node["amount"] -= taken
+	resource_deltas[cell] = node["amount"]
 	if node["amount"] <= 0:
 		chunk.resources.erase(cell)
 		resource_depleted.emit(cell)

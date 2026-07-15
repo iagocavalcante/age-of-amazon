@@ -53,6 +53,7 @@ func _ready() -> void:
 	if _should_skip_menu(OS.get_cmdline_user_args()):
 		get_tree().change_scene_to_file.call_deferred(MAIN_SCENE)
 		return
+	Sfx.ambience_stop()
 	_load_config()
 	_build_backdrop()
 	_build_ui()
@@ -248,8 +249,17 @@ func _build_ui() -> void:
 	_main_page.add_theme_constant_override("separation", 10)
 	pages.add_child(_main_page)
 
-	var single: Button = _primary_button("Play vs. the Forest AI")
-	single.pressed.connect(func() -> void: get_tree().change_scene_to_file(MAIN_SCENE))
+	if SaveGame.has_save():
+		var cont: Button = _primary_button("Continue Your Game")
+		cont.pressed.connect(func() -> void:
+			SaveGame.pending_resume = true
+			get_tree().change_scene_to_file(MAIN_SCENE))
+		_main_page.add_child(cont)
+	var single: Button = _primary_button("Play vs. the Forest AI") \
+		if not SaveGame.has_save() else _secondary_button("New Game vs. the Forest AI")
+	single.pressed.connect(func() -> void:
+		SaveGame.clear()
+		get_tree().change_scene_to_file(MAIN_SCENE))
 	_main_page.add_child(single)
 
 	var friends: Button = _secondary_button("Play with Friends")
@@ -439,6 +449,7 @@ func _flat_style(bg: Color, border: Color, radius: int = 6) -> StyleBoxFlat:
 
 func _primary_button(text: String) -> Button:
 	var button: Button = Button.new()
+	button.pressed.connect(func() -> void: Sfx.play("click"))
 	button.text = text
 	button.focus_mode = Control.FOCUS_NONE
 	button.add_theme_stylebox_override("normal", _flat_style(COLOR_GOLD, COLOR_GOLD))
@@ -456,6 +467,7 @@ func _primary_button(text: String) -> Button:
 
 func _secondary_button(text: String) -> Button:
 	var button: Button = Button.new()
+	button.pressed.connect(func() -> void: Sfx.play("click"))
 	button.text = text
 	button.focus_mode = Control.FOCUS_NONE
 	var base: Color = Color(0.10, 0.18, 0.12, 0.9)
@@ -469,6 +481,7 @@ func _secondary_button(text: String) -> Button:
 
 func _text_button(text: String) -> Button:
 	var button: Button = Button.new()
+	button.pressed.connect(func() -> void: Sfx.play("click"))
 	button.text = text
 	button.flat = true
 	button.focus_mode = Control.FOCUS_NONE

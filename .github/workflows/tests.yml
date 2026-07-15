@@ -48,6 +48,10 @@ jobs:
           grep -c " OK" /tmp/seat.log | grep -q "^4$"
           $G --headless --path . ++ --test-build 2>&1 | tee /tmp/build.log
           grep -c " OK" /tmp/build.log | grep -q "^10$"
+          $G --headless --path . ++ --test-save 2>&1 | tee /tmp/save.log
+          grep -c " OK" /tmp/save.log | grep -q "^5$"
+          $G --headless --path . ++ --test-audio 2>&1 | tee /tmp/audio.log
+          grep -c " OK" /tmp/audio.log | grep -q "^3$"
 
       - name: Multiplayer harness (2 players)
         run: GODOT=~/godot/godot bash tools/test_mp.sh

@@ -26,6 +26,8 @@ Net="*res://scripts/autoloads/Net.gd"
 CommandRouter="*res://scripts/autoloads/CommandRouter.gd"
 Replication="*res://scripts/autoloads/Replication.gd"
 Gateway="*res://scripts/autoloads/Gateway.gd"
+SaveGame="*res://scripts/autoloads/SaveGame.gd"
+Sfx="*res://scripts/autoloads/Sfx.gd"
 
 [display]
 
