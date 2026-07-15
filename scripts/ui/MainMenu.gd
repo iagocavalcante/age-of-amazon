@@ -15,7 +15,7 @@ const MAIN_SCENE: String = "res://scenes/main/Main.tscn"
 const CONFIG_PATH: String = "res://server_config.json"
 const BACKDROP_SEED: int = 20260712
 # Invite links from non-web builds point at the public site.
-const FALLBACK_SHARE_URL: String = "https://iagocavalcante.github.io/age-of-amazon/"
+const FALLBACK_SHARE_URL: String = "https://aoa.iagocavalcante.com/"
 
 # Palette (mirrors the in-game HUD, gold from the town center).
 const COLOR_BG: Color = Color("#0b160d")

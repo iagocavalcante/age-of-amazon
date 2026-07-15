@@ -104,3 +104,30 @@ old="""	_spawn_unit("archer", 0, Vector
 2026-07-15 19:48:30|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
 2026-07-15 19:48:50|Bash|SC=/private/tmp/claude-501/-Users-iagocavalcante-Workspaces-IagoCavalcante-age-of-amazon/6cab59ba-22
 2026-07-15 19:49:01|Read|assets/splash.png
+2026-07-15 19:50:16|Bash|git add -A && git commit -q -m "feat: custom boot splash — golden-hour pyramid replaces the Godot 
+2026-07-15 20:02:24|mcp__claude-in-chrome__tabs_context_mcp|
+2026-07-15 20:02:36|mcp__claude-in-chrome__navigate|
+2026-07-15 20:02:43|mcp__claude-in-chrome__computer|
+2026-07-15 20:02:45|mcp__claude-in-chrome__computer|
+2026-07-15 20:03:02|mcp__claude-in-chrome__computer|
+2026-07-15 20:03:04|mcp__claude-in-chrome__computer|
+2026-07-15 20:03:16|mcp__claude-in-chrome__computer|
+2026-07-15 20:03:19|mcp__claude-in-chrome__computer|
+2026-07-15 20:03:20|mcp__claude-in-chrome__computer|
+2026-07-15 20:03:37|mcp__claude-in-chrome__computer|
+2026-07-15 20:03:38|mcp__claude-in-chrome__computer|
+2026-07-15 20:03:52|mcp__claude-in-chrome__computer|
+2026-07-15 20:03:53|mcp__claude-in-chrome__computer|
+2026-07-15 20:03:54|mcp__claude-in-chrome__computer|
+2026-07-15 20:03:55|mcp__claude-in-chrome__computer|
+2026-07-15 20:04:07|mcp__claude-in-chrome__computer|
+2026-07-15 20:04:09|mcp__claude-in-chrome__computer|
+2026-07-15 20:04:10|mcp__claude-in-chrome__computer|
+2026-07-15 20:04:11|mcp__claude-in-chrome__computer|
+2026-07-15 20:04:27|mcp__claude-in-chrome__computer|
+2026-07-15 20:04:28|mcp__claude-in-chrome__computer|
+2026-07-15 20:04:40|mcp__claude-in-chrome__computer|
+2026-07-15 20:04:44|mcp__claude-in-chrome__computer|
+2026-07-15 20:04:45|mcp__claude-in-chrome__computer|
+2026-07-15 20:05:06|Bash|dig +short aoa.iagocavalcante.com CNAME @1.1.1.1; gh api repos/iagocavalcante/age-of-amazon/contents
+2026-07-15 20:05:19|Bash|gh api "repos/iagocavalcante/age-of-amazon/contents/CNAME" -F ref=gh-pages --jq '.content' 2>/dev/nu
