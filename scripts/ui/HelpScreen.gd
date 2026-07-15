@@ -180,7 +180,7 @@ func _build() -> void:
 
 func _build_left(col: VBoxContainer) -> void:
 	_add_section(col, "Goal")
-	_add_body(col, "Destroy the enemy's red Town Center. If your blue Town Center falls, you lose. The map is endless — explore it, gather from it, and out-fight your rival.")
+	_add_body(col, "Destroy every rival Town Center — lose yours and you are out. The map is endless: explore it, gather from it, build on it, and out-fight your rivals.")
 
 	_add_section(col, "Move the camera")
 	_add_control(col, "W A S D / Arrows", "Pan across the world")
@@ -199,12 +199,20 @@ func _build_left(col: VBoxContainer) -> void:
 	_add_control(col, "Right-click a resource", "Send villagers to gather it")
 	_add_control(col, "Right-click an enemy", "Attack it")
 	_add_control(col, "Right-click an animal", "Hunt it for food")
+	_add_control(col, "Right-click your unfinished site", "Send villagers to build it")
 
 func _build_right(col: VBoxContainer) -> void:
 	_add_section(col, "Your people")
 	_add_unit(col, "villager", "Gathers food, wood and jade and carries it back to the Town Center. Fragile in a fight — keep them working. Costs 50 food.")
 	_add_unit(col, "warrior", "Your muscle — auto-attacks enemies it can see and defends itself when struck. Costs 40 food and 20 wood.")
-	_add_body(col, "Select your Town Center to train more, up to a population of %d." % Constants.POPULATION_CAP)
+	_add_body(col, "Select your Town Center to train more. Population starts capped at %d — build houses to raise it (up to %d)." % [Constants.POPULATION_CAP, Constants.POPULATION_CEILING])
+
+	_add_section(col, "Build")
+	_add_body(col, "Select villagers and pick a building, then click open scouted ground to place it — your villagers raise it plank by plank (more builders, faster build).")
+	_add_body(col, "•  House (30 wood) — +5 population.")
+	_add_body(col, "•  Barracks (60 wood, 20 food) — trains warriors.")
+	_add_body(col, "•  Watchtower (40 wood) — watches far into the fog.")
+	_add_body(col, "Unfinished sites are fragile and can be razed — guard them.")
 
 	_add_section(col, "Resources")
 	_add_resource(col, Constants.ResourceType.FOOD, "Food", "trains villagers and warriors")
@@ -218,6 +226,7 @@ func _build_right(col: VBoxContainer) -> void:
 	_add_body(col, "•  Keep every villager gathering — idle villagers lose games.")
 	_add_body(col, "•  Hunt capybaras for food — but beware prowling jaguars.")
 	_add_body(col, "•  Scout before you strike — you can't hit what you can't see.")
+	_add_body(col, "•  A watchtower on a border ridge is worth three patrols.")
 
 # --- Builders ---
 
