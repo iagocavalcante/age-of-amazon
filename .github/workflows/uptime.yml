@@ -1,0 +1,17 @@
+name: uptime
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Public health check
+        run: |
+          BODY=$(curl -sf -m 20 https://game.iagocavalcante.com/health)
+          echo "$BODY"
+          echo "$BODY" | grep -q '"ok":true'

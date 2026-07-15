@@ -121,7 +121,23 @@ unchanged (export preset "Web" → `build/web` → `gh-pages`).
 - Browsers on HTTPS pages require `wss://` — set both URLs in
   `server_config.json` accordingly before exporting.
 
-## 6. Local smoke tests
+## 6. Health, recovery, and verified deploys
+
+- The gateway serves `/health` on its port + 1 (`{"ok":true,"rooms":N,
+  "protocol":V,"uptime_s":T}`), exposed publicly through Caddy at
+  `https://game.iagocavalcante.com/health` — one probe exercises the whole
+  edge -> tunnel -> proxy -> gateway chain.
+- **Deploy with `bash tools/deploy_server.sh`** — it exports, ships,
+  restarts, and refuses to succeed unless the served protocol matches the
+  local checkout (this class of mismatch once cost a debugging session).
+- On the box, the `aoa-health.timer` user unit probes each layer every 2
+  minutes and restarts exactly the failed one (inside-out with
+  short-circuit, so a gateway blip never restarts the proxy/tunnel under
+  live matches). Log: `~/age-of-amazon/health.log`.
+- GitHub Actions `uptime.yml` pings the public health URL every 30 minutes;
+  a red run means the stack needs eyes.
+
+## 7. Local smoke tests
 
 ```bash
 bash tools/test_mp.sh        # 1 match server + 2 scripted clients

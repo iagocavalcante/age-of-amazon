@@ -141,3 +141,23 @@ p='.github/workflows/tests.yml'
 s=open(p).read()
 old="""          $G --headless -
 2026-07-14 23:18:18|Bash|/Applications/Godot.app/Contents/MacOS/Godot --headless --path . ++ --test-systems 2>&1 | grep -E "O
+2026-07-14 23:18:54|Bash|python3 - << 'EOF'
+p='scripts/ui/HelpScreen.gd'
+s=open(p).read()
+dash="—"
+old='''	_add_body(col, "
+2026-07-14 23:19:55|Bash|HASH=$(git rev-parse --short HEAD) && G=/Applications/Godot.app/Contents/MacOS/Godot && cat > server
+2026-07-15 10:09:24|Bash|python3 - << 'EOF'
+p='scripts/autoloads/Gateway.gd'
+s=open(p).read()
+
+old="""var _heartbeat_accum: f
+2026-07-15 10:09:52|Bash|cat > tools/deploy_server.sh << 'EOF'
+#!/usr/bin/env bash
+# Deploy the dedicated server to ssh-tron 
+2026-07-15 10:10:15|Bash|scp -q tools/healthcheck_remote.sh ssh-tron:~/age-of-amazon/healthcheck.sh && ssh ssh-tron 'chmod +x
+2026-07-15 10:11:01|Bash|bash tools/deploy_server.sh
+2026-07-15 10:11:24|Bash|ssh ssh-tron "pkill -f 'x86_64 [-]-headless' ; sleep 1; curl -sf -m 3 http://127.0.0.1:9001/health |
+2026-07-15 10:11:48|Bash|cat > tools/healthcheck_remote.sh << 'EOF'
+#!/usr/bin/env bash
+# Runs ON the box via a user systemd 

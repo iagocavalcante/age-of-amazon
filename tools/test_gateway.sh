@@ -21,6 +21,10 @@ cleanup() {
 trap cleanup EXIT
 sleep 3
 
+HEALTH=$(curl -sf -m 5 "http://127.0.0.1:$((GW_PORT + 1))/health")
+echo "health: $HEALTH"
+echo "$HEALTH" | grep -q '"ok":true' || { echo "RESULT: FAILED (no health endpoint)"; exit 1; }
+
 "$GODOT" --headless --path . ++ --test-gw-host --gateway-url=ws://127.0.0.1:$GW_PORT \
   > "$DIR/host.log" 2>&1 &
 HOST_PID=$!

@@ -32,16 +32,39 @@ var _peer_rooms: Dictionary = {}  # peer_id -> code
 var _next_match_port: int = 9100
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _heartbeat_accum: float = 0.0
+# Plain-HTTP health sidecar on gateway port + 1: answers /health with room
+# count and protocol version, so watchdogs and deploys can verify the
+# gateway is not just running but serving the expected build.
+var _health_server: TCPServer = null
 
 func _process(delta: float) -> void:
 	if Net.mode != Net.Mode.GATEWAY:
 		return
+	_poll_health()
 	_heartbeat_accum += delta
 	if _heartbeat_accum < HEARTBEAT_INTERVAL:
 		return
 	_heartbeat_accum = 0.0
 	for peer: int in multiplayer.get_peers():
 		_ping.rpc_id(peer)
+
+func _poll_health() -> void:
+	if _health_server == null:
+		return
+	while _health_server.is_connection_available():
+		var conn: StreamPeerTCP = _health_server.take_connection()
+		if conn == null:
+			continue
+		var body: String = JSON.stringify({
+			"ok": true,
+			"rooms": _rooms.size(),
+			"protocol": Net.PROTOCOL_VERSION,
+			"uptime_s": int(Time.get_ticks_msec() / 1000.0),
+		})
+		conn.put_data(("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n" +
+			"Content-Length: %d\r\nConnection: close\r\n\r\n%s" % [
+			body.length(), body]).to_utf8_buffer())
+		conn.disconnect_from_host()
 
 @rpc("authority", "call_remote", "reliable")
 func _ping() -> void:
@@ -63,7 +86,12 @@ func host(port: int, match_port_base: int) -> Error:
 	multiplayer.multiplayer_peer = peer
 	Net.mode = Net.Mode.GATEWAY
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
-	print("[gw] gateway listening on port %d, matches from %d" % [port, match_port_base])
+	_health_server = TCPServer.new()
+	if _health_server.listen(port + 1) != OK:
+		push_warning("[gw] health port %d unavailable" % (port + 1))
+		_health_server = null
+	print("[gw] gateway listening on port %d, matches from %d, health on %d" % [
+		port, match_port_base, port + 1])
 	return OK
 
 # Client side: dial the gateway (the match connection later replaces this
