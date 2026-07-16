@@ -1,0 +1,42 @@
+# Plain-HTTP front for the Cloudflare tunnel (TLS terminates at the edge).
+# Lives in the repo (infra/Caddyfile); tools/deploy_admin.sh ships it to
+# ~/age-of-amazon/Caddyfile on the box.
+#
+#   /ws        -> gateway (lobby)
+#   /m/<port>  -> that match server (gateway spawns them on 9100-9199)
+#   /health    -> gateway health endpoint (public: uptime.yml pings it)
+#   /stats     -> gateway ops stats            (basic auth)
+#   /admin     -> static ops dashboard          (basic auth)
+#
+# AOA_ADMIN_USER / AOA_ADMIN_HASH come from ~/age-of-amazon/admin.env via a
+# systemd drop-in (EnvironmentFile) — credentials never live in the repo.
+{
+	auto_https off
+}
+:8081 {
+	handle /ws* {
+		reverse_proxy 127.0.0.1:9000
+	}
+	handle /health {
+		reverse_proxy 127.0.0.1:9001
+	}
+	handle /stats {
+		basic_auth {
+			{$AOA_ADMIN_USER} {$AOA_ADMIN_HASH}
+		}
+		reverse_proxy 127.0.0.1:9001
+	}
+	handle /admin {
+		basic_auth {
+			{$AOA_ADMIN_USER} {$AOA_ADMIN_HASH}
+		}
+		root * /home/tron/age-of-amazon/www
+		rewrite * /dashboard.html
+		file_server
+	}
+	@match path_regexp m ^/m/(91[0-9][0-9])$
+	handle @match {
+		reverse_proxy 127.0.0.1:{re.m.1}
+	}
+	respond 404
+}

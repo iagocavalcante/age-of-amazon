@@ -146,8 +146,15 @@ DNS-only so GitHub provisions the certificate).
 
 - **`https://game.iagocavalcante.com/admin`** — live ops dashboard
   (static `tools/dashboard.html`, served by Caddy from
-  `~/age-of-amazon/www/` on the box; redeploy with
-  `scp tools/dashboard.html ssh-tron:~/age-of-amazon/www/`).
+  `~/age-of-amazon/www/` on the box). **Deploy with
+  `bash tools/deploy_admin.sh`** — ships the dashboard and
+  `infra/Caddyfile`, restarts the proxy, and verifies auth is enforced.
+- `/admin` and `/stats` are behind **basic auth** (`/health` stays public
+  for the uptime pings). Username defaults to `admin`; the bcrypt hash
+  lives only in `~/age-of-amazon/admin.env` on the box (loaded via a
+  systemd drop-in), the plaintext only in the local gitignored
+  `.admin_credentials`. Rotate with
+  `bash tools/deploy_admin.sh --password '<new>'`.
 - It polls **`/stats`** (same health port, routed by request path) every
   5 s: open rooms (codes masked — a room code is a join secret), lobby
   players/connections, live matches with player counts and uptime, and
