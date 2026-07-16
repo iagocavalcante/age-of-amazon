@@ -171,6 +171,14 @@ are skipped, or four files when they are not.
 
 ## Validation log
 
+- **2026-07-16:** corner flood-fill alone is NOT enough — the model sometimes
+  draws the green screen as an inset box on a different outer background
+  (jaguar walk_b shipped with a full green square), plus enclosed pockets
+  between legs. The pipeline now adds a chroma-ratio pass after the flood
+  fill: any pixel with `g > 140 and g > 1.5*r and g > 1.5*b` is keyed.
+  Painted foliage survives (validated on the green-heavy cashew crown);
+  still, eyeball every green-dominant sprite after processing.
+
 - **2026-07-15 (a):** Local Gemini MCP tools fail with API 404 (server pins
   the retired `imagen-4.0-generate-001`). Don't use them.
 - **2026-07-15 (b): VALIDATED end-to-end with OpenAI `gpt-image-1`**
