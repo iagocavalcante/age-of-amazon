@@ -48,23 +48,116 @@ func _process(delta: float) -> void:
 	for peer: int in multiplayer.get_peers():
 		_ping.rpc_id(peer)
 
+# Pending health-port connections waiting for their request line, so we can
+# route /health vs /stats. Each entry: {conn, deadline_msec}.
+var _pending_http: Array = []
+# Matches this gateway has spawned: [{port, started_msec}].
+var _spawned_matches: Array = []
+var _matches_spawned_total: int = 0
+
 func _poll_health() -> void:
 	if _health_server == null:
 		return
 	while _health_server.is_connection_available():
 		var conn: StreamPeerTCP = _health_server.take_connection()
-		if conn == null:
-			continue
-		var body: String = JSON.stringify({
+		if conn != null:
+			_pending_http.append({
+				"conn": conn, "deadline": Time.get_ticks_msec() + 500})
+	var keep: Array = []
+	for entry: Dictionary in _pending_http:
+		var conn: StreamPeerTCP = entry["conn"]
+		conn.poll()
+		if conn.get_available_bytes() > 0:
+			var request: String = conn.get_utf8_string(conn.get_available_bytes())
+			_respond_http(conn, request)
+		elif Time.get_ticks_msec() > int(entry["deadline"]):
+			_respond_http(conn, "GET /health")  # legacy probes send nothing
+		else:
+			keep.append(entry)
+	_pending_http = keep
+
+func _respond_http(conn: StreamPeerTCP, request: String) -> void:
+	var body: String
+	if request.contains("/stats"):
+		body = JSON.stringify(_stats())
+	else:
+		body = JSON.stringify({
 			"ok": true,
 			"rooms": _rooms.size(),
 			"protocol": Net.PROTOCOL_VERSION,
 			"uptime_s": int(Time.get_ticks_msec() / 1000.0),
 		})
-		conn.put_data(("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n" +
-			"Content-Length: %d\r\nConnection: close\r\n\r\n%s" % [
-			body.length(), body]).to_utf8_buffer())
-		conn.disconnect_from_host()
+	conn.put_data(("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n" +
+		"Access-Control-Allow-Origin: *\r\n" +
+		"Content-Length: %d\r\nConnection: close\r\n\r\n%s" % [
+		body.length(), body]).to_utf8_buffer())
+	conn.disconnect_from_host()
+
+# The admin dashboard's data: lobby detail plus live-match telemetry
+# aggregated from each match's port+500 sidecar. Room codes are masked —
+# a code is an invitation, and /stats is public.
+func _stats() -> Dictionary:
+	var rooms: Array = []
+	var lobby_players: int = 0
+	for code: String in _rooms:
+		var room: Dictionary = _rooms[code]
+		lobby_players += room["peers"].size()
+		rooms.append({
+			"code": code.substr(0, 2) + "**",
+			"players": room["peers"].size(),
+			"started": room["started"],
+		})
+	var live: Array = []
+	var keep: Array = []
+	for entry: Dictionary in _spawned_matches:
+		var telemetry: Dictionary = _probe_match(int(entry["port"]))
+		if telemetry.is_empty():
+			# A fresh match needs a few seconds to boot before its telemetry
+			# sidecar listens; only treat a failed probe as "dead" (and prune)
+			# after the boot grace period.
+			if Time.get_ticks_msec() - int(entry["started_msec"]) < 15000:
+				keep.append(entry)
+			continue
+		keep.append(entry)
+		telemetry["port"] = entry["port"]
+		live.append(telemetry)
+	_spawned_matches = keep
+	return {
+		"ok": true,
+		"protocol": Net.PROTOCOL_VERSION,
+		"uptime_s": int(Time.get_ticks_msec() / 1000.0),
+		"lobby": {"rooms": rooms, "players": lobby_players,
+			"peers": multiplayer.get_peers().size()},
+		"matches": {"spawned_total": _matches_spawned_total, "live": live},
+	}
+
+# Short blocking probe of a match telemetry sidecar (same box, ~instant).
+func _probe_match(port: int) -> Dictionary:
+	var conn: StreamPeerTCP = StreamPeerTCP.new()
+	if conn.connect_to_host("127.0.0.1", port + 500) != OK:
+		return {}
+	var waited: int = 0
+	while conn.get_status() == StreamPeerTCP.STATUS_CONNECTING and waited < 200:
+		OS.delay_msec(10)
+		waited += 10
+		conn.poll()
+	if conn.get_status() != StreamPeerTCP.STATUS_CONNECTED:
+		return {}
+	conn.put_data("GET / HTTP/1.1\r\n\r\n".to_utf8_buffer())
+	waited = 0
+	while conn.get_available_bytes() == 0 and waited < 300:
+		OS.delay_msec(10)
+		waited += 10
+		conn.poll()
+	if conn.get_available_bytes() == 0:
+		return {}
+	var response: String = conn.get_utf8_string(conn.get_available_bytes())
+	conn.disconnect_from_host()
+	var json_start: int = response.find("{")
+	if json_start < 0:
+		return {}
+	var parsed: Variant = JSON.parse_string(response.substr(json_start))
+	return parsed if parsed is Dictionary else {}
 
 @rpc("authority", "call_remote", "reliable")
 func _ping() -> void:
@@ -185,6 +278,8 @@ func _start_match() -> void:
 		room["started"] = false
 		_error.rpc_id(sender, "could not start match server")
 		return
+	_spawned_matches.append({"port": port, "started_msec": Time.get_ticks_msec()})
+	_matches_spawned_total += 1
 	print("[gw] room %s -> match on port %d (pid %d, %d players)" % [
 		code, port, pid, room["peers"].size()])
 

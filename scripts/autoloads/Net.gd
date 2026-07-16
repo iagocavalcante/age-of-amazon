@@ -186,9 +186,34 @@ func _on_connection_failed() -> void:
 	if auto_return_to_menu:
 		back_to_menu("Could not reach the match server.")
 
+# Telemetry sidecar (match servers): plain-HTTP JSON on port+500 so the
+# gateway's /stats can aggregate live matches for the admin dashboard.
+var _telemetry_server: TCPServer = null
+var _boot_msec: int = 0
+
+func _poll_telemetry() -> void:
+	if _telemetry_server == null:
+		return
+	while _telemetry_server.is_connection_available():
+		var conn: StreamPeerTCP = _telemetry_server.take_connection()
+		if conn == null:
+			continue
+		var body: String = JSON.stringify({
+			"ok": true,
+			"players": peer_players.size(),
+			"expected": expected_players,
+			"state": GameManager.GameState.keys()[GameManager.state],
+			"uptime_s": int((Time.get_ticks_msec() - _boot_msec) / 1000.0),
+		})
+		conn.put_data(("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n" +
+			"Content-Length: %d\r\nConnection: close\r\n\r\n%s" % [
+			body.length(), body]).to_utf8_buffer())
+		conn.disconnect_from_host()
+
 func _process(delta: float) -> void:
 	if mode != Mode.SERVER:
 		return
+	_poll_telemetry()
 	var idle: bool = peer_players.is_empty() \
 		or GameManager.state == GameManager.GameState.GAME_OVER
 	if not idle:
@@ -226,6 +251,10 @@ func host(port: int, players: int) -> Error:
 	expected_players = players
 	if not multiplayer.peer_disconnected.is_connected(_on_peer_disconnected):
 		multiplayer.peer_disconnected.connect(_on_peer_disconnected)
+	_telemetry_server = TCPServer.new()
+	_boot_msec = Time.get_ticks_msec()
+	if _telemetry_server.listen(port + 500) != OK:
+		_telemetry_server = null
 	print("[net] match server listening on port %d for %d players" % [port, players])
 	return OK
 

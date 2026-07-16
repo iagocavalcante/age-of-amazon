@@ -142,6 +142,21 @@ DNS-only so GitHub provisions the certificate).
 - GitHub Actions `uptime.yml` pings the public health URL every 30 minutes;
   a red run means the stack needs eyes.
 
+### Ops dashboard
+
+- **`https://game.iagocavalcante.com/admin`** — live ops dashboard
+  (static `tools/dashboard.html`, served by Caddy from
+  `~/age-of-amazon/www/` on the box; redeploy with
+  `scp tools/dashboard.html ssh-tron:~/age-of-amazon/www/`).
+- It polls **`/stats`** (same health port, routed by request path) every
+  5 s: open rooms (codes masked — a room code is a join secret), lobby
+  players/connections, live matches with player counts and uptime, and
+  a total-matches-spawned counter.
+- Live-match data comes from a telemetry sidecar every match server opens
+  on `its port + 500` (localhost-only; `Net._poll_telemetry`). The gateway
+  probes each spawned match's sidecar on demand and prunes entries that
+  stay unreachable past a 15 s boot grace period.
+
 ## 7. Local smoke tests
 
 ```bash
