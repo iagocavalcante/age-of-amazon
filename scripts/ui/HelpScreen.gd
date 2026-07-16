@@ -230,6 +230,7 @@ func _build_right(col: VBoxContainer) -> void:
 	_add_body(col, "•  Keep every villager gathering — idle villagers lose games.")
 	_add_body(col, "•  Hunt capybaras and tapirs for food — but beware jaguars, bush dog packs, and caimans lurking at the water's edge.")
 	_add_body(col, "•  Fish schools shimmer along riverbanks — villagers can work them like berry bushes.")
+	_add_body(col, "•  Fruit trees (red-dotted crowns) pay food alongside the wood your villagers chop.")
 	_add_body(col, "•  Mine jade early if you dream of a Monument victory.")
 	_add_body(col, "•  Scout before you strike — you can't hit what you can't see.")
 	_add_body(col, "•  A watchtower on a border ridge is worth three patrols.")

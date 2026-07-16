@@ -54,6 +54,7 @@ var _attack_move_target: Vector2 = Vector2.INF
 # Gathering
 var _gather_cell: Vector2i = Vector2i.ZERO
 var _gather_type: int = -1
+var _gather_bonus_type: int = -1  # fruit trees: food banked alongside wood
 var _carrying: int = 0
 var _gather_timer: float = 0.0
 
@@ -227,10 +228,14 @@ func command_gather(cell: Vector2i) -> void:
 	var node: Dictionary = GameManager.world.get_resource_at(cell)
 	if node.is_empty():
 		return
-	_gather_cell = cell
-	_gather_type = node["type"]
+	_set_gather_target(cell, node)
 	_attack_target = null
 	_go_to_gather_site()
+
+func _set_gather_target(cell: Vector2i, node: Dictionary) -> void:
+	_gather_cell = cell
+	_gather_type = node["type"]
+	_gather_bonus_type = int(node.get("bonus_type", -1))
 
 func command_attack(target: Node2D) -> void:
 	if target == null or not is_instance_valid(target):
@@ -416,9 +421,16 @@ func _go_deposit() -> void:
 func _deposit() -> void:
 	if _carrying > 0 and _gather_type >= 0:
 		GameManager.add_resource(player_id, _gather_type, _carrying)
+		var bonus: int = int(_carrying * Constants.FRUIT_FOOD_RATIO) \
+			if _gather_bonus_type >= 0 else 0
+		if bonus > 0:
+			GameManager.add_resource(player_id, _gather_bonus_type, bonus)
 		if not Net.is_headless_server() and player_id == GameManager.local_player_id:
-			WorkFx.float_text(get_parent(), global_position, "+%d %s" % [
-				_carrying, Constants.RESOURCE_NAMES[_gather_type]])
+			var text: String = "+%d %s" % [
+				_carrying, Constants.RESOURCE_NAMES[_gather_type]]
+			if bonus > 0:
+				text += "  +%d %s" % [bonus, Constants.RESOURCE_NAMES[_gather_bonus_type]]
+			WorkFx.float_text(get_parent(), global_position, text)
 		_carrying = 0
 	# Resume the cycle: same node if alive, otherwise a nearby one.
 	if not GameManager.world.get_resource_at(_gather_cell).is_empty():
@@ -433,7 +445,8 @@ func _find_next_resource_node() -> void:
 	var result: Dictionary = GameManager.world.find_nearest_resource(_gather_cell, _gather_type)
 	# Only auto-retarget nodes this tribe has scouted — no gathering in fog.
 	if result["found"] and GameManager.has_explored(player_id, result["cell"]):
-		_gather_cell = result["cell"]
+		_set_gather_target(result["cell"],
+			GameManager.world.get_resource_at(result["cell"]))
 		_go_to_gather_site()
 	else:
 		current_state = State.IDLE

@@ -13,6 +13,7 @@ var building_textures: Array[Dictionary] = []  # player_id -> {type -> ImageText
 var selection_ring: ImageTexture
 var unit_shadow: ImageTexture
 var tree_textures: Array[ImageTexture] = []
+var fruit_tree_texture: ImageTexture
 var rock_texture: ImageTexture
 var reeds_texture: ImageTexture
 var berry_texture: ImageTexture
@@ -111,6 +112,9 @@ func _ready() -> void:
 			painted_trees.append(painted)
 	tree_textures = painted_trees if painted_trees.size() == 3 \
 		else doodad_artist.build_trees()
+	fruit_tree_texture = _override_neutral("tree_fruit")
+	if fruit_tree_texture == null:
+		fruit_tree_texture = doodad_artist.build_fruit_tree()
 	rock_texture = doodad_artist.build_rock()
 	reeds_texture = doodad_artist.build_reeds()
 	berry_texture = doodad_artist.build_berry_bush()

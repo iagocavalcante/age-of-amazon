@@ -150,6 +150,8 @@ func _resource_texture(node: Dictionary, cell: Vector2i) -> Texture2D:
 		return AssetLibrary.fish_texture
 	match int(node["type"]):
 		Constants.ResourceType.WOOD:
+			if node.has("bonus_type"):
+				return AssetLibrary.fruit_tree_texture
 			var idx: int = int(PixelArt.hash2(cell.x, cell.y, 31) * AssetLibrary.tree_textures.size())
 			return AssetLibrary.tree_textures[idx % AssetLibrary.tree_textures.size()]
 		Constants.ResourceType.FOOD:

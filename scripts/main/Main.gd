@@ -50,6 +50,9 @@ func _ready() -> void:
 		_run_monument_test()
 	if "--test-tactics" in args:
 		_run_tactics_test()
+	if "--test-fruit" in args:
+		_run_fruit_test()
+		return
 	if "--test-fish" in args:
 		_run_fish_test()
 	if "--test-victory" in args:
@@ -355,6 +358,51 @@ func _run_build_test() -> void:
 
 # Prove shore fishing: a fish school exists near the shore, a villager can
 # work it, and the catch banks as food.
+# Prove fruit trees bank food alongside the wood haul.
+func _run_fruit_test() -> void:
+	await get_tree().create_timer(0.5).timeout
+	var fruit_cell: Vector2i = Vector2i(9999, 9999)
+	var radius: int = 4
+	while radius <= 80 and fruit_cell.x == 9999:
+		for dy in range(-radius, radius + 1):
+			for dx in range(-radius, radius + 1):
+				if maxi(absi(dx), absi(dy)) != radius:
+					continue  # ring only — keeps the scan linear
+				var cell: Vector2i = Vector2i(dx, dy)
+				var node: Dictionary = GameManager.world.get_resource_at(cell)
+				if node.has("bonus_type"):
+					fruit_cell = cell
+					break
+			if fruit_cell.x != 9999:
+				break
+		radius += 2
+	print("[test-fruit] tree-found ", "OK" if fruit_cell.x != 9999 else "FAILED",
+		" at ", fruit_cell)
+	if fruit_cell.x == 9999:
+		get_tree().quit(1)
+		return
+
+	var villagers: Array = get_tree().get_nodes_in_group("player_0").filter(
+		func(n: Node) -> bool: return n is UnitBase and (n as UnitBase).can_gather)
+	var wood_before: int = GameManager.get_resource(0, Constants.ResourceType.WOOD)
+	var food_before: int = GameManager.get_resource(0, Constants.ResourceType.FOOD)
+	var picker: UnitBase = villagers[0]
+	picker.global_position = Constants.grid_to_world(fruit_cell.x, fruit_cell.y) \
+		+ Vector2(0, 40)  # start nearby; pathing over distance isn't the point
+	picker.command_gather(fruit_cell)
+	var elapsed: float = 0.0
+	while GameManager.get_resource(0, Constants.ResourceType.FOOD) <= food_before \
+			and elapsed < 60.0:
+		await get_tree().create_timer(0.5).timeout
+		elapsed += 0.5
+	var wood_after: int = GameManager.get_resource(0, Constants.ResourceType.WOOD)
+	var food_after: int = GameManager.get_resource(0, Constants.ResourceType.FOOD)
+	print("[test-fruit] wood-banked ", "OK" if wood_after > wood_before else "FAILED",
+		" wood ", wood_before, "->", wood_after)
+	print("[test-fruit] food-bonus ", "OK" if food_after > food_before else "FAILED",
+		" food ", food_before, "->", food_after)
+	get_tree().quit(0 if wood_after > wood_before and food_after > food_before else 1)
+
 func _run_fish_test() -> void:
 	await get_tree().create_timer(0.5).timeout
 	var fish_cell: Vector2i = Vector2i(9999, 9999)

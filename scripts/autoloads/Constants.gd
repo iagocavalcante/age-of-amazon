@@ -30,6 +30,9 @@ const RESOURCE_NAMES: Dictionary = {
 # Gathering
 const GATHER_INTERVAL: float = 1.2  # seconds per resource unit
 const CARRY_CAPACITY: int = 10
+# Fruit trees pay a food bonus alongside the wood haul: each deposit banks
+# carrying * this ratio as food (10 wood -> +5 food).
+const FRUIT_FOOD_RATIO: float = 0.5
 
 # Population: every tribe starts at the base cap; each finished house adds
 # HOUSE_POP_BONUS, up to the hard ceiling.

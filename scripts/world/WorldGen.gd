@@ -141,9 +141,15 @@ func resource_at(x: int, y: int, biome: int) -> Dictionary:
 	var h: float = PixelArt.hash2(x, y, seed_val)
 	match biome:
 		Constants.Biome.FOREST_DENSE:
+			if h < 0.02:
+				return { "type": Constants.ResourceType.WOOD, "amount": 100,
+					"bonus_type": Constants.ResourceType.FOOD }
 			if h < 0.30:
 				return { "type": Constants.ResourceType.WOOD, "amount": 120 }
 		Constants.Biome.FOREST_LIGHT:
+			if h < 0.025:
+				return { "type": Constants.ResourceType.WOOD, "amount": 100,
+					"bonus_type": Constants.ResourceType.FOOD }
 			if h < 0.12:
 				return { "type": Constants.ResourceType.WOOD, "amount": 100 }
 		Constants.Biome.GRASS:

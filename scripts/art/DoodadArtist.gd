@@ -14,6 +14,23 @@ func build_trees() -> Array[ImageTexture]:
 		trees.append(_build_tree(v))
 	return trees
 
+# Fallback fruit tree: the variant-0 tree with red fruit speckled through
+# the canopy (the painted override is tree_fruit.png).
+func build_fruit_tree() -> ImageTexture:
+	var base: ImageTexture = _build_tree(0)
+	var img: Image = base.get_image()
+	var fruit: Color = Color8(206, 58, 60)
+	var fruit_light: Color = Color8(238, 108, 96)
+	for y in range(img.get_height()):
+		for x in range(img.get_width()):
+			var p: Color = img.get_pixel(x, y)
+			if p.a > 0.0 and p.g > p.r and p.g > p.b and y < 24 \
+					and PixelArt.hash2(x, y, 977) > 0.93:
+				img.set_pixel(x, y, fruit)
+				if y > 0 and img.get_pixel(x, y - 1).a > 0.0:
+					img.set_pixel(x, y - 1, fruit_light)
+	return ImageTexture.create_from_image(img)
+
 func _build_tree(variant: int) -> ImageTexture:
 	var w: int = 34
 	var h: int = 44

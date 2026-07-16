@@ -79,6 +79,10 @@ TREES = {
     "brazil_nut": ((44, 64), "A Brazil nut tree (castanheira): very tall "
         "straight cylindrical trunk, bare of branches, with a single dense "
         "rounded crown only at the very top."),
+    "fruit": ((44, 56), "A wild cashew tree (cajueiro): broad rounded green "
+        "crown on a sturdy short trunk, dotted all over with bright red-orange "
+        "cashew fruits hanging under the leaves, a few fallen fruits at the "
+        "base. The red fruit must read clearly against the green crown."),
     "acai": ((28, 52), "An acai palm: tall vertical composition, two very "
         "slender ringed grey-green stems side by side, each stem five times "
         "taller than its crown, topped with a small burst of arching feathery "
@@ -165,6 +169,15 @@ def process(src, out_name, target):
                 if c[3] > 0 and near(c):
                     seen.add((nx, ny))
                     stack.append((nx, ny))
+    # Second pass: the model sometimes draws the green screen as an inset
+    # box on a different outer background (corner fill can't reach it), or
+    # leaves enclosed pockets between legs. Chroma-ratio key: kill anything
+    # unmistakably green-screen green; painted foliage is far less saturated.
+    for y in range(h):
+        for x in range(w):
+            c = px[x, y]
+            if c[3] > 0 and c[1] > 140 and c[1] > 1.5 * c[0] and c[1] > 1.5 * c[2]:
+                px[x, y] = (0, 0, 0, 0)
     box = img.getbbox()
     if box is None:
         raise RuntimeError(f"{src}: keyed to nothing")
