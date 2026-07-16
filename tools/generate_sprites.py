@@ -67,6 +67,24 @@ BUILDINGS = {
         "jade capstone, small flat magenta pennant. Sacred and imposing."),
 }
 
+# Environment trees — three real Amazon species with distinct silhouettes,
+# sized against the 20x30 unit so the forest towers over people instead of
+# reading as shrubs (kapok ~2.4x a villager; real ones are 40x, but tiles
+# are 64x32 and readability wins).
+TREES = {
+    "kapok": ((56, 72), "A giant kapok tree (samauma), emergent giant of the "
+        "Amazon: massive pale grey-brown trunk flaring into wide buttress "
+        "roots at the base, broad flat umbrella-shaped crown held high, a few "
+        "thick horizontal limbs visible below the crown."),
+    "brazil_nut": ((44, 64), "A Brazil nut tree (castanheira): very tall "
+        "straight cylindrical trunk, bare of branches, with a single dense "
+        "rounded crown only at the very top."),
+    "acai": ((28, 52), "An acai palm: tall vertical composition, two very "
+        "slender ringed grey-green stems side by side, each stem five times "
+        "taller than its crown, topped with a small burst of arching feathery "
+        "fronds and small dark purple berry clusters just under the crowns."),
+}
+
 ANIMALS = {
     "capybara": ((30, 22), "A capybara, brown fur, rounded and calm."),
     "jaguar": ((30, 22), "A jaguar, golden coat with dark rosette spots, prowling."),
@@ -188,6 +206,11 @@ def main():
         plan.append((f"building_{btype}", "gen",
             MASTER + "Three-quarter isometric game-building view, centered. " + prompt,
             None, (f"building_{btype}", size)))
+
+    for species, (size, prompt) in TREES.items():
+        plan.append((f"tree_{species}", "gen",
+            MASTER + "Full tree, centered, ground-level base. " + prompt +
+            " NO magenta anywhere.", None, (f"tree_{species}", size)))
 
     for species, (size, prompt) in ANIMALS.items():
         base = f"animal_{species}_idle"

@@ -101,7 +101,16 @@ func _ready() -> void:
 	unit_shadow = unit_artist.build_shadow()
 
 	var doodad_artist: DoodadArtist = DoodadArtist.new()
-	tree_textures = doodad_artist.build_trees()
+	# Painted Amazon species (kapok, brazil nut, acai) win over the
+	# procedural blobs; any missing file falls back to the full procedural
+	# set so the forest never goes bare.
+	var painted_trees: Array[ImageTexture] = []
+	for species: String in ["kapok", "brazil_nut", "acai"]:
+		var painted: ImageTexture = _override_neutral("tree_" + species)
+		if painted != null:
+			painted_trees.append(painted)
+	tree_textures = painted_trees if painted_trees.size() == 3 \
+		else doodad_artist.build_trees()
 	rock_texture = doodad_artist.build_rock()
 	reeds_texture = doodad_artist.build_reeds()
 	berry_texture = doodad_artist.build_berry_bush()
@@ -171,6 +180,17 @@ func _override_texture(name: String, player_color: Color) -> ImageTexture:
 	if not ResourceLoader.exists(path):
 		return null
 	return _load_tinted(path, player_color)
+
+# Untinted override for neutral world art (trees, doodads) — no magenta
+# remap, the file is used as painted.
+func _override_neutral(name: String) -> ImageTexture:
+	var path: String = SPRITE_DIR + name + ".png"
+	if not ResourceLoader.exists(path):
+		return null
+	var texture: Texture2D = load(path)
+	var img: Image = texture.get_image()
+	img.convert(Image.FORMAT_RGBA8)
+	return ImageTexture.create_from_image(img)
 
 func _override_animal_frames(species: String) -> Array:
 	var frames: Array = []

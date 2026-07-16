@@ -92,6 +92,18 @@ Never generate walk frames from scratch — they will drift.
   glowing green jade with gold inlay bands and carved glyphs, jade
   capstone, magenta pennant. Sacred, imposing.`
 
+### Environment trees (neutral — NO magenta anywhere)
+Three real Amazon species, sized so the forest towers over the 20x30 unit
+(kapok 56x72, brazil nut 44x64, acai 28x52). Prompt with "full tree,
+centered, ground-level base"; for slender species force a "tall vertical
+composition" or the model renders a squat clump (bit the first acai).
+- **Kapok (samauma):** giant pale trunk, wide buttress roots, high flat
+  umbrella crown.
+- **Brazil nut (castanheira):** very tall bare cylindrical trunk, single
+  dense rounded crown at the top.
+- **Acai palm:** two slender ringed stems, feathery frond bursts, dark
+  purple berry clusters under the crowns.
+
 ### Wildlife (neutral — NO magenta anywhere)
 - **Capybara:** `A capybara, brown, rounded, calm.`
 - **Jaguar:** `A jaguar, golden coat with dark rosettes, prowling.`
