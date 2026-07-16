@@ -58,8 +58,12 @@ func _process(delta: float) -> void:
 	zoom = zoom.lerp(Vector2(target_zoom, target_zoom), 10.0 * delta)
 
 # Edge scrolling requires: desktop, no active drag, the mouse has actually
-# moved since launch, the window is focused, and the cursor is inside the
-# viewport. Disabled under the "movie" feature tag (offline frame capture).
+# moved since launch, the window is focused, the cursor is inside the
+# viewport, and the cursor is not over UI (the selection panel sits inside
+# the bottom edge band — panning while the player reaches for its buttons
+# scrolls their selection off screen). Controls in the "edge_pan_through"
+# group (the top resource bar) opt back in so upward scrolling keeps
+# working across the full top edge. Disabled under the "movie" feature tag.
 func _edge_scroll_active() -> bool:
 	if is_mobile or is_dragging or not _mouse_seen:
 		return false
@@ -68,7 +72,17 @@ func _edge_scroll_active() -> bool:
 	if not get_window().has_focus():
 		return false
 	var mouse: Vector2 = get_viewport().get_mouse_position()
-	return get_viewport_rect().has_point(mouse)
+	if not get_viewport_rect().has_point(mouse):
+		return false
+	return not _mouse_over_blocking_ui()
+
+func _mouse_over_blocking_ui() -> bool:
+	var node: Node = get_viewport().gui_get_hovered_control()
+	while node is Control:
+		if node.is_in_group("edge_pan_through"):
+			return false
+		node = node.get_parent()
+	return get_viewport().gui_get_hovered_control() != null
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:

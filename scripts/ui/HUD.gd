@@ -15,8 +15,8 @@ var _pause_button: Button
 
 var _sel_panel: PanelContainer
 var _sel_label: Label
-var _train_box: HBoxContainer
-var _build_box: HBoxContainer
+var _train_box: HFlowContainer
+var _build_box: HFlowContainer
 var _queue_label: Label
 
 var _minimap_rect: TextureRect
@@ -91,6 +91,9 @@ func _build_top_bar() -> void:
 	bar.offset_left = 8
 	bar.offset_right = -8
 	bar.offset_top = 8
+	# Hovering UI blocks edge scrolling (see GameCamera), but the top bar
+	# spans the whole top edge — exempt it so upward scrolling still works.
+	bar.add_to_group("edge_pan_through")
 	add_child(bar)
 
 	var row: HBoxContainer = HBoxContainer.new()
@@ -185,9 +188,12 @@ func _build_selection_panel() -> void:
 	_sel_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(_sel_label)
 
-	_train_box = HBoxContainer.new()
-	_train_box.add_theme_constant_override("separation", 8)
-	_train_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	# Flow containers so button rows wrap instead of running off both screen
+	# edges on narrow viewports (see _clamp_row).
+	_train_box = HFlowContainer.new()
+	_train_box.add_theme_constant_override("h_separation", 8)
+	_train_box.add_theme_constant_override("v_separation", 6)
+	_train_box.alignment = FlowContainer.ALIGNMENT_CENTER
 	box.add_child(_train_box)
 
 
@@ -196,9 +202,10 @@ func _build_selection_panel() -> void:
 	box.add_child(_queue_label)
 
 	# Construction buttons appear when villagers are selected.
-	_build_box = HBoxContainer.new()
-	_build_box.add_theme_constant_override("separation", 8)
-	_build_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	_build_box = HFlowContainer.new()
+	_build_box.add_theme_constant_override("h_separation", 8)
+	_build_box.add_theme_constant_override("v_separation", 6)
+	_build_box.alignment = FlowContainer.ALIGNMENT_CENTER
 	_build_box.visible = false
 	box.add_child(_build_box)
 	for building_type: String in ["house", "barracks", "watchtower", "monument"]:
@@ -214,6 +221,19 @@ func _build_selection_panel() -> void:
 		button.pressed.connect(func() -> void:
 			SelectionManager.start_placement(captured))
 		_build_box.add_child(button)
+
+# A flow row wraps at its own width, but left alone it takes its natural
+# single-row width — wider than narrow viewports, pushing buttons off both
+# screen edges. Clamp it to the viewport so overflow wraps instead.
+func _clamp_row(row: HFlowContainer) -> void:
+	var natural: float = 0.0
+	var count: int = 0
+	for child: Node in row.get_children():
+		if child is Control and not child.is_queued_for_deletion():
+			natural += (child as Control).get_combined_minimum_size().x
+			count += 1
+	natural += 8.0 * maxf(0.0, count - 1)
+	row.custom_minimum_size.x = minf(natural, get_viewport_rect().size.x - 48.0)
 
 # The train row mirrors whatever the selected building can produce.
 func _populate_train_buttons(building_type: String) -> void:
@@ -231,6 +251,7 @@ func _populate_train_buttons(building_type: String) -> void:
 		var captured: String = unit_type
 		button.pressed.connect(func() -> void: _train(captured))
 		_train_box.add_child(button)
+	_clamp_row(_train_box)
 
 func _train(unit_type: String) -> void:
 	var building: Node2D = SelectionManager.selected_building
@@ -275,6 +296,7 @@ func _refresh_selection_panel() -> void:
 	_queue_label.visible = false
 	_build_box.visible = units.any(
 		func(u: Node2D) -> bool: return bool(u.get("can_gather")))
+	_clamp_row(_build_box)
 	var counts: Dictionary = {}
 	for unit: Node2D in units:
 		var t: String = unit.get("unit_type")
