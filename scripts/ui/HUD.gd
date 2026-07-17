@@ -90,6 +90,30 @@ func _ready() -> void:
 	_refresh_top_bar()
 	_refresh_selection_panel()
 
+# Anchored controls grow DOWNWARD when their minimum size changes while
+# visible — Godot's grow_vertical=BEGIN is only honored on some layout
+# paths, which intermittently pushed the bottom panels off screen. Pin
+# their geometry explicitly every frame instead of trusting grow.
+func _process(_delta: float) -> void:
+	if _sel_panel != null and _sel_panel.visible:
+		_pin_bottom(_sel_panel, true)
+	if _idle_button != null:
+		var idle_panel: PanelContainer = _idle_button.get_meta("panel")
+		if idle_panel.visible:
+			_pin_bottom(idle_panel, false)
+
+func _pin_bottom(panel: Control, centered: bool) -> void:
+	var min_size: Vector2 = panel.get_combined_minimum_size()
+	if centered:  # anchors at bottom-center
+		panel.offset_left = -min_size.x / 2.0
+		panel.offset_right = min_size.x / 2.0
+	else:  # anchors at bottom-left
+		panel.offset_left = 10.0
+		panel.offset_right = 10.0 + min_size.x
+	panel.offset_top = -10.0 - min_size.y
+	panel.offset_bottom = -10.0
+	panel.size = min_size
+
 func _panel_style() -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
 	style.bg_color = Color(0.07, 0.10, 0.08, 0.88)

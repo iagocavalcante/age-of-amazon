@@ -373,6 +373,12 @@ func _run_hud_test() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	print("[test-hud] panel-shown ", "OK" if hud._sel_panel.visible else "FAILED")
+	var rect: Rect2 = hud._sel_panel.get_global_rect()
+	var vp: Vector2 = get_viewport().get_visible_rect().size
+	var on_screen: bool = rect.position.y >= 0.0 and rect.end.y <= vp.y \
+		and rect.position.x >= 0.0 and rect.end.x <= vp.x
+	print("[test-hud] panel-on-screen ", "OK" if on_screen else "FAILED",
+		" rect=", rect, " vp=", vp)
 	print("[test-hud] cmd-row ", "OK" if hud._cmd_box.visible else "FAILED")
 	print("[test-hud] hotkeys-mapped ", "OK" if hud._hotkeys.has(KEY_G)
 		and hud._hotkeys.has(KEY_X) and hud._hotkeys.has(KEY_B) else "FAILED")
@@ -396,6 +402,24 @@ func _run_hud_test() -> void:
 	var idle_count: int = hud._idle_villagers().size()
 	print("[test-hud] idle-finder ", "OK" if idle_count >= 1 else "FAILED",
 		" count=", idle_count)
+
+	# Panel-size flips (building -> unit -> building) are what used to push
+	# the panel below the viewport; assert it stays on screen through them.
+	var stays: bool = true
+	for target: Node2D in [_find_tc(0), unit, _find_tc(0)]:
+		if target is Building:
+			SelectionManager.clear_selection()
+			SelectionManager.selected_building = target
+			EventBus.selection_changed.emit()
+		else:
+			SelectionManager.select_only(target)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		var r: Rect2 = hud._sel_panel.get_global_rect()
+		if r.position.y < 0.0 or r.end.y > vp.y or r.position.x < 0.0 or r.end.x > vp.x:
+			stays = false
+			print("  off-screen after switching to ", target.name, " rect=", r)
+	print("[test-hud] panel-stays-on-screen ", "OK" if stays else "FAILED")
 	get_tree().quit()
 
 func _push_key(keycode: Key) -> void:
