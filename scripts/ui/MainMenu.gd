@@ -357,11 +357,13 @@ func _build_friends_page(parent: Control) -> void:
 	_name_edit.max_length = 16
 	_name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_style_input(_name_edit)
+	# Claim only when the player is DONE typing — claiming per keystroke
+	# once registered every prefix of a name as its own player.
 	_name_edit.text_changed.connect(func(text: String) -> void:
 		_profile["name"] = text.strip_edges()
-		Net.save_profile(_profile)
-		if _connected and _current_name_valid():
-			Gateway.send_hello(_profile["name"], _profile["secret"]))
+		Net.save_profile(_profile))
+	_name_edit.text_submitted.connect(func(_text: String) -> void: _claim_now())
+	_name_edit.focus_exited.connect(_claim_now)
 	name_row.add_child(_name_edit)
 	_rank_label = Label.new()
 	_rank_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -636,6 +638,10 @@ func _on_hello_result(ok: bool, reason: String, elo: int, wins: int, losses: int
 	else:
 		_set_status(reason + " — pick another name.")
 		_rank_label.text = ""
+
+func _claim_now() -> void:
+	if _connected and _current_name_valid():
+		Gateway.send_hello(_profile["name"], _profile["secret"])
 
 func _current_name_valid() -> bool:
 	return RegEx.create_from_string(Gateway.NAME_REGEX) \

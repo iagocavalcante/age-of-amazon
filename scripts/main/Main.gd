@@ -401,9 +401,13 @@ func _run_rank_test() -> void:
 	print("[test-rank] persistence ", "OK"
 		if int(Gateway._registry.get("Aracy", {}).get("elo", 0)) == 1016 else "FAILED")
 
+	Gateway.claim_name("Cacau", "secret-c")  # claimed but never played
 	var board: Array = Gateway.leaderboard()
-	print("[test-rank] leaderboard ", "OK"
-		if board.size() == 2 and board[0]["name"] == "Aracy" else "FAILED")
+	var board_ok: bool = board.size() == 2 and board[0]["name"] == "Aracy"
+	print("[test-rank] leaderboard ", "OK" if board_ok else "FAILED")
+	print("[test-rank] unplayed-hidden ", "OK"
+		if not board.any(func(r: Dictionary) -> bool: return r["name"] == "Cacau")
+		else "FAILED")
 	get_tree().quit()
 
 # Prove the HUD input chain: select -> hotkey arms attack-move -> click

@@ -206,13 +206,28 @@ func _probe_match(port: int) -> Dictionary:
 	var parsed: Variant = JSON.parse_string(response.substr(json_start))
 	return parsed if parsed is Dictionary else {}
 
+const UNPLAYED_CLAIM_TTL: int = 7 * 86400  # a week to play or lose the name
+
 func _load_registry() -> void:
 	if not FileAccess.file_exists(RANKING_PATH):
 		return
 	var parsed: Variant = JSON.parse_string(
 		FileAccess.get_file_as_string(RANKING_PATH))
-	if parsed is Dictionary:
-		_registry = parsed
+	if not (parsed is Dictionary):
+		return
+	_registry = parsed
+	var now: int = int(Time.get_unix_time_from_system())
+	var stale: Array = []
+	for display_name: String in _registry:
+		var entry: Dictionary = _registry[display_name]
+		if int(entry["wins"]) + int(entry["losses"]) == 0 \
+				and now - int(entry["last_seen"]) > UNPLAYED_CLAIM_TTL:
+			stale.append(display_name)
+	for display_name: String in stale:
+		_registry.erase(display_name)
+	if not stale.is_empty():
+		_save_registry()
+		print("[gw] purged %d stale unplayed name claims" % stale.size())
 
 func _save_registry() -> void:
 	var file: FileAccess = FileAccess.open(RANKING_PATH, FileAccess.WRITE)
@@ -261,6 +276,9 @@ func leaderboard(limit: int = 50) -> Array:
 	var rows: Array = []
 	for display_name: String in _registry:
 		var entry: Dictionary = _registry[display_name]
+		# A claim only becomes a leaderboard row once it has played.
+		if int(entry["wins"]) + int(entry["losses"]) == 0:
+			continue
 		rows.append({"name": display_name, "elo": entry["elo"],
 			"wins": entry["wins"], "losses": entry["losses"]})
 	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
