@@ -50,6 +50,9 @@ func _ready() -> void:
 		_run_monument_test()
 	if "--test-tactics" in args:
 		_run_tactics_test()
+	if "--test-rank" in args:
+		_run_rank_test()
+		return
 	if "--test-hud" in args:
 		_run_hud_test()
 		return
@@ -149,6 +152,11 @@ func _boot_server(args: PackedStringArray) -> void:
 	var tokens: String = _arg_value(args, "--tokens=")
 	if tokens != "":
 		Net.slot_tokens = tokens.split(",")
+	var names: String = _arg_value(args, "--names=", "")
+	if names != "":
+		Net.player_names = names.split(",")
+	Net.report_port = int(_arg_value(args, "--report-port=", "0"))
+	Net.report_key = _arg_value(args, "--report-key=", "")
 
 	# Harness hook: end the match automatically (tests the rematch flow).
 	var end_after: float = float(_arg_value(args, "--end-after=", "0"))
@@ -182,6 +190,9 @@ func _boot_server(args: PackedStringArray) -> void:
 func _boot_gateway(args: PackedStringArray) -> void:
 	var port: int = int(_arg_value(args, "--port=", "9000"))
 	var base: int = int(_arg_value(args, "--match-port-base=", "9100"))
+	var extra: String = _arg_value(args, "--match-args=", "")
+	if extra != "":
+		Gateway.match_extra_args = extra.split(" ")
 	$EnemyAI.queue_free()
 	$UILayer.queue_free()
 	if Gateway.host(port, base) != OK:
@@ -361,6 +372,40 @@ func _run_build_test() -> void:
 
 # Prove shore fishing: a fish school exists near the shore, a villager can
 # work it, and the catch banks as food.
+# Prove the ranking core: name claims, wrong-secret rejection, Elo motion,
+# report dedupe, and registry persistence across a reload.
+func _run_rank_test() -> void:
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(Gateway.RANKING_PATH))
+	Gateway._registry = {}
+
+	var claim_a: Dictionary = Gateway.claim_name("Aracy", "secret-a")
+	var reclaim: Dictionary = Gateway.claim_name("Aracy", "secret-a")
+	var thief: Dictionary = Gateway.claim_name("Aracy", "secret-x")
+	var bad: Dictionary = Gateway.claim_name("no spaces!", "s")
+	print("[test-rank] claim ", "OK" if claim_a["ok"] and reclaim["ok"] else "FAILED")
+	print("[test-rank] claim-auth ", "OK" if not thief["ok"] and not bad["ok"] else "FAILED")
+
+	Gateway.claim_name("Boto", "secret-b")
+	Gateway.apply_result(PackedStringArray(["Aracy", "Boto"]), 0)
+	var elo_a: int = int(Gateway._registry["Aracy"]["elo"])
+	var elo_b: int = int(Gateway._registry["Boto"]["elo"])
+	print("[test-rank] elo ", "OK" if elo_a == 1016 and elo_b == 984 else "FAILED",
+		" a=", elo_a, " b=", elo_b)
+	var wl_ok: bool = int(Gateway._registry["Aracy"]["wins"]) == 1 \
+		and int(Gateway._registry["Boto"]["losses"]) == 1
+	print("[test-rank] win-loss ", "OK" if wl_ok else "FAILED")
+
+	# Persistence: wipe memory, reload from disk.
+	Gateway._registry = {}
+	Gateway._load_registry()
+	print("[test-rank] persistence ", "OK"
+		if int(Gateway._registry.get("Aracy", {}).get("elo", 0)) == 1016 else "FAILED")
+
+	var board: Array = Gateway.leaderboard()
+	print("[test-rank] leaderboard ", "OK"
+		if board.size() == 2 and board[0]["name"] == "Aracy" else "FAILED")
+	get_tree().quit()
+
 # Prove the HUD input chain: select -> hotkey arms attack-move -> click
 # commands the march -> stop hotkey drops it -> idle finder sees the unit.
 func _run_hud_test() -> void:
@@ -712,8 +757,9 @@ func _run_gw_test(args: PackedStringArray, is_host: bool) -> void:
 	var match_template: String = _arg_value(args, "--match-template=", "ws://127.0.0.1:{port}")
 	var updates: Array = []
 	var ports: Array = []
-	Gateway.room_updated.connect(func(code: String, count: int, slot: int) -> void:
-		updates.append([code, count, slot]))
+	Gateway.room_updated.connect(
+		func(code: String, count: int, slot: int, names: PackedStringArray) -> void:
+			updates.append([code, count, slot, names]))
 	Gateway.match_ready.connect(func(port: int, token: String) -> void:
 		ports.append([port, token]))
 
@@ -726,6 +772,22 @@ func _run_gw_test(args: PackedStringArray, is_host: bool) -> void:
 		print("[test-gw] %s gateway-connect FAILED" % role)
 		get_tree().quit(1)
 		return
+
+	# The lobby requires a claimed name before any room action.
+	var hello: Array = []
+	Gateway.hello_result.connect(
+		func(ok: bool, reason: String, _e: int, _w: int, _l: int) -> void:
+			hello.append([ok, reason]))
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng.randomize()
+	var gw_name: String = ("GwH%05d" if is_host else "GwJ%05d") % rng.randi_range(0, 99999)
+	Gateway.send_hello(gw_name, "%08x%08x" % [rng.randi(), rng.randi()])
+	await _until(func() -> bool: return not hello.is_empty(), 10.0)
+	if hello.is_empty() or not hello[0][0]:
+		print("[test-gw] %s hello FAILED %s" % [role, hello])
+		get_tree().quit(1)
+		return
+	print("[test-gw] %s hello OK name=%s" % [role, gw_name])
 
 	if is_host:
 		Gateway.create_room()

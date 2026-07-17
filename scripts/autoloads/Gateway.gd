@@ -22,9 +22,24 @@ const MATCH_BOOT_GRACE: float = 2.0
 const HEARTBEAT_INTERVAL: float = 40.0
 
 # Client-side signals for the menu UI.
-signal room_updated(code: String, player_count: int, my_slot: int)
+signal room_updated(code: String, player_count: int, my_slot: int, names: PackedStringArray)
 signal match_ready(port: int, token: String)
 signal gateway_error(reason: String)
+signal hello_result(ok: bool, reason: String, elo: int, wins: int, losses: int)
+
+# --- Player ranking (gateway side) ---
+# Accountless identity: first claim of a name stores a hash of the client's
+# secret; later sessions must present the same secret. Ratings are plain
+# Elo, updated ONLY from match-server result reports (localhost + per-match
+# key) — clients never report their own wins.
+const RANKING_PATH: String = "user://ranking.json"
+const ELO_START: int = 1000
+const ELO_K: float = 32.0
+const NAME_REGEX: String = "^[A-Za-z0-9_-]{3,16}$"
+var _registry: Dictionary = {}   # name -> {hash, elo, wins, losses, last_seen}
+var _peer_names: Dictionary = {} # peer_id -> claimed name
+# Extra CLI args forwarded to every spawned match (test harness hook).
+var match_extra_args: PackedStringArray = PackedStringArray()
 
 # Gateway side: code -> {"peers": Array[int], "started": bool}
 var _rooms: Dictionary = {}
@@ -78,7 +93,12 @@ func _poll_health() -> void:
 
 func _respond_http(conn: StreamPeerTCP, request: String) -> void:
 	var body: String
-	if request.contains("/stats"):
+	if request.begins_with("POST /result"):
+		# Match servers on this box report authoritative outcomes here.
+		body = JSON.stringify(_ingest_result(conn, request))
+	elif request.contains("/leaderboard"):
+		body = JSON.stringify({"ok": true, "players": leaderboard()})
+	elif request.contains("/stats"):
 		body = JSON.stringify(_stats())
 	else:
 		body = JSON.stringify({
@@ -131,6 +151,33 @@ func _stats() -> Dictionary:
 		"matches": {"spawned_total": _matches_spawned_total, "live": live},
 	}
 
+# Validate and apply a match-server result report. Only localhost may
+# report, and only with the per-match key the gateway minted at spawn —
+# clients can never reach this path (Caddy does not route /result).
+func _ingest_result(conn: StreamPeerTCP, request: String) -> Dictionary:
+	if conn.get_connected_host() != "127.0.0.1":
+		return {"ok": false, "reason": "not local"}
+	var json_start: int = request.find("{")
+	if json_start < 0:
+		return {"ok": false, "reason": "no body"}
+	var parsed: Variant = JSON.parse_string(request.substr(json_start))
+	if not (parsed is Dictionary):
+		return {"ok": false, "reason": "bad json"}
+	var report: Dictionary = parsed
+	for entry: Dictionary in _spawned_matches:
+		if int(entry["port"]) != int(report.get("port", -1)):
+			continue
+		if entry["report_key"] != String(report.get("key", "")):
+			return {"ok": false, "reason": "bad key"}
+		if entry["reported"]:
+			return {"ok": false, "reason": "already reported"}
+		entry["reported"] = true
+		apply_result(entry["roster"], int(report.get("winner", -1)))
+		print("[gw] result: port %d winner seat %d (%s)" % [
+			entry["port"], int(report.get("winner", -1)), ",".join(entry["roster"])])
+		return {"ok": true}
+	return {"ok": false, "reason": "unknown match"}
+
 # Short blocking probe of a match telemetry sidecar (same box, ~instant).
 func _probe_match(port: int) -> Dictionary:
 	var conn: StreamPeerTCP = StreamPeerTCP.new()
@@ -159,6 +206,67 @@ func _probe_match(port: int) -> Dictionary:
 	var parsed: Variant = JSON.parse_string(response.substr(json_start))
 	return parsed if parsed is Dictionary else {}
 
+func _load_registry() -> void:
+	if not FileAccess.file_exists(RANKING_PATH):
+		return
+	var parsed: Variant = JSON.parse_string(
+		FileAccess.get_file_as_string(RANKING_PATH))
+	if parsed is Dictionary:
+		_registry = parsed
+
+func _save_registry() -> void:
+	var file: FileAccess = FileAccess.open(RANKING_PATH, FileAccess.WRITE)
+	if file != null:
+		file.store_string(JSON.stringify(_registry))
+
+# Claim or re-authenticate a name. Returns {ok, reason}.
+func claim_name(display_name: String, secret: String) -> Dictionary:
+	var regex: RegEx = RegEx.create_from_string(NAME_REGEX)
+	if regex.search(display_name) == null:
+		return {"ok": false, "reason": "names are 3-16 letters, digits, - or _"}
+	var hash_hex: String = secret.sha256_text()
+	if _registry.has(display_name):
+		var entry: Dictionary = _registry[display_name]
+		if entry["hash"] != hash_hex:
+			return {"ok": false, "reason": "name already taken"}
+		entry["last_seen"] = int(Time.get_unix_time_from_system())
+	else:
+		_registry[display_name] = {"hash": hash_hex, "elo": ELO_START,
+			"wins": 0, "losses": 0,
+			"last_seen": int(Time.get_unix_time_from_system())}
+	_save_registry()
+	return {"ok": true, "reason": ""}
+
+# Winner beats every other rostered player, pairwise Elo.
+func apply_result(roster: PackedStringArray, winner_index: int) -> void:
+	if winner_index < 0 or winner_index >= roster.size():
+		return
+	var winner: String = roster[winner_index]
+	if not _registry.has(winner):
+		return
+	for i in range(roster.size()):
+		if i == winner_index or not _registry.has(roster[i]):
+			continue
+		var loser: String = roster[i]
+		var elo_w: float = float(_registry[winner]["elo"])
+		var elo_l: float = float(_registry[loser]["elo"])
+		var expected_w: float = 1.0 / (1.0 + pow(10.0, (elo_l - elo_w) / 400.0))
+		_registry[winner]["elo"] = int(round(elo_w + ELO_K * (1.0 - expected_w)))
+		_registry[loser]["elo"] = int(round(elo_l - ELO_K * (1.0 - expected_w)))
+		_registry[loser]["losses"] = int(_registry[loser]["losses"]) + 1
+	_registry[winner]["wins"] = int(_registry[winner]["wins"]) + 1
+	_save_registry()
+
+func leaderboard(limit: int = 50) -> Array:
+	var rows: Array = []
+	for display_name: String in _registry:
+		var entry: Dictionary = _registry[display_name]
+		rows.append({"name": display_name, "elo": entry["elo"],
+			"wins": entry["wins"], "losses": entry["losses"]})
+	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return int(a["elo"]) > int(b["elo"]))
+	return rows.slice(0, limit)
+
 @rpc("authority", "call_remote", "reliable")
 func _ping() -> void:
 	# Client side: answer so every proxy hop sees two-way traffic.
@@ -168,9 +276,13 @@ func _ping() -> void:
 func _pong() -> void:
 	pass
 
+var _listen_port: int = 9000
+
 func host(port: int, match_port_base: int) -> Error:
 	_rng.randomize()
+	_listen_port = port
 	_next_match_port = match_port_base
+	_load_registry()
 	var peer := WebSocketMultiplayerPeer.new()
 	Net._configure_ws(peer)
 	var err: Error = peer.create_server(port)
@@ -198,6 +310,9 @@ func connect_to_gateway(url: String) -> Error:
 	multiplayer.multiplayer_peer = peer
 	return OK
 
+func send_hello(display_name: String, secret: String) -> void:
+	_hello.rpc_id(1, display_name, secret, Net.PROTOCOL_VERSION)
+
 func create_room() -> void:
 	_create_room.rpc_id(1, Net.PROTOCOL_VERSION)
 
@@ -210,11 +325,29 @@ func start_match() -> void:
 # --- Gateway side ---
 
 @rpc("any_peer", "call_remote", "reliable")
+func _hello(display_name: String, secret: String, proto_version: int = 0) -> void:
+	if Net.mode != Net.Mode.GATEWAY:
+		return
+	var sender: int = multiplayer.get_remote_sender_id()
+	if not _version_ok(sender, proto_version):
+		return
+	var result: Dictionary = claim_name(display_name, secret)
+	if result["ok"]:
+		_peer_names[sender] = display_name
+		var entry: Dictionary = _registry[display_name]
+		_hello_result.rpc_id(sender, true, "", entry["elo"], entry["wins"], entry["losses"])
+	else:
+		_hello_result.rpc_id(sender, false, result["reason"], 0, 0, 0)
+
+@rpc("any_peer", "call_remote", "reliable")
 func _create_room(proto_version: int = 0) -> void:
 	if Net.mode != Net.Mode.GATEWAY:
 		return
 	var sender: int = multiplayer.get_remote_sender_id()
 	if not _version_ok(sender, proto_version):
+		return
+	if not _peer_names.has(sender):
+		_error.rpc_id(sender, "claim a player name first")
 		return
 	_leave_current_room(sender)
 	var code: String = _new_code()
@@ -229,6 +362,9 @@ func _join_room(code: String, proto_version: int = 0) -> void:
 		return
 	var sender: int = multiplayer.get_remote_sender_id()
 	if not _version_ok(sender, proto_version):
+		return
+	if not _peer_names.has(sender):
+		_error.rpc_id(sender, "claim a player name first")
 		return
 	if not _rooms.has(code):
 		_error.rpc_id(sender, "room %s not found" % code)
@@ -273,12 +409,17 @@ func _start_match() -> void:
 	var tokens: PackedStringArray = PackedStringArray()
 	for _i in range(room["peers"].size()):
 		tokens.append("%08x%08x" % [_rng.randi(), _rng.randi()])
-	var pid: int = _spawn_match(port, match_seed, tokens)
+	var roster: PackedStringArray = PackedStringArray()
+	for peer: int in room["peers"]:
+		roster.append(_peer_names.get(peer, "?"))
+	var report_key: String = "%08x%08x" % [_rng.randi(), _rng.randi()]
+	var pid: int = _spawn_match(port, match_seed, tokens, roster, report_key)
 	if pid < 0:
 		room["started"] = false
 		_error.rpc_id(sender, "could not start match server")
 		return
-	_spawned_matches.append({"port": port, "started_msec": Time.get_ticks_msec()})
+	_spawned_matches.append({"port": port, "started_msec": Time.get_ticks_msec(),
+		"roster": roster, "report_key": report_key, "reported": false})
 	_matches_spawned_total += 1
 	print("[gw] room %s -> match on port %d (pid %d, %d players)" % [
 		code, port, pid, room["peers"].size()])
@@ -288,15 +429,25 @@ func _start_match() -> void:
 	for i in range(room["peers"].size()):
 		_match_ready.rpc_id(room["peers"][i], port, tokens[i])
 
-func _spawn_match(port: int, match_seed: int, tokens: PackedStringArray) -> int:
+func _spawn_match(port: int, match_seed: int, tokens: PackedStringArray,
+		roster: PackedStringArray, report_key: String) -> int:
 	var exe: String = OS.get_executable_path()
 	var args: PackedStringArray = ["--headless"]
 	if OS.has_feature("editor"):
 		args.append_array(["--path", ProjectSettings.globalize_path("res://")])
 	args.append_array(["++", "--server", "--port=%d" % port,
 		"--players=%d" % tokens.size(), "--seed=%d" % match_seed,
-		"--tokens=%s" % ",".join(tokens)])
+		"--tokens=%s" % ",".join(tokens),
+		"--names=%s" % ",".join(roster),
+		"--report-port=%d" % _health_port(),
+		"--report-key=%s" % report_key])
+	args.append_array(match_extra_args)
 	return OS.create_process(exe, args)
+
+func _health_port() -> int:
+	# The result-report listener is the health/stats server.
+	return _listen_port + 1
+
 
 func _version_ok(sender: int, proto_version: int) -> bool:
 	if proto_version == Net.PROTOCOL_VERSION:
@@ -322,8 +473,11 @@ func _leave_current_room(peer_id: int) -> void:
 
 func _broadcast_room(code: String) -> void:
 	var peers: Array = _rooms[code]["peers"]
+	var names: PackedStringArray = PackedStringArray()
+	for peer: int in peers:
+		names.append(_peer_names.get(peer, "?"))
 	for i in range(peers.size()):
-		_room_update.rpc_id(peers[i], code, peers.size(), i)
+		_room_update.rpc_id(peers[i], code, peers.size(), i, names)
 
 func _new_code() -> String:
 	while true:
@@ -337,8 +491,13 @@ func _new_code() -> String:
 # --- Client side ---
 
 @rpc("authority", "call_remote", "reliable")
-func _room_update(code: String, player_count: int, my_slot: int) -> void:
-	room_updated.emit(code, player_count, my_slot)
+func _room_update(code: String, player_count: int, my_slot: int,
+		names: PackedStringArray = PackedStringArray()) -> void:
+	room_updated.emit(code, player_count, my_slot, names)
+
+@rpc("authority", "call_remote", "reliable")
+func _hello_result(ok: bool, reason: String, elo: int, wins: int, losses: int) -> void:
+	hello_result.emit(ok, reason, elo, wins, losses)
 
 @rpc("authority", "call_remote", "reliable")
 func _match_ready(port: int, token: String) -> void:

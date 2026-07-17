@@ -12,6 +12,7 @@ DIR="$(mktemp -d)"
 cd "$(dirname "$0")/.."
 
 "$GODOT" --headless --path . ++ --gateway --port=$GW_PORT --match-port-base=$MATCH_BASE \
+  "--match-args=--end-after=45" \
   > "$DIR/gateway.log" 2>&1 &
 GW_PID=$!
 cleanup() {
@@ -91,6 +92,24 @@ if ! grep -q "rejoin-takeover OK" "$DIR/host.log"; then
 fi
 if [ "$MATCH_SEEN" -ne 1 ]; then
   echo "RESULT: INCOMPLETE (/stats never reported the live match; logs in $DIR)"
+  exit 1
+fi
+
+# Ranking E2E: the match self-ends (--end-after via --match-args), the match
+# server reports the winner to the gateway, and the leaderboard must move.
+HOST_NAME=$(grep -o "hello OK name=GwH[0-9]*" "$DIR/host.log" | head -1 | cut -d= -f2)
+RANKED=0
+for _ in $(seq 1 50); do
+  BOARD=$(curl -sf -m 5 "http://127.0.0.1:$((GW_PORT + 1))/leaderboard" || true)
+  if echo "$BOARD" | grep -q "\"name\":\"$HOST_NAME\",\"wins\":1"; then
+    RANKED=1
+    echo "leaderboard: $BOARD"
+    break
+  fi
+  sleep 2
+done
+if [ "$RANKED" -ne 1 ]; then
+  echo "RESULT: FAILED (winner never appeared on the leaderboard; logs in $DIR)"
   exit 1
 fi
 echo "RESULT: OK"

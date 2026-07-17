@@ -48,6 +48,11 @@ var _room_code: String = ""
 var _footer: Label
 var _connected: bool = false
 var _pending_action: Callable = Callable()
+var _name_edit: LineEdit
+var _rank_label: Label
+var _board_panel: PanelContainer
+var _board_label: Label
+var _profile: Dictionary = {}
 
 func _ready() -> void:
 	if _should_skip_menu(OS.get_cmdline_user_args()):
@@ -59,6 +64,7 @@ func _ready() -> void:
 	_build_ui()
 
 	Gateway.room_updated.connect(_on_room_updated)
+	Gateway.hello_result.connect(_on_hello_result)
 	Gateway.match_ready.connect(_on_match_ready)
 	Gateway.gateway_error.connect(_on_gateway_error)
 	multiplayer.connected_to_server.connect(_on_gateway_connected)
@@ -337,6 +343,32 @@ func _build_friends_page(parent: Control) -> void:
 	back_row.add_child(heading)
 	back_row.add_child(_spacer_h(52))
 
+	_profile = Net.load_profile()
+	var name_row: HBoxContainer = HBoxContainer.new()
+	name_row.add_theme_constant_override("separation", 8)
+	_friends_page.add_child(name_row)
+	var name_label: Label = Label.new()
+	name_label.text = "your name"
+	name_label.add_theme_font_size_override("font_size", 11)
+	name_label.add_theme_color_override("font_color", COLOR_TEXT_DIM)
+	name_row.add_child(name_label)
+	_name_edit = LineEdit.new()
+	_name_edit.text = _profile["name"]
+	_name_edit.max_length = 16
+	_name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_style_input(_name_edit)
+	_name_edit.text_changed.connect(func(text: String) -> void:
+		_profile["name"] = text.strip_edges()
+		Net.save_profile(_profile)
+		if _connected and _current_name_valid():
+			Gateway.send_hello(_profile["name"], _profile["secret"]))
+	name_row.add_child(_name_edit)
+	_rank_label = Label.new()
+	_rank_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_rank_label.add_theme_font_size_override("font_size", 11)
+	_rank_label.add_theme_color_override("font_color", COLOR_TEXT_DIM)
+	_friends_page.add_child(_rank_label)
+
 	var create: Button = _primary_button("Create a Room")
 	create.pressed.connect(func() -> void: _gateway_action(Gateway.create_room))
 	_friends_page.add_child(create)
@@ -427,6 +459,66 @@ func _build_friends_page(parent: Control) -> void:
 	_style_input(_url_edit)
 	_url_edit.modulate = Color(1, 1, 1, 0.45)
 	server_row.add_child(_url_edit)
+
+	var board_button: Button = _text_button("leaderboard")
+	board_button.pressed.connect(_fetch_leaderboard)
+	_friends_page.add_child(board_button)
+	_board_panel = PanelContainer.new()
+	var board_style: StyleBoxFlat = StyleBoxFlat.new()
+	board_style.bg_color = Color(0.05, 0.09, 0.06, 0.85)
+	board_style.border_color = Color(0.25, 0.35, 0.22, 0.9)
+	board_style.set_border_width_all(1)
+	board_style.set_corner_radius_all(6)
+	board_style.set_content_margin_all(12)
+	_board_panel.add_theme_stylebox_override("panel", board_style)
+	_board_panel.visible = false
+	_friends_page.add_child(_board_panel)
+	_board_label = Label.new()
+	_board_label.add_theme_font_size_override("font_size", 12)
+	_board_label.add_theme_color_override("font_color", COLOR_TEXT)
+	_board_panel.add_child(_board_label)
+
+func _leaderboard_url() -> String:
+	# wss://host/ws -> https://host/leaderboard (Caddy route);
+	# ws://host:9000 -> http://host:9001/leaderboard (dev, health port).
+	var ws_url: String = _url_edit.text.strip_edges()
+	if ws_url.begins_with("wss://"):
+		return "https://" + ws_url.trim_prefix("wss://").get_slice("/", 0) + "/leaderboard"
+	var host_port: String = ws_url.trim_prefix("ws://").get_slice("/", 0)
+	var host: String = host_port.get_slice(":", 0)
+	var port: int = int(host_port.get_slice(":", 1)) if host_port.contains(":") else 9000
+	return "http://%s:%d/leaderboard" % [host, port + 1]
+
+func _fetch_leaderboard() -> void:
+	var request: HTTPRequest = HTTPRequest.new()
+	add_child(request)
+	request.request_completed.connect(
+		func(_result: int, code: int, _headers: PackedStringArray, response: PackedByteArray) -> void:
+			request.queue_free()
+			_show_leaderboard(code, response))
+	if request.request(_leaderboard_url()) != OK:
+		request.queue_free()
+		_set_status("Could not reach the leaderboard.")
+
+func _show_leaderboard(code: int, response: PackedByteArray) -> void:
+	if code != 200:
+		_set_status("Could not reach the leaderboard.")
+		return
+	var parsed: Variant = JSON.parse_string(response.get_string_from_utf8())
+	if not (parsed is Dictionary) or not parsed.get("ok", false):
+		_set_status("Could not reach the leaderboard.")
+		return
+	var rows: Array = parsed["players"]
+	if rows.is_empty():
+		_board_label.text = "No ranked players yet — win a match!"
+	else:
+		var lines: Array[String] = []
+		for i in range(mini(rows.size(), 10)):
+			var row: Dictionary = rows[i]
+			lines.append("%2d.  %-16s  %4d elo   %dW %dL" % [i + 1,
+				row["name"], int(row["elo"]), int(row["wins"]), int(row["losses"])])
+		_board_label.text = "\n".join(lines)
+	_board_panel.visible = true
 
 func _show_friends(show_friends: bool) -> void:
 	_friends_page.visible = show_friends
@@ -530,9 +622,24 @@ func _gateway_action(action: Callable) -> void:
 
 func _on_gateway_connected() -> void:
 	_connected = true
+	# Claim the player name first; RPCs are ordered, so the queued room
+	# action lands after the claim is processed.
+	Gateway.send_hello(_profile["name"], _profile["secret"])
 	if _pending_action.is_valid():
 		_pending_action.call()
 		_pending_action = Callable()
+
+func _on_hello_result(ok: bool, reason: String, elo: int, wins: int, losses: int) -> void:
+	if ok:
+		_rank_label.text = "%s  ·  %d elo  ·  %dW %dL" % [
+			_profile["name"], elo, wins, losses]
+	else:
+		_set_status(reason + " — pick another name.")
+		_rank_label.text = ""
+
+func _current_name_valid() -> bool:
+	return RegEx.create_from_string(Gateway.NAME_REGEX) \
+		.search(_name_edit.text.strip_edges()) != null
 
 func _invite_link(code: String) -> String:
 	var base: String = FALLBACK_SHARE_URL
@@ -543,11 +650,14 @@ func _invite_link(code: String) -> String:
 			base = String(origin)
 	return "%s?room=%s" % [base, code]
 
-func _on_room_updated(code: String, player_count: int, my_slot: int) -> void:
+func _on_room_updated(code: String, player_count: int, my_slot: int,
+		names: PackedStringArray = PackedStringArray()) -> void:
 	_room_code = code
 	_invite_edit.text = _invite_link(code)
 	_lobby_panel.visible = true
 	_lobby_label.text = "ROOM %s  —  %d/%d PLAYERS" % [code, player_count, Gateway.MAX_PLAYERS]
+	if not names.is_empty():
+		_lobby_label.text += "\n" + " · ".join(names)
 	_start_button.visible = my_slot == 0
 	_start_button.disabled = player_count < Gateway.MIN_PLAYERS
 	if my_slot == 0:

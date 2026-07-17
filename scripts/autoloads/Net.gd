@@ -15,7 +15,7 @@ enum Mode { OFFLINE, SERVER, CLIENT, GATEWAY }
 # a stale build get a clear "refresh" error instead of silently dropped RPCs
 # (an argument-count mismatch makes Godot discard the call without a trace —
 # this bit us in production between two builds of the lobby protocol).
-const PROTOCOL_VERSION: int = 6
+const PROTOCOL_VERSION: int = 7
 
 signal match_config_received
 signal join_refused(reason: String)
@@ -121,14 +121,73 @@ var pending_token: String = ""
 # Server: token per tribe slot (from --tokens=). Empty = open seating, which
 # direct --server runs (dev, harnesses) rely on.
 var slot_tokens: PackedStringArray = PackedStringArray()
+# Seat-indexed display names (from --names= on servers, from the match
+# config on clients). Empty on direct/dev matches.
+var player_names: PackedStringArray = PackedStringArray()
+# Server: where and how to report the authoritative result (gateway-spawned
+# matches only).
+var report_port: int = 0
+var report_key: String = ""
+var _result_reported: bool = false
+
+# --- Client profile (accountless identity for the ranking) ---
+const PROFILE_PATH: String = "user://profile.json"
+
+func load_profile() -> Dictionary:
+	if FileAccess.file_exists(PROFILE_PATH):
+		var parsed: Variant = JSON.parse_string(
+			FileAccess.get_file_as_string(PROFILE_PATH))
+		if parsed is Dictionary and parsed.has("name") and parsed.has("secret"):
+			return parsed
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng.randomize()
+	var profile: Dictionary = {
+		"name": "Chief%04d" % rng.randi_range(0, 9999),
+		"secret": "%08x%08x%08x%08x" % [rng.randi(), rng.randi(), rng.randi(), rng.randi()],
+	}
+	save_profile(profile)
+	return profile
+
+func save_profile(profile: Dictionary) -> void:
+	var file: FileAccess = FileAccess.open(PROFILE_PATH, FileAccess.WRITE)
+	if file != null:
+		file.store_string(JSON.stringify(profile))
 
 func _ready() -> void:
 	multiplayer.server_disconnected.connect(_on_server_disconnected)
 	multiplayer.connection_failed.connect(_on_connection_failed)
 	# A finished match can't be rejoined — drop the persisted seat.
-	EventBus.game_over.connect(func(_winner: int) -> void:
+	EventBus.game_over.connect(func(winner: int) -> void:
 		if mode == Mode.CLIENT:
-			clear_seat())
+			clear_seat()
+		elif mode == Mode.SERVER:
+			_report_result(winner))
+
+# Push the authoritative outcome to the gateway on this box. Fire-and-forget
+# with a short blocking wait — the match is over, nothing is latency-bound.
+func _report_result(winner: int) -> void:
+	if report_port <= 0 or _result_reported:
+		return
+	_result_reported = true
+	var conn: StreamPeerTCP = StreamPeerTCP.new()
+	if conn.connect_to_host("127.0.0.1", report_port) != OK:
+		return
+	var waited: int = 0
+	while conn.get_status() == StreamPeerTCP.STATUS_CONNECTING and waited < 1000:
+		OS.delay_msec(20)
+		waited += 20
+		conn.poll()
+	if conn.get_status() != StreamPeerTCP.STATUS_CONNECTED:
+		push_warning("[net] could not reach gateway to report result")
+		return
+	var body: String = JSON.stringify({"port": listen_port, "winner": winner,
+		"key": report_key})
+	conn.put_data(("POST /result HTTP/1.1\r\nContent-Length: %d\r\n\r\n%s" % [
+		body.length(), body]).to_utf8_buffer())
+	conn.poll()
+	OS.delay_msec(100)
+	conn.disconnect_from_host()
+	print("[net] reported winner seat %d to gateway" % winner)
 
 # Tear down all match/connection state and return this process to a clean
 # offline baseline. The single exit path for every way a match can end.
@@ -240,6 +299,8 @@ static func _configure_ws(peer: WebSocketMultiplayerPeer) -> void:
 	peer.outbound_buffer_size = 256 * 1024
 	peer.max_queued_packets = 4096
 
+var listen_port: int = 0
+
 func host(port: int, players: int) -> Error:
 	var peer := WebSocketMultiplayerPeer.new()
 	_configure_ws(peer)
@@ -248,6 +309,7 @@ func host(port: int, players: int) -> Error:
 		return err
 	multiplayer.multiplayer_peer = peer
 	mode = Mode.SERVER
+	listen_port = port
 	expected_players = players
 	if not multiplayer.peer_disconnected.is_connected(_on_peer_disconnected):
 		multiplayer.peer_disconnected.connect(_on_peer_disconnected)
@@ -314,7 +376,8 @@ func _client_hello(proto_version: int, token: String = "") -> void:
 					multiplayer.multiplayer_peer.disconnect_peer(old_peer)
 	peer_players[sender] = slot
 	print("[net] player %d joined (peer %d)" % [slot, sender])
-	_match_config.rpc_id(sender, GameManager.map_seed, expected_players, slot)
+	_match_config.rpc_id(sender, GameManager.map_seed, expected_players, slot,
+		player_names)
 
 # Refuse a hello and then actively drop the connection (after a beat so the
 # refusal RPC flushes first) — refused peers don't get to linger.
@@ -332,11 +395,20 @@ func _lowest_free_slot() -> int:
 	return -1
 
 @rpc("authority", "call_remote", "reliable")
-func _match_config(map_seed: int, player_count: int, my_player_id: int) -> void:
+func _match_config(map_seed: int, player_count: int, my_player_id: int,
+		names: PackedStringArray = PackedStringArray()) -> void:
 	GameManager.map_seed = map_seed
 	GameManager.reset_players(player_count)
 	GameManager.local_player_id = my_player_id
+	player_names = names
 	match_config_received.emit()
+
+# "TribeName" for players with claimed names, "Tribe N" otherwise.
+func display_name_of(player_id: int) -> String:
+	if player_id >= 0 and player_id < player_names.size() \
+			and player_names[player_id] != "?":
+		return player_names[player_id]
+	return "Tribe %d" % (player_id + 1)
 
 @rpc("authority", "call_remote", "reliable")
 func _refuse(reason: String) -> void:

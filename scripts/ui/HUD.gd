@@ -742,7 +742,12 @@ func _build_game_over() -> void:
 
 func _on_game_over(winner_player_id: int) -> void:
 	get_tree().paused = true
-	_game_over_label.text = "Victory!" if winner_player_id == GameManager.local_player_id else "Defeat"
+	if winner_player_id == GameManager.local_player_id:
+		_game_over_label.text = "Victory!"
+	elif Net.mode == Net.Mode.CLIENT and not Net.player_names.is_empty():
+		_game_over_label.text = "%s wins" % Net.display_name_of(winner_player_id)
+	else:
+		_game_over_label.text = "Defeat"
 	_restart_button.text = "Back to Menu" if Net.mode == Net.Mode.CLIENT else "Play Again"
 	_rematch_button.visible = Net.mode == Net.Mode.CLIENT
 	_rematch_button.disabled = false
