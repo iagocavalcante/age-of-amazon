@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://d3o2s4if13lop"
-path="res://.godot/imported/ipad129_2_world.png-80c8d52ed9fbea00af0b223755d72e36.ctex"
+uid="uid://doq27ckxf62tk"
+path="res://.godot/imported/tree_kapok.png-077b3564e66494ff1bb27e8a4659b593.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://docs/store/screenshots/ipad129_2_world.png"
-dest_files=["res://.godot/imported/ipad129_2_world.png-80c8d52ed9fbea00af0b223755d72e36.ctex"]
+source_file="res://assets/sprites/tree_kapok.png"
+dest_files=["res://.godot/imported/tree_kapok.png-077b3564e66494ff1bb27e8a4659b593.ctex"]
 
 [params]
 

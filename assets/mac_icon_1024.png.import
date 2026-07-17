@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://blsjii66agur5"
-path="res://.godot/imported/iphone67_2_battle.png-27d3e933b96d1c6faa5efdcd60aa4a20.ctex"
+uid="uid://pt1lxhjexylp"
+path="res://.godot/imported/mac_icon_1024.png-d77c458ee0081e2df0205e39909d4250.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://docs/store/screenshots/iphone67_2_battle.png"
-dest_files=["res://.godot/imported/iphone67_2_battle.png-27d3e933b96d1c6faa5efdcd60aa4a20.ctex"]
+source_file="res://assets/mac_icon_1024.png"
+dest_files=["res://.godot/imported/mac_icon_1024.png-d77c458ee0081e2df0205e39909d4250.ctex"]
 
 [params]
 

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://kuhytp13iowb"
-path="res://.godot/imported/iphone67_3_world.png-146fafb12d6a95772e6e441b36f2c500.ctex"
+uid="uid://cqwltduiaic2l"
+path="res://.godot/imported/mac_1_command.png-13d113a7a8185ecdf4b5669dfb75b241.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://docs/store/screenshots/iphone67_3_world.png"
-dest_files=["res://.godot/imported/iphone67_3_world.png-146fafb12d6a95772e6e441b36f2c500.ctex"]
+source_file="res://docs/store/screenshots/mac_1_command.png"
+dest_files=["res://.godot/imported/mac_1_command.png-13d113a7a8185ecdf4b5669dfb75b241.ctex"]
 
 [params]
 

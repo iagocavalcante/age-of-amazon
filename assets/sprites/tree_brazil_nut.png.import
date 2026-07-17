@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bc0jmw4ev2m8o"
-path="res://.godot/imported/iphone67_1_command.png-2fe4c3ff7e00ffb95a16a4f8847d7290.ctex"
+uid="uid://b2e463e5g5mvl"
+path="res://.godot/imported/tree_brazil_nut.png-2d2932d34fb6ad7fe883c1c007096271.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://docs/store/screenshots/iphone67_1_command.png"
-dest_files=["res://.godot/imported/iphone67_1_command.png-2fe4c3ff7e00ffb95a16a4f8847d7290.ctex"]
+source_file="res://assets/sprites/tree_brazil_nut.png"
+dest_files=["res://.godot/imported/tree_brazil_nut.png-2d2932d34fb6ad7fe883c1c007096271.ctex"]
 
 [params]
 
