@@ -116,6 +116,11 @@ func _should_skip_menu(args: PackedStringArray) -> bool:
 	return false
 
 func _load_config() -> void:
+	# Desktop builds ship without the web deploy's server_config.json —
+	# point them at the production gateway instead of localhost.
+	if not OS.has_feature("web"):
+		_gateway_url = "wss://game.iagocavalcante.com/ws"
+		_match_url_template = "wss://game.iagocavalcante.com/m/{port}"
 	if not FileAccess.file_exists(CONFIG_PATH):
 		return
 	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(CONFIG_PATH))
