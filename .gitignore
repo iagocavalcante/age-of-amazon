@@ -8,3 +8,4 @@
 .admin_credentials
 build/*
 !build/.gdignore
+certs/

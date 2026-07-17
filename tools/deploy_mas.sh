@@ -9,5 +9,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 GODOT="${GODOT:-/Applications/Godot.app/Contents/MacOS/Godot}"
 mkdir -p build/mas
+if [ ! -f certs/aoa_mas.provisionprofile ]; then
+  echo "MISSING certs/aoa_mas.provisionprofile — create a Mac App Store"
+  echo "provisioning profile at developer.apple.com (see docs/store/mac-metadata.md §1)."
+  exit 1
+fi
 "$GODOT" --headless --path . --export-release "macOS App Store" build/mas/AgeOfAmazon.pkg
 echo "BUILT build/mas/AgeOfAmazon.pkg ($(git rev-parse --short HEAD)) — upload with Transporter or altool"

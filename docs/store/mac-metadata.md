@@ -92,6 +92,10 @@ identity names pre-filled.
    certificates if they don't exist yet (the preset's identity strings
    must match the certificate names — adjust if Xcode names them
    "Apple Distribution: …" instead of "3rd Party Mac Developer …").
+   Then at developer.apple.com → Profiles: create a **Mac App Store**
+   provisioning profile for `com.iagocavalcante.ageofamazon` and save it
+   as `certs/aoa_mas.provisionprofile` in the repo (gitignored — the
+   preset points there).
 2. `bash tools/deploy_mas.sh` → produces signed `build/mas/AgeOfAmazon.pkg`.
 3. Upload: `xcrun altool --upload-app -f build/mas/AgeOfAmazon.pkg -t macos`
    (or drag the pkg into the Transporter app) — signs in with YOUR
