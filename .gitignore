@@ -1,8 +1,10 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
-/build/
+/build/*
 .DS_Store
 .token
 .sprite_raws/
 .admin_credentials
+build/*
+!build/.gdignore
