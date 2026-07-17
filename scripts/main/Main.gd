@@ -946,6 +946,7 @@ func _run_scout_test() -> void:
 	var ai: Node = $EnemyAI
 	ai.scout_interval = 2.0
 	ai.wave_interval = 8.0
+	ai.wave_grace = 0.0
 	print("[test-scout] accelerated AI; waiting for discovery")
 
 	var elapsed: int = 0

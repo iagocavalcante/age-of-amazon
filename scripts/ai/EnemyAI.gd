@@ -22,12 +22,20 @@ var max_military: int = 8
 var archer_ratio: float = 0.3
 var builds: bool = true
 
+# Tuned 2026-07-17 after player feedback that normal was brutal: the AI's
+# trickle is a faucet economy the player cannot raid, so it must stay well
+# below what a real villager line produces. "grace" holds the first wave
+# back long enough to establish an economy; "wave_size" caps how many
+# warriors leave home at once (hard sends everyone).
 const DIFFICULTY_PRESETS: Dictionary = {
-	"easy": {"wave": 110.0, "max": 5, "archers": 0.0, "builds": false,
+	"easy": {"wave": 130.0, "max": 4, "archers": 0.0, "builds": false,
+		"grace": 300.0, "wave_size": 3,
+		"trickle": {Constants.ResourceType.FOOD: 1, Constants.ResourceType.WOOD: 1}},
+	"normal": {"wave": 95.0, "max": 6, "archers": 0.2, "builds": true,
+		"grace": 210.0, "wave_size": 5,
 		"trickle": {Constants.ResourceType.FOOD: 2, Constants.ResourceType.WOOD: 1}},
-	"normal": {"wave": 75.0, "max": 8, "archers": 0.3, "builds": true,
-		"trickle": {Constants.ResourceType.FOOD: 3, Constants.ResourceType.WOOD: 2}},
 	"hard": {"wave": 55.0, "max": 14, "archers": 0.4, "builds": true,
+		"grace": 60.0, "wave_size": 999,
 		"trickle": {Constants.ResourceType.FOOD: 5, Constants.ResourceType.WOOD: 3}},
 }
 const SCOUT_DISTANCE_STEP: int = 12
@@ -38,6 +46,9 @@ const HUNT_RANGE_TILES: int = 26
 @export var wave_interval: float = 75.0
 @export var scout_interval: float = 18.0
 @export var hunt_interval: float = 22.0
+@export var wave_grace: float = 210.0  # no waves before this game time
+var wave_size: int = 5
+var _elapsed: float = 0.0
 
 var trickle: Dictionary = {
 	Constants.ResourceType.FOOD: 3,
@@ -62,6 +73,8 @@ func _ready() -> void:
 	archer_ratio = preset["archers"]
 	builds = preset["builds"]
 	trickle = preset["trickle"]
+	wave_grace = preset["grace"]
+	wave_size = preset["wave_size"]
 
 func _process(delta: float) -> void:
 	if GameManager.state != GameManager.GameState.RUNNING:
@@ -73,6 +86,7 @@ func _process(delta: float) -> void:
 	_wave_accum += TICK_INTERVAL
 	_scout_accum += TICK_INTERVAL
 	_hunt_accum += TICK_INTERVAL
+	_elapsed += TICK_INTERVAL
 	_tick()
 
 func _tick() -> void:
@@ -122,13 +136,14 @@ func _tick() -> void:
 			_send_scout(tc, warriors)
 		return
 
-	if _wave_accum >= wave_interval:
+	if _elapsed >= wave_grace and _wave_accum >= wave_interval:
 		var idle: Array[UnitBase] = _idle_of(warriors)
 		if idle.size() >= WAVE_MIN_WARRIORS:
 			_wave_accum = 0.0
 			CommandRouter.submit({
 				"type": "attack", "player_id": ENEMY_ID,
-				"actor_names": _names_of(idle), "target_name": String(target.name),
+				"actor_names": _names_of(idle.slice(0, wave_size)),
+				"target_name": String(target.name),
 			})
 
 func _advance_sites() -> void:
