@@ -15,6 +15,10 @@ var selection_rect: Rect2 = Rect2()
 var placing_type: String = ""
 var _ghost: Sprite2D = null
 
+# Attack-move arming: the HUD button arms it; the next click on the map is
+# the destination (shift+right-click stays as the power-user shortcut).
+var attack_move_armed: bool = false
+
 # Touch tracking: taps select, drags are camera pans (handled by GameCamera).
 var _touch_start: Dictionary = {}
 var _touch_moved: Dictionary = {}
@@ -24,6 +28,18 @@ func _unhandled_input(event: InputEvent) -> void:
 	if placing_type != "":
 		_placement_input(event)
 		return
+
+	if attack_move_armed:
+		if event is InputEventKey and (event as InputEventKey).pressed \
+				and (event as InputEventKey).keycode == KEY_ESCAPE:
+			disarm_attack_move()
+			return
+		if event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
+			var amb := event as InputEventMouseButton
+			if amb.button_index == MOUSE_BUTTON_LEFT:
+				_attack_move_at(amb.position)
+			disarm_attack_move()
+			return
 
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
@@ -201,11 +217,7 @@ func _command_at(screen_pos: Vector2) -> void:
 
 	# Shift + right-click: attack-move — march there, engaging on the way.
 	if Input.is_key_pressed(KEY_SHIFT):
-		CommandRouter.submit({
-			"type": "attack_move", "player_id": GameManager.local_player_id,
-			"actor_names": names, "target": world_pos,
-		})
-		EventBus.units_commanded_move.emit(selected_units, world_pos)
+		_attack_move_at(screen_pos)
 		return
 
 	# A friendly site or damaged building under the cursor: build / repair.
@@ -333,8 +345,36 @@ func _set_rally(screen_pos: Vector2) -> void:
 	WorkFx.float_text(get_tree().current_scene,
 		Constants.grid_to_world(cell.x, cell.y), "rally point", Color(0.6, 0.95, 0.75))
 
+func _attack_move_at(screen_pos: Vector2) -> void:
+	selected_units.assign(selected_units.filter(is_instance_valid))
+	if selected_units.is_empty():
+		return
+	var world_pos: Vector2 = _screen_to_world(screen_pos)
+	CommandRouter.submit({
+		"type": "attack_move", "player_id": GameManager.local_player_id,
+		"actor_names": selected_units.map(
+			func(u: Node2D) -> String: return String(u.name)),
+		"target": world_pos,
+	})
+	EventBus.units_commanded_move.emit(selected_units, world_pos)
+
+func arm_attack_move() -> void:
+	if selected_units.filter(is_instance_valid).is_empty():
+		return
+	attack_move_armed = true
+	Input.set_default_cursor_shape(Input.CURSOR_CROSS)
+
+func disarm_attack_move() -> void:
+	attack_move_armed = false
+	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
+
+func select_only(unit: Node2D) -> void:
+	_deselect_all()
+	_select_unit(unit)
+
 func clear_selection() -> void:
 	_deselect_all()
+	disarm_attack_move()
 
 func _deselect_all() -> void:
 	for unit: Node2D in selected_units:

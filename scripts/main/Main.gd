@@ -50,6 +50,9 @@ func _ready() -> void:
 		_run_monument_test()
 	if "--test-tactics" in args:
 		_run_tactics_test()
+	if "--test-hud" in args:
+		_run_hud_test()
+		return
 	if "--test-fruit" in args:
 		_run_fruit_test()
 		return
@@ -358,6 +361,59 @@ func _run_build_test() -> void:
 
 # Prove shore fishing: a fish school exists near the shore, a villager can
 # work it, and the catch banks as food.
+# Prove the HUD input chain: select -> hotkey arms attack-move -> click
+# commands the march -> stop hotkey drops it -> idle finder sees the unit.
+func _run_hud_test() -> void:
+	await get_tree().create_timer(0.5).timeout
+	var hud: Control = $UILayer/HUD
+	var villagers: Array = get_tree().get_nodes_in_group("player_0").filter(
+		func(n: Node) -> bool: return n is UnitBase and (n as UnitBase).can_gather)
+	var unit: UnitBase = villagers[0]
+	SelectionManager.select_only(unit)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	print("[test-hud] panel-shown ", "OK" if hud._sel_panel.visible else "FAILED")
+	print("[test-hud] cmd-row ", "OK" if hud._cmd_box.visible else "FAILED")
+	print("[test-hud] hotkeys-mapped ", "OK" if hud._hotkeys.has(KEY_G)
+		and hud._hotkeys.has(KEY_X) and hud._hotkeys.has(KEY_B) else "FAILED")
+
+	_push_key(KEY_G)
+	await get_tree().process_frame
+	print("[test-hud] g-arms ", "OK" if SelectionManager.attack_move_armed else "FAILED")
+
+	_push_click(get_viewport().get_visible_rect().size / 2.0 + Vector2(200, -120))
+	await get_tree().create_timer(0.5).timeout
+	var marching: bool = unit.current_state == UnitBase.State.MOVING
+	print("[test-hud] click-marches ", "OK" if marching
+		and not SelectionManager.attack_move_armed else "FAILED",
+		" state=", unit.current_state)
+
+	_push_key(KEY_X)
+	await get_tree().create_timer(0.2).timeout
+	print("[test-hud] x-stops ", "OK" if unit.current_state == UnitBase.State.IDLE else "FAILED")
+
+	await get_tree().create_timer(0.6).timeout  # idle refresh tick
+	var idle_count: int = hud._idle_villagers().size()
+	print("[test-hud] idle-finder ", "OK" if idle_count >= 1 else "FAILED",
+		" count=", idle_count)
+	get_tree().quit()
+
+func _push_key(keycode: Key) -> void:
+	var ev: InputEventKey = InputEventKey.new()
+	ev.keycode = keycode
+	ev.physical_keycode = keycode
+	ev.pressed = true
+	get_viewport().push_input(ev)
+
+func _push_click(pos: Vector2) -> void:
+	for pressed: bool in [true, false]:
+		var ev: InputEventMouseButton = InputEventMouseButton.new()
+		ev.button_index = MOUSE_BUTTON_LEFT
+		ev.position = pos
+		ev.global_position = pos
+		ev.pressed = pressed
+		get_viewport().push_input(ev)
+
 # Prove fruit trees bank food alongside the wood haul.
 func _run_fruit_test() -> void:
 	await get_tree().create_timer(0.5).timeout
@@ -836,6 +892,21 @@ func _run_commands_test() -> void:
 	await get_tree().create_timer(3.0).timeout
 	var moved: bool = mover.global_position.distance_to(start) > 40.0
 	print("[test-commands] move ", "OK" if moved else "FAILED")
+
+	# Stop: a fresh march is dropped on the spot.
+	CommandRouter.submit({
+		"type": "move", "player_id": 0,
+		"actor_names": [String(mover.name)],
+		"target": Constants.grid_to_world(30, 30),
+	})
+	await get_tree().create_timer(0.5).timeout
+	CommandRouter.submit({
+		"type": "stop", "player_id": 0,
+		"actor_names": [String(mover.name)],
+	})
+	await get_tree().process_frame
+	var stopped: bool = mover.current_state == UnitBase.State.IDLE
+	print("[test-commands] stop ", "OK" if stopped else "FAILED")
 
 	# Ownership: player 1 may not command player 0's unit away.
 	CommandRouter.submit({

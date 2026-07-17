@@ -17,6 +17,17 @@ var _sel_panel: PanelContainer
 var _sel_label: Label
 var _train_box: HFlowContainer
 var _build_box: HFlowContainer
+var _hp_bar: ProgressBar
+var _train_progress: ProgressBar
+var _cmd_box: HBoxContainer
+var _idle_button: Button
+var _idle_cycle: int = 0
+# keycode -> Callable, rebuilt with the panel (see _unhandled_key_input)
+var _hotkeys: Dictionary = {}
+
+const TRAIN_KEYS: Dictionary = { "villager": KEY_V, "warrior": KEY_C, "archer": KEY_R }
+const BUILD_KEYS: Dictionary = { "house": KEY_B, "barracks": KEY_N,
+	"watchtower": KEY_T, "monument": KEY_M }
 var _queue_label: Label
 
 var _minimap_rect: TextureRect
@@ -62,7 +73,13 @@ func _ready() -> void:
 	# Pausing is meaningless in multiplayer — the server marches on. Mode is
 	# only known after Main's boot, so decide at world_ready.
 	EventBus.world_ready.connect(func() -> void:
-		_pause_button.visible = Net.mode != Net.Mode.CLIENT)
+		_pause_button.visible = Net.mode != Net.Mode.CLIENT
+		# Thumbnails were built before the local tribe was known.
+		for child: Node in _build_box.get_children():
+			var b: Button = child as Button
+			if b != null and b.has_meta("btype"):
+				b.icon = AssetLibrary.building_textures[
+					GameManager.local_player_id].get(b.get_meta("btype")))
 
 	var timer: Timer = Timer.new()
 	timer.wait_time = REFRESH_INTERVAL
@@ -167,6 +184,20 @@ func _refresh_top_bar() -> void:
 func _on_resources_changed(player_id: int) -> void:
 	if player_id == GameManager.local_player_id:
 		_refresh_top_bar()
+		if _sel_panel.visible:
+			_refresh_selection_panel()
+
+func _rebuild_hotkeys() -> void:
+	_hotkeys.clear()
+	for row: Container in [_train_box, _build_box, _cmd_box]:
+		if not row.visible:
+			continue
+		for child: Node in row.get_children():
+			var b: Button = child as Button
+			if b != null and not b.is_queued_for_deletion() \
+					and b.has_meta("hotkey") and int(b.get_meta("hotkey")) != 0 \
+					and not b.disabled:
+				_hotkeys[int(b.get_meta("hotkey"))] = b.pressed.emit
 
 # --- Selection / training panel ---
 
@@ -188,6 +219,13 @@ func _build_selection_panel() -> void:
 	_sel_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(_sel_label)
 
+	_hp_bar = ProgressBar.new()
+	_hp_bar.show_percentage = false
+	_hp_bar.custom_minimum_size = Vector2(150, 8)
+	_hp_bar.add_theme_stylebox_override("background", AssetLibrary.health_bar_bg)
+	_hp_bar.add_theme_stylebox_override("fill", AssetLibrary.health_bar_fill)
+	box.add_child(_hp_bar)
+
 	# Flow containers so button rows wrap instead of running off both screen
 	# edges on narrow viewports (see _clamp_row).
 	_train_box = HFlowContainer.new()
@@ -201,6 +239,16 @@ func _build_selection_panel() -> void:
 	_queue_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(_queue_label)
 
+	_train_progress = ProgressBar.new()
+	_train_progress.show_percentage = false
+	_train_progress.max_value = 100.0
+	_train_progress.custom_minimum_size = Vector2(150, 6)
+	_train_progress.add_theme_stylebox_override("background", AssetLibrary.health_bar_bg)
+	var progress_fill: StyleBoxFlat = AssetLibrary.health_bar_fill.duplicate()
+	progress_fill.bg_color = Color(0.89, 0.71, 0.36)
+	_train_progress.add_theme_stylebox_override("fill", progress_fill)
+	box.add_child(_train_progress)
+
 	# Construction buttons appear when villagers are selected.
 	_build_box = HFlowContainer.new()
 	_build_box.add_theme_constant_override("h_separation", 8)
@@ -210,17 +258,124 @@ func _build_selection_panel() -> void:
 	box.add_child(_build_box)
 	for building_type: String in ["house", "barracks", "watchtower", "monument"]:
 		var def: Dictionary = Constants.BUILDING_DEFS[building_type]
-		var parts: Array[String] = []
-		for res_type: int in def["cost"]:
-			parts.append("%d %s" % [def["cost"][res_type],
-				Constants.RESOURCE_NAMES[res_type]])
 		var button: Button = Button.new()
-		button.text = "%s (%s)" % [building_type.capitalize(), ", ".join(parts)]
+		button.text = "%s · %s  [%s]" % [building_type.capitalize().replace("_", " "),
+			_cost_text(def["cost"]), OS.get_keycode_string(BUILD_KEYS[building_type])]
+		button.icon = AssetLibrary.building_textures[0].get(building_type)
+		button.add_theme_constant_override("icon_max_width", 20)
 		button.focus_mode = Control.FOCUS_NONE
 		var captured: String = building_type
 		button.pressed.connect(func() -> void:
 			SelectionManager.start_placement(captured))
+		button.set_meta("cost", def["cost"])
+		button.set_meta("hotkey", BUILD_KEYS[building_type])
+		button.set_meta("btype", building_type)
 		_build_box.add_child(button)
+
+	# Orders for the selected units.
+	_cmd_box = HBoxContainer.new()
+	_cmd_box.add_theme_constant_override("separation", 8)
+	_cmd_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	_cmd_box.visible = false
+	box.add_child(_cmd_box)
+	var atk_button: Button = Button.new()
+	atk_button.text = "Attack-move  [G]"
+	atk_button.tooltip_text = "Then click a destination — units engage everything on the way. (Or shift+right-click.)"
+	atk_button.focus_mode = Control.FOCUS_NONE
+	atk_button.pressed.connect(func() -> void: SelectionManager.arm_attack_move())
+	atk_button.set_meta("hotkey", KEY_G)
+	_cmd_box.add_child(atk_button)
+	var stop_button: Button = Button.new()
+	stop_button.text = "Stop  [X]"
+	stop_button.tooltip_text = "Drop all orders and stand down."
+	stop_button.focus_mode = Control.FOCUS_NONE
+	stop_button.pressed.connect(_stop_selected)
+	stop_button.set_meta("hotkey", KEY_X)
+	_cmd_box.add_child(stop_button)
+
+	_build_idle_button()
+
+func _cost_text(cost: Dictionary) -> String:
+	var parts: Array[String] = []
+	for res_type: int in cost:
+		parts.append("%d %s" % [cost[res_type], Constants.RESOURCE_NAMES[res_type]])
+	return ", ".join(parts)
+
+# Disable what the player cannot pay for, and say why.
+func _apply_affordability(button: Button, cost: Dictionary, pop_gated: bool) -> void:
+	var pid: int = GameManager.local_player_id
+	var lacking: Array[String] = []
+	for res_type: int in cost:
+		var short: int = cost[res_type] - GameManager.get_resource(pid, res_type)
+		if short > 0:
+			lacking.append("%d more %s" % [short, Constants.RESOURCE_NAMES[res_type]])
+	if pop_gated and GameManager.get_population(pid) >= GameManager.population_cap(pid):
+		lacking.append("room — population cap reached, build houses")
+	button.disabled = not lacking.is_empty()
+	button.tooltip_text = "Need " + " and ".join(lacking) if button.disabled else ""
+
+func _stop_selected() -> void:
+	var units: Array = SelectionManager.selected_units.filter(is_instance_valid)
+	if units.is_empty():
+		return
+	CommandRouter.submit({
+		"type": "stop", "player_id": GameManager.local_player_id,
+		"actor_names": units.map(func(u: Node2D) -> String: return String(u.name)),
+	})
+
+func _build_idle_button() -> void:
+	var panel: PanelContainer = PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", _panel_style())
+	panel.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	panel.offset_left = 10
+	panel.offset_bottom = -10
+	add_child(panel)
+	_idle_button = Button.new()
+	_idle_button.focus_mode = Control.FOCUS_NONE
+	_idle_button.tooltip_text = "Select the next idle villager and jump the camera there."
+	_idle_button.pressed.connect(_cycle_idle_villager)
+	panel.add_child(_idle_button)
+	panel.visible = false
+	_idle_button.set_meta("panel", panel)
+
+func _idle_villagers() -> Array:
+	return get_tree().get_nodes_in_group(
+		"player_%d" % GameManager.local_player_id).filter(
+		func(n: Node) -> bool:
+			var unit: UnitBase = n as UnitBase
+			return unit != null and unit.can_gather \
+				and unit.current_state == UnitBase.State.IDLE)
+
+func _cycle_idle_villager() -> void:
+	var idle: Array = _idle_villagers()
+	if idle.is_empty():
+		return
+	_idle_cycle = (_idle_cycle + 1) % idle.size()
+	var unit: Node2D = idle[_idle_cycle]
+	SelectionManager.select_only(unit)
+	var camera: Camera2D = get_viewport().get_camera_2d()
+	if camera != null:
+		camera.global_position = unit.global_position
+
+func _refresh_idle_button() -> void:
+	if _idle_button == null:
+		return
+	var count: int = _idle_villagers().size()
+	(_idle_button.get_meta("panel") as PanelContainer).visible = count > 0
+	_idle_button.text = "Idle workers: %d  [F]" % count
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	var key := event as InputEventKey
+	if key == null or not key.pressed or key.echo or get_tree().paused:
+		return
+	if key.keycode == KEY_F:
+		if not _idle_villagers().is_empty():
+			_cycle_idle_villager()
+		return
+	if not _sel_panel.visible or not _hotkeys.has(key.keycode):
+		return
+	(_hotkeys[key.keycode] as Callable).call()
 
 # A flow row wraps at its own width, but left alone it takes its natural
 # single-row width — wider than narrow viewports, pushing buttons off both
@@ -233,7 +388,10 @@ func _clamp_row(row: HFlowContainer) -> void:
 			natural += (child as Control).get_combined_minimum_size().x
 			count += 1
 	natural += 8.0 * maxf(0.0, count - 1)
-	row.custom_minimum_size.x = minf(natural, get_viewport_rect().size.x - 48.0)
+	# Clear the minimap (bottom-right) and idle-workers button (bottom-left),
+	# not just the screen edges — a wide row must wrap before sliding under
+	# either overlay.
+	row.custom_minimum_size.x = minf(natural, get_viewport_rect().size.x - 420.0)
 
 # The train row mirrors whatever the selected building can produce.
 func _populate_train_buttons(building_type: String) -> void:
@@ -241,15 +399,19 @@ func _populate_train_buttons(building_type: String) -> void:
 		child.queue_free()
 	for unit_type: String in Constants.BUILDING_DEFS[building_type]["trains"]:
 		var def: Dictionary = Constants.UNIT_DEFS[unit_type]
-		var parts: Array[String] = []
-		for res_type: int in def["cost"]:
-			parts.append("%d %s" % [def["cost"][res_type],
-				Constants.RESOURCE_NAMES[res_type]])
 		var button: Button = Button.new()
-		button.text = "Train %s (%s)" % [unit_type.capitalize(), ", ".join(parts)]
+		button.text = "%s · %s  [%s]" % [unit_type.capitalize(),
+			_cost_text(def["cost"]), OS.get_keycode_string(TRAIN_KEYS.get(unit_type, 0))]
+		var frames: Array = AssetLibrary.get_unit_frames(
+			GameManager.local_player_id, unit_type)
+		if not frames.is_empty():
+			button.icon = frames[0]
+			button.add_theme_constant_override("icon_max_width", 14)
 		button.focus_mode = Control.FOCUS_NONE
 		var captured: String = unit_type
 		button.pressed.connect(func() -> void: _train(captured))
+		button.set_meta("cost", def["cost"])
+		button.set_meta("hotkey", TRAIN_KEYS.get(unit_type, 0))
 		_train_box.add_child(button)
 	_clamp_row(_train_box)
 
@@ -268,6 +430,7 @@ func _refresh_selection_panel() -> void:
 	if building != null and is_instance_valid(building):
 		_sel_panel.visible = true
 		_build_box.visible = false
+		_cmd_box.visible = false
 		var constructed: bool = bool(building.get("is_constructed"))
 		_train_box.visible = constructed
 		_queue_label.visible = constructed
@@ -276,13 +439,24 @@ func _refresh_selection_panel() -> void:
 		if not constructed:
 			title += "  ·  under construction"
 		_sel_label.text = "%s  —  %d/%d HP" % [title, building.current_hp, building.max_hp]
+		_hp_bar.visible = true
+		_hp_bar.max_value = building.max_hp
+		_hp_bar.value = building.current_hp
 		var queue: Array = building.train_queue
 		if queue.is_empty():
 			_queue_label.text = "Queue empty"
+			_train_progress.visible = false
 		else:
 			var train_time: float = Constants.UNIT_DEFS[queue[0]]["train_time"]
-			var pct: int = int(building.train_progress / train_time * 100.0)
-			_queue_label.text = "Training %s (%d%%)  —  queue: %d" % [queue[0].capitalize(), pct, queue.size()]
+			_queue_label.text = "Training %s  —  queue: %d" % [
+				queue[0].capitalize(), queue.size()]
+			_train_progress.visible = constructed
+			_train_progress.value = building.train_progress / train_time * 100.0
+		for child: Node in _train_box.get_children():
+			var b: Button = child as Button
+			if b != null and not b.is_queued_for_deletion() and b.has_meta("cost"):
+				_apply_affordability(b, b.get_meta("cost"), true)
+		_rebuild_hotkeys()
 		return
 
 	var units: Array = SelectionManager.selected_units.filter(is_instance_valid)
@@ -294,8 +468,23 @@ func _refresh_selection_panel() -> void:
 	_sel_panel.visible = true
 	_train_box.visible = false
 	_queue_label.visible = false
+	_train_progress.visible = false
+	_cmd_box.visible = true
 	_build_box.visible = units.any(
 		func(u: Node2D) -> bool: return bool(u.get("can_gather")))
+	var hp: int = 0
+	var hp_max: int = 0
+	for unit: Node2D in units:
+		hp += int(unit.get("current_hp"))
+		hp_max += int(unit.get("max_hp"))
+	_hp_bar.visible = hp_max > 0
+	_hp_bar.max_value = hp_max
+	_hp_bar.value = hp
+	for child: Node in _build_box.get_children():
+		var b: Button = child as Button
+		if b != null and b.has_meta("cost"):
+			_apply_affordability(b, b.get_meta("cost"), false)
+	_rebuild_hotkeys()
 	_clamp_row(_build_box)
 	var counts: Dictionary = {}
 	for unit: Node2D in units:
@@ -404,6 +593,7 @@ func _refresh_monument_banner() -> void:
 func _on_refresh_tick() -> void:
 	_redraw_minimap()
 	_refresh_monument_banner()
+	_refresh_idle_button()
 	if _sel_panel.visible:
 		_refresh_selection_panel()
 

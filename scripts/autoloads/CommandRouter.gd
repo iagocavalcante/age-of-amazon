@@ -45,6 +45,8 @@ func _validate_and_execute(command: Dictionary) -> void:
 			_exec_rally(command)
 		"attack_move":
 			_exec_attack_move(command)
+		"stop":
+			_exec_stop(command)
 		"build":
 			_exec_build(command)
 		_:
@@ -52,6 +54,10 @@ func _validate_and_execute(command: Dictionary) -> void:
 
 # Actors resolve by name from the issuing player's group — ownership check
 # and dangling-reference filtering in one step.
+func _exec_stop(command: Dictionary) -> void:
+	for unit: UnitBase in _resolve_actors(command):
+		unit.stop_order()
+
 func _resolve_actors(command: Dictionary) -> Array[UnitBase]:
 	var owned: Array[UnitBase] = []
 	var wanted: Array = command.get("actor_names", [])

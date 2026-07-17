@@ -212,6 +212,12 @@ func _view_step(delta: float) -> void:
 
 # --- Commands (issued by SelectionManager / AI) ---
 
+# Hard stop: drop every order and stand down (server-validated "stop").
+func stop_order() -> void:
+	_attack_target = null
+	_intent = {}
+	current_state = State.IDLE
+
 func move_to(target: Vector2) -> void:
 	_intent = {}
 	_attack_target = null
