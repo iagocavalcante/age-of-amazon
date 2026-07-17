@@ -90,29 +90,26 @@ func _ready() -> void:
 	_refresh_top_bar()
 	_refresh_selection_panel()
 
-# Anchored controls grow DOWNWARD when their minimum size changes while
-# visible — Godot's grow_vertical=BEGIN is only honored on some layout
-# paths, which intermittently pushed the bottom panels off screen. Pin
-# their geometry explicitly every frame instead of trusting grow.
+# The selection panel is a fixed-width command bar: anchored bottom-wide
+# with side margins that clear the idle button (left) and minimap (right)
+# BY CONSTRUCTION. Its flow rows wrap at the bar's real width, so
+# horizontal overflow is structurally impossible; only the height follows
+# content, pinned upward from the bottom edge each frame (Godot's
+# grow_vertical is not reliable when minimum size changes while visible).
+const BAR_SIDE_MARGIN: float = 210.0
+
 func _process(_delta: float) -> void:
 	if _sel_panel != null and _sel_panel.visible:
-		_pin_bottom(_sel_panel, true)
+		_sel_panel.offset_top = -10.0 - _sel_panel.get_combined_minimum_size().y
+		_sel_panel.offset_bottom = -10.0
 	if _idle_button != null:
 		var idle_panel: PanelContainer = _idle_button.get_meta("panel")
 		if idle_panel.visible:
-			_pin_bottom(idle_panel, false)
-
-func _pin_bottom(panel: Control, centered: bool) -> void:
-	var min_size: Vector2 = panel.get_combined_minimum_size()
-	if centered:  # anchors at bottom-center
-		panel.offset_left = -min_size.x / 2.0
-		panel.offset_right = min_size.x / 2.0
-	else:  # anchors at bottom-left
-		panel.offset_left = 10.0
-		panel.offset_right = 10.0 + min_size.x
-	panel.offset_top = -10.0 - min_size.y
-	panel.offset_bottom = -10.0
-	panel.size = min_size
+			var min_size: Vector2 = idle_panel.get_combined_minimum_size()
+			idle_panel.offset_left = 10.0
+			idle_panel.offset_right = 10.0 + min_size.x
+			idle_panel.offset_top = -10.0 - min_size.y
+			idle_panel.offset_bottom = -10.0
 
 func _panel_style() -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
@@ -228,9 +225,9 @@ func _rebuild_hotkeys() -> void:
 func _build_selection_panel() -> void:
 	_sel_panel = PanelContainer.new()
 	_sel_panel.add_theme_stylebox_override("panel", _panel_style())
-	_sel_panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	_sel_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_sel_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_sel_panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	_sel_panel.offset_left = BAR_SIDE_MARGIN
+	_sel_panel.offset_right = -BAR_SIDE_MARGIN
 	_sel_panel.offset_bottom = -10
 	_sel_panel.visible = false
 	add_child(_sel_panel)
@@ -401,22 +398,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		return
 	(_hotkeys[key.keycode] as Callable).call()
 
-# A flow row wraps at its own width, but left alone it takes its natural
-# single-row width — wider than narrow viewports, pushing buttons off both
-# screen edges. Clamp it to the viewport so overflow wraps instead.
-func _clamp_row(row: HFlowContainer) -> void:
-	var natural: float = 0.0
-	var count: int = 0
-	for child: Node in row.get_children():
-		if child is Control and not child.is_queued_for_deletion():
-			natural += (child as Control).get_combined_minimum_size().x
-			count += 1
-	natural += 8.0 * maxf(0.0, count - 1)
-	# Clear the minimap (bottom-right) and idle-workers button (bottom-left),
-	# not just the screen edges — a wide row must wrap before sliding under
-	# either overlay.
-	row.custom_minimum_size.x = minf(natural, get_viewport_rect().size.x - 420.0)
-
 # The train row mirrors whatever the selected building can produce.
 func _populate_train_buttons(building_type: String) -> void:
 	for child: Node in _train_box.get_children():
@@ -437,7 +418,6 @@ func _populate_train_buttons(building_type: String) -> void:
 		button.set_meta("cost", def["cost"])
 		button.set_meta("hotkey", TRAIN_KEYS.get(unit_type, 0))
 		_train_box.add_child(button)
-	_clamp_row(_train_box)
 
 func _train(unit_type: String) -> void:
 	var building: Node2D = SelectionManager.selected_building
@@ -509,7 +489,6 @@ func _refresh_selection_panel() -> void:
 		if b != null and b.has_meta("cost"):
 			_apply_affordability(b, b.get_meta("cost"), false)
 	_rebuild_hotkeys()
-	_clamp_row(_build_box)
 	var counts: Dictionary = {}
 	for unit: Node2D in units:
 		var t: String = unit.get("unit_type")

@@ -375,8 +375,10 @@ func _run_hud_test() -> void:
 	print("[test-hud] panel-shown ", "OK" if hud._sel_panel.visible else "FAILED")
 	var rect: Rect2 = hud._sel_panel.get_global_rect()
 	var vp: Vector2 = get_viewport().get_visible_rect().size
+	# On screen AND clear of the bottom-corner overlays (minimap is 144px
+	# + margins on the right, idle button on the left).
 	var on_screen: bool = rect.position.y >= 0.0 and rect.end.y <= vp.y \
-		and rect.position.x >= 0.0 and rect.end.x <= vp.x
+		and rect.position.x >= 170.0 and rect.end.x <= vp.x - 170.0
 	print("[test-hud] panel-on-screen ", "OK" if on_screen else "FAILED",
 		" rect=", rect, " vp=", vp)
 	print("[test-hud] cmd-row ", "OK" if hud._cmd_box.visible else "FAILED")
@@ -406,19 +408,27 @@ func _run_hud_test() -> void:
 	# Panel-size flips (building -> unit -> building) are what used to push
 	# the panel below the viewport; assert it stays on screen through them.
 	var stays: bool = true
-	for target: Node2D in [_find_tc(0), unit, _find_tc(0)]:
-		if target is Building:
-			SelectionManager.clear_selection()
-			SelectionManager.selected_building = target
-			EventBus.selection_changed.emit()
-		else:
-			SelectionManager.select_only(target)
-		await get_tree().process_frame
-		await get_tree().process_frame
-		var r: Rect2 = hud._sel_panel.get_global_rect()
-		if r.position.y < 0.0 or r.end.y > vp.y or r.position.x < 0.0 or r.end.x > vp.x:
-			stays = false
-			print("  off-screen after switching to ", target.name, " rect=", r)
+	# Exercise size flips at several window shapes — wide, square, narrow —
+	# re-selecting through building -> unit -> building at each.
+	for win_size: Vector2i in [Vector2i(0, 0), Vector2i(1998, 1142), Vector2i(900, 1200)]:
+		if win_size.x > 0:
+			get_window().size = win_size
+			await get_tree().process_frame
+		vp = get_viewport().get_visible_rect().size
+		for target: Node2D in [_find_tc(0), unit, _find_tc(0)]:
+			if target is Building:
+				SelectionManager.clear_selection()
+				SelectionManager.selected_building = target
+				EventBus.selection_changed.emit()
+			else:
+				SelectionManager.select_only(target)
+			await get_tree().process_frame
+			await get_tree().process_frame
+			var r: Rect2 = hud._sel_panel.get_global_rect()
+			if r.position.y < 0.0 or r.end.y > vp.y \
+					or r.position.x < 170.0 or r.end.x > vp.x - 170.0:
+				stays = false
+				print("  off-screen after ", target.name, " at vp=", vp, " rect=", r)
 	print("[test-hud] panel-stays-on-screen ", "OK" if stays else "FAILED")
 	get_tree().quit()
 
