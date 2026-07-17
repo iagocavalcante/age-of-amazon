@@ -29,6 +29,9 @@
 	handle /leaderboard {
 		reverse_proxy 127.0.0.1:9001
 	}
+	handle /daily {
+		reverse_proxy 127.0.0.1:9001
+	}
 	handle /admin {
 		basic_auth {
 			{$AOA_ADMIN_USER} {$AOA_ADMIN_HASH}

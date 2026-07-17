@@ -26,6 +26,7 @@ signal room_updated(code: String, player_count: int, my_slot: int, names: Packed
 signal match_ready(port: int, token: String)
 signal gateway_error(reason: String)
 signal hello_result(ok: bool, reason: String, elo: int, wins: int, losses: int)
+signal daily_result(ok: bool, reason: String)
 
 # --- Player ranking (gateway side) ---
 # Accountless identity: first claim of a name stores a hash of the client's
@@ -98,6 +99,8 @@ func _respond_http(conn: StreamPeerTCP, request: String) -> void:
 		body = JSON.stringify(_ingest_result(conn, request))
 	elif request.contains("/leaderboard"):
 		body = JSON.stringify({"ok": true, "players": leaderboard()})
+	elif request.contains("/daily"):
+		body = JSON.stringify(daily_board())
 	elif request.contains("/stats"):
 		body = JSON.stringify(_stats())
 	else:
@@ -208,6 +211,63 @@ func _probe_match(port: int) -> Dictionary:
 
 const UNPLAYED_CLAIM_TTL: int = 7 * 86400  # a week to play or lose the name
 
+# --- Daily challenge board ---
+# Client-reported times (the run is offline), but identity is verified and
+# bounds-checked; good enough among friends, and the Elo ladder stays pure.
+const DAILY_PATH: String = "user://daily.json"
+const DAILY_MIN_SECS: float = 120.0
+const DAILY_MAX_SECS: float = 3.0 * 3600.0
+var _daily: Dictionary = {}  # date -> {name: seconds}
+
+func _load_daily() -> void:
+	if not FileAccess.file_exists(DAILY_PATH):
+		return
+	var parsed: Variant = JSON.parse_string(
+		FileAccess.get_file_as_string(DAILY_PATH))
+	if parsed is Dictionary:
+		_daily = parsed
+
+func _save_daily() -> void:
+	# Only today and yesterday matter; the rest is history nobody reads.
+	var keep: Array = [GameManager.daily_date(), _yesterday()]
+	for date: String in _daily.keys():
+		if not date in keep:
+			_daily.erase(date)
+	var file: FileAccess = FileAccess.open(DAILY_PATH, FileAccess.WRITE)
+	if file != null:
+		file.store_string(JSON.stringify(_daily))
+
+func _yesterday() -> String:
+	return Time.get_date_string_from_unix_time(
+		int(Time.get_unix_time_from_system()) - 86400)
+
+# Returns {ok, reason}. Best time per name per day wins.
+func submit_daily(display_name: String, date: String, seconds: float) -> Dictionary:
+	if not _registry.has(display_name):
+		return {"ok": false, "reason": "unknown player"}
+	if date != GameManager.daily_date() and date != _yesterday():
+		return {"ok": false, "reason": "that daily is over"}
+	if seconds < DAILY_MIN_SECS or seconds > DAILY_MAX_SECS:
+		return {"ok": false, "reason": "implausible time"}
+	if not _daily.has(date):
+		_daily[date] = {}
+	var day: Dictionary = _daily[date]
+	if day.has(display_name) and float(day[display_name]) <= seconds:
+		return {"ok": true, "reason": "kept your better time"}
+	day[display_name] = seconds
+	_save_daily()
+	return {"ok": true, "reason": ""}
+
+func daily_board(date: String = "") -> Dictionary:
+	var day_key: String = date if date != "" else GameManager.daily_date()
+	var rows: Array = []
+	for display_name: String in _daily.get(day_key, {}):
+		rows.append({"name": display_name,
+			"seconds": float(_daily[day_key][display_name])})
+	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a["seconds"]) < float(b["seconds"]))
+	return {"ok": true, "date": day_key, "scores": rows.slice(0, 20)}
+
 func _load_registry() -> void:
 	if not FileAccess.file_exists(RANKING_PATH):
 		return
@@ -301,6 +361,7 @@ func host(port: int, match_port_base: int) -> Error:
 	_listen_port = port
 	_next_match_port = match_port_base
 	_load_registry()
+	_load_daily()
 	var peer := WebSocketMultiplayerPeer.new()
 	Net._configure_ws(peer)
 	var err: Error = peer.create_server(port)
@@ -331,6 +392,9 @@ func connect_to_gateway(url: String) -> Error:
 func send_hello(display_name: String, secret: String) -> void:
 	_hello.rpc_id(1, display_name, secret, Net.PROTOCOL_VERSION)
 
+func submit_daily_score(date: String, seconds: float) -> void:
+	_submit_daily.rpc_id(1, date, seconds, Net.PROTOCOL_VERSION)
+
 func create_room() -> void:
 	_create_room.rpc_id(1, Net.PROTOCOL_VERSION)
 
@@ -356,6 +420,19 @@ func _hello(display_name: String, secret: String, proto_version: int = 0) -> voi
 		_hello_result.rpc_id(sender, true, "", entry["elo"], entry["wins"], entry["losses"])
 	else:
 		_hello_result.rpc_id(sender, false, result["reason"], 0, 0, 0)
+
+@rpc("any_peer", "call_remote", "reliable")
+func _submit_daily(date: String, seconds: float, proto_version: int = 0) -> void:
+	if Net.mode != Net.Mode.GATEWAY:
+		return
+	var sender: int = multiplayer.get_remote_sender_id()
+	if not _version_ok(sender, proto_version):
+		return
+	if not _peer_names.has(sender):
+		_daily_result.rpc_id(sender, false, "claim a player name first")
+		return
+	var verdict: Dictionary = submit_daily(_peer_names[sender], date, seconds)
+	_daily_result.rpc_id(sender, verdict["ok"], verdict["reason"])
 
 @rpc("any_peer", "call_remote", "reliable")
 func _create_room(proto_version: int = 0) -> void:
@@ -516,6 +593,10 @@ func _room_update(code: String, player_count: int, my_slot: int,
 @rpc("authority", "call_remote", "reliable")
 func _hello_result(ok: bool, reason: String, elo: int, wins: int, losses: int) -> void:
 	hello_result.emit(ok, reason, elo, wins, losses)
+
+@rpc("authority", "call_remote", "reliable")
+func _daily_result(ok: bool, reason: String) -> void:
+	daily_result.emit(ok, reason)
 
 @rpc("authority", "call_remote", "reliable")
 func _match_ready(port: int, token: String) -> void:

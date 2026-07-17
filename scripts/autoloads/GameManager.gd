@@ -41,6 +41,40 @@ func has_explored(player_id: int, cell: Vector2i) -> bool:
 		return fog.is_explored(cell)
 	return true
 
+# Daily challenge: everyone plays the same UTC-dated map, racing to win.
+var daily_mode: bool = false
+var game_time_secs: float = 0.0
+
+func _process(delta: float) -> void:
+	if state == GameState.RUNNING:
+		game_time_secs += delta
+
+func daily_date() -> String:
+	return Time.get_date_string_from_system(true)  # UTC — one map worldwide
+
+const DAILY_PENDING_PATH: String = "user://daily_pending.json"
+
+func stash_daily_result() -> void:
+	var file: FileAccess = FileAccess.open(DAILY_PENDING_PATH, FileAccess.WRITE)
+	if file != null:
+		file.store_string(JSON.stringify({
+			"date": daily_date(), "seconds": game_time_secs}))
+
+func take_pending_daily() -> Dictionary:
+	if not FileAccess.file_exists(DAILY_PENDING_PATH):
+		return {}
+	var parsed: Variant = JSON.parse_string(
+		FileAccess.get_file_as_string(DAILY_PENDING_PATH))
+	return parsed if parsed is Dictionary else {}
+
+func clear_pending_daily() -> void:
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(DAILY_PENDING_PATH))
+
+func daily_seed(date: String = "") -> int:
+	var key: String = "aoa-daily-" + (date if date != "" else daily_date())
+	var h: int = key.hash()
+	return h if h != 0 else 1
+
 func _ready() -> void:
 	if map_seed == 0:
 		map_seed = randi()
@@ -139,6 +173,9 @@ func end_game(winner_player_id: int) -> void:
 	if state == GameState.GAME_OVER:
 		return
 	change_state(GameState.GAME_OVER)
+	if daily_mode and winner_player_id == local_player_id \
+			and Net.mode == Net.Mode.OFFLINE:
+		stash_daily_result()
 	EventBus.game_over.emit(winner_player_id)
 	if Net.mode == Net.Mode.SERVER:
 		_recv_game_over.rpc(winner_player_id)

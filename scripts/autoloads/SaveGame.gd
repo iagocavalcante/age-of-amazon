@@ -40,6 +40,10 @@ func clear() -> void:
 		DirAccess.remove_absolute(PATH)
 
 func save_now() -> void:
+	# A daily-challenge run is a single timed sitting — never saved, so the
+	# clock can't be gamed by resuming.
+	if GameManager.daily_mode:
+		return
 	var tree: SceneTree = get_tree()
 	var units: Array = []
 	for node: Node in tree.get_nodes_in_group("units"):

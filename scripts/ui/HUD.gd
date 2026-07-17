@@ -11,6 +11,7 @@ const REFRESH_INTERVAL: float = 0.5
 
 var _resource_labels: Dictionary = {}  # ResourceType -> Label
 var _pop_label: Label
+var _daily_label: Label
 var _pause_button: Button
 
 var _sel_panel: PanelContainer
@@ -151,6 +152,11 @@ func _build_top_bar() -> void:
 	_pop_label.text = "0/%d" % Constants.POPULATION_CAP
 	row.add_child(_pop_label)
 
+	_daily_label = Label.new()
+	_daily_label.add_theme_color_override("font_color", Color(0.89, 0.71, 0.36))
+	_daily_label.visible = false
+	row.add_child(_daily_label)
+
 	var spacer: Control = Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(spacer)
@@ -196,7 +202,13 @@ func _icon_rect(texture: Texture2D) -> TextureRect:
 	rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	return rect
 
+func _format_secs(secs: float) -> String:
+	return "%d:%02d" % [int(secs) / 60, int(secs) % 60]
+
 func _refresh_top_bar() -> void:
+	_daily_label.visible = GameManager.daily_mode
+	if GameManager.daily_mode:
+		_daily_label.text = "DAILY  %s" % _format_secs(GameManager.game_time_secs)
 	for type: int in _resource_labels:
 		_resource_labels[type].text = str(GameManager.get_resource(GameManager.local_player_id, type))
 	_pop_label.text = "%d/%d" % [GameManager.get_population(GameManager.local_player_id),
@@ -597,6 +609,7 @@ func _on_refresh_tick() -> void:
 	_redraw_minimap()
 	_refresh_monument_banner()
 	_refresh_idle_button()
+	_refresh_top_bar()
 	if _sel_panel.visible:
 		_refresh_selection_panel()
 
@@ -744,6 +757,9 @@ func _on_game_over(winner_player_id: int) -> void:
 	get_tree().paused = true
 	if winner_player_id == GameManager.local_player_id:
 		_game_over_label.text = "Victory!"
+		if GameManager.daily_mode:
+			_game_over_label.text = "Victory!  —  %s\nyour daily time" % \
+				_format_secs(GameManager.game_time_secs)
 	elif Net.mode == Net.Mode.CLIENT and not Net.player_names.is_empty():
 		_game_over_label.text = "%s wins" % Net.display_name_of(winner_player_id)
 	else:

@@ -50,6 +50,9 @@ func _ready() -> void:
 		_run_monument_test()
 	if "--test-tactics" in args:
 		_run_tactics_test()
+	if "--test-daily" in args:
+		_run_daily_test()
+		return
 	if "--test-rank" in args:
 		_run_rank_test()
 		return
@@ -129,6 +132,7 @@ func _boot_offline(args: PackedStringArray) -> void:
 			ai.vision.restore_explored(resume.get("ai_explored", []))
 	fog.force_update()
 
+	GameManager.game_time_secs = 0.0
 	EventBus.world_ready.emit()
 	GameManager.change_state(GameManager.GameState.RUNNING)
 
@@ -372,6 +376,44 @@ func _run_build_test() -> void:
 
 # Prove shore fishing: a fish school exists near the shore, a villager can
 # work it, and the catch banks as food.
+# Prove the daily-challenge core: shared seed, submission validation,
+# best-time keeping, and board ordering.
+func _run_daily_test() -> void:
+	var today: String = GameManager.daily_date()
+	var seed_same: bool = GameManager.daily_seed(today) == GameManager.daily_seed(today)
+	var seed_diff: bool = GameManager.daily_seed("2026-01-01") != GameManager.daily_seed("2026-01-02")
+	print("[test-daily] seed ", "OK" if seed_same and seed_diff else "FAILED")
+
+	Gateway._registry = {}
+	Gateway._daily = {}
+	Gateway.claim_name("Aracy", "s-a")
+	Gateway.claim_name("Boto", "s-b")
+
+	var unknown: Dictionary = Gateway.submit_daily("Nobody", today, 300.0)
+	var stale: Dictionary = Gateway.submit_daily("Aracy", "2020-01-01", 300.0)
+	var cheat: Dictionary = Gateway.submit_daily("Aracy", today, 5.0)
+	print("[test-daily] rejects ", "OK"
+		if not unknown["ok"] and not stale["ok"] and not cheat["ok"] else "FAILED")
+
+	var first: Dictionary = Gateway.submit_daily("Aracy", today, 400.0)
+	var better: Dictionary = Gateway.submit_daily("Aracy", today, 350.0)
+	var worse: Dictionary = Gateway.submit_daily("Aracy", today, 500.0)
+	Gateway.submit_daily("Boto", today, 380.0)
+	var board: Dictionary = Gateway.daily_board()
+	var scores: Array = board["scores"]
+	var order_ok: bool = scores.size() == 2 \
+		and scores[0]["name"] == "Aracy" and float(scores[0]["seconds"]) == 350.0 \
+		and scores[1]["name"] == "Boto"
+	print("[test-daily] submit ", "OK" if first["ok"] and better["ok"] and worse["ok"] else "FAILED")
+	print("[test-daily] board ", "OK" if order_ok else "FAILED", " ", scores)
+
+	# Persistence roundtrip.
+	Gateway._daily = {}
+	Gateway._load_daily()
+	var kept: bool = float(Gateway.daily_board()["scores"][0]["seconds"]) == 350.0
+	print("[test-daily] persistence ", "OK" if kept else "FAILED")
+	get_tree().quit()
+
 # Prove the ranking core: name claims, wrong-secret rejection, Elo motion,
 # report dedupe, and registry persistence across a reload.
 func _run_rank_test() -> void:

@@ -52,6 +52,8 @@ var _name_edit: LineEdit
 var _rank_label: Label
 var _board_panel: PanelContainer
 var _board_label: Label
+var _daily_panel: PanelContainer
+var _daily_label: Label
 var _profile: Dictionary = {}
 
 func _ready() -> void:
@@ -71,6 +73,12 @@ func _ready() -> void:
 	multiplayer.connection_failed.connect(
 		func() -> void: _set_status("Could not reach the lobby server."))
 	multiplayer.server_disconnected.connect(_on_gateway_lost)
+
+	# Back in the menu: daily state must not leak into other modes (a stale
+	# daily seed would replay today's map in "New Game").
+	GameManager.daily_mode = false
+	GameManager.map_seed = randi()
+	_submit_pending_daily()
 
 	# Why the previous session ended (disconnect, refusal, ...).
 	if Net.last_status != "":
@@ -291,6 +299,36 @@ func _build_ui() -> void:
 	friends.pressed.connect(func() -> void: _show_friends(true))
 	_main_page.add_child(friends)
 
+	# Daily challenge: one shared map per UTC day, race to win it. Fixed
+	# normal AI so every time on the board was earned on equal terms.
+	var daily: Button = _secondary_button(
+		"Daily Challenge  ·  %s" % GameManager.daily_date())
+	daily.pressed.connect(func() -> void:
+		SaveGame.clear()
+		GameManager.ai_difficulty = "normal"
+		GameManager.daily_mode = true
+		GameManager.map_seed = GameManager.daily_seed()
+		get_tree().change_scene_to_file(MAIN_SCENE))
+	_main_page.add_child(daily)
+
+	var daily_board_button: Button = _text_button("today's times")
+	daily_board_button.pressed.connect(_fetch_daily)
+	_main_page.add_child(daily_board_button)
+	_daily_panel = PanelContainer.new()
+	var daily_style: StyleBoxFlat = StyleBoxFlat.new()
+	daily_style.bg_color = Color(0.05, 0.09, 0.06, 0.85)
+	daily_style.border_color = Color(0.25, 0.35, 0.22, 0.9)
+	daily_style.set_border_width_all(1)
+	daily_style.set_corner_radius_all(6)
+	daily_style.set_content_margin_all(12)
+	_daily_panel.add_theme_stylebox_override("panel", daily_style)
+	_daily_panel.visible = false
+	_main_page.add_child(_daily_panel)
+	_daily_label = Label.new()
+	_daily_label.add_theme_font_size_override("font_size", 12)
+	_daily_label.add_theme_color_override("font_color", COLOR_TEXT)
+	_daily_panel.add_child(_daily_label)
+
 	var seat: Dictionary = Net.load_seat()
 	if not seat.is_empty():
 		var rejoin: Button = _secondary_button("Rejoin Last Match")
@@ -490,6 +528,60 @@ func _leaderboard_url() -> String:
 	var host: String = host_port.get_slice(":", 0)
 	var port: int = int(host_port.get_slice(":", 1)) if host_port.contains(":") else 9000
 	return "http://%s:%d/leaderboard" % [host, port + 1]
+
+# A won daily run was stashed by GameManager; push it to the gateway now
+# (identity rides the same hello as everything else).
+func _submit_pending_daily() -> void:
+	var pending: Dictionary = GameManager.take_pending_daily()
+	if pending.is_empty():
+		return
+	Gateway.daily_result.connect(
+		func(ok: bool, reason: String) -> void:
+			if ok:
+				GameManager.clear_pending_daily()
+				_set_status("Daily time submitted — %d:%02d.%s" % [
+					int(pending["seconds"]) / 60, int(pending["seconds"]) % 60,
+					("  (" + reason + ")") if reason != "" else ""])
+			else:
+				GameManager.clear_pending_daily()
+				_set_status("Daily submit failed: %s" % reason),
+		CONNECT_ONE_SHOT)
+	_gateway_action(func() -> void:
+		Gateway.submit_daily_score(String(pending["date"]), float(pending["seconds"])))
+
+func _daily_url() -> String:
+	return _leaderboard_url().replace("/leaderboard", "/daily")
+
+func _fetch_daily() -> void:
+	var request: HTTPRequest = HTTPRequest.new()
+	add_child(request)
+	request.request_completed.connect(
+		func(_result: int, code: int, _headers: PackedStringArray, response: PackedByteArray) -> void:
+			request.queue_free()
+			_show_daily(code, response))
+	if request.request(_daily_url()) != OK:
+		request.queue_free()
+		_set_status("Could not reach the daily board.")
+
+func _show_daily(code: int, response: PackedByteArray) -> void:
+	if code != 200:
+		_set_status("Could not reach the daily board.")
+		return
+	var parsed: Variant = JSON.parse_string(response.get_string_from_utf8())
+	if not (parsed is Dictionary) or not parsed.get("ok", false):
+		_set_status("Could not reach the daily board.")
+		return
+	var rows: Array = parsed["scores"]
+	if rows.is_empty():
+		_daily_label.text = "No times yet for %s — be the first!" % parsed["date"]
+	else:
+		var lines: Array[String] = []
+		for i in range(rows.size()):
+			var row: Dictionary = rows[i]
+			lines.append("%2d.  %-16s  %d:%02d" % [i + 1, row["name"],
+				int(row["seconds"]) / 60, int(row["seconds"]) % 60])
+		_daily_label.text = "\n".join(lines)
+	_daily_panel.visible = true
 
 func _fetch_leaderboard() -> void:
 	var request: HTTPRequest = HTTPRequest.new()
