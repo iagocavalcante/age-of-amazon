@@ -19,6 +19,10 @@ const CLEARING_CORE_RADIUS: float = 5.0
 # _water_at and biome_at must share this threshold to stay contiguous.
 const RIVER_CHANNEL_THRESHOLD: float = 0.042
 
+# Fraction of buildable tiles that carry a point of interest. POIs are
+# landmarks, not scatter — keep this small.
+const POI_RARITY: float = 0.00035
+
 var seed_val: int
 
 var _elevation: FastNoiseLite
@@ -191,6 +195,19 @@ func _has_land_neighbor(x: int, y: int) -> bool:
 				and Constants.WALKABLE.get(biome, false):
 			return true
 	return false
+
+# A point of interest on this tile, or empty. Pure and deterministic, like
+# resource_at. Very rare. Only on buildable land outside spawn clearings.
+func poi_at(x: int, y: int, biome: int) -> Dictionary:
+	if _clearing_factor(x, y) > 0.0:
+		return {}
+	if not Constants.BUILDABLE.get(biome, false):
+		return {}
+	var h: float = PixelArt.hash2(x, y, seed_val + 9001)
+	if h < POI_RARITY:
+		return { "type": "ancient_ruins",
+			"loot": { Constants.ResourceType.JADE: 40, Constants.ResourceType.WOOD: 60 } }
+	return {}
 
 # Pure decoration (not harvestable): reeds on swamp, rocks on cliffs.
 # Returns "" or a decor id.

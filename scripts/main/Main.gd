@@ -74,6 +74,9 @@ func _ready() -> void:
 	if "--test-world" in args:
 		_run_world_test()
 		return
+	if "--test-poi" in args:
+		_run_poi_test()
+		return
 	if "--test-systems" in args:
 		_run_systems_test()
 	if "--test-scout" in args:
@@ -1358,4 +1361,31 @@ func _run_world_test() -> void:
 					break
 		if food_on_varzea: break
 	print("[test-world] varzea-food: %s" % ("OK" if food_on_varzea else "FAILED"))
+	get_tree().quit()
+
+func _run_poi_test() -> void:
+	var w: WorldData = GameManager.world
+	# Determinism: same coords -> same POI, twice.
+	var a: Dictionary = w.gen.poi_at(1234, -567, w.gen.biome_at(1234, -567))
+	var b: Dictionary = w.gen.poi_at(1234, -567, w.gen.biome_at(1234, -567))
+	print("[test-poi] deterministic: %s" % ("OK" if a == b else "FAILED"))
+	# Rarity + placement: scan a wide area, expect a handful, all on buildable land.
+	var count := 0
+	var on_bad := 0
+	for y in range(-120, 120):
+		for x in range(-120, 120):
+			var biome: int = w.gen.biome_at(x, y)
+			var p: Dictionary = w.gen.poi_at(x, y, biome)
+			if p.is_empty():
+				continue
+			count += 1
+			if not Constants.BUILDABLE.get(biome, false):
+				on_bad += 1
+	print("[test-poi] found %d POIs in 240x240; on-unbuildable=%d" % [count, on_bad])
+	print("[test-poi] rarity: %s" % ("OK" if count >= 1 and count <= 40 else "FAILED"))
+	print("[test-poi] placement: %s" % ("OK" if on_bad == 0 else "FAILED"))
+	# Stored on the chunk that owns the tile.
+	var cc: Vector2i = Constants.tile_to_chunk(Vector2i(0, 0))
+	var chunk: ChunkData = w.get_chunk(cc)
+	print("[test-poi] chunk store is Dictionary: %s" % ("OK" if chunk.pois is Dictionary else "FAILED"))
 	get_tree().quit()

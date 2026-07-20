@@ -49,6 +49,12 @@ func get_resource_at(cell: Vector2i) -> Dictionary:
 	var chunk: ChunkData = get_chunk(Constants.tile_to_chunk(cell))
 	return chunk.resources.get(cell, {})
 
+# --- Points of interest ---
+
+func get_poi_at(cell: Vector2i) -> Dictionary:
+	var chunk: ChunkData = get_chunk(Constants.tile_to_chunk(cell))
+	return chunk.pois.get(cell, {})
+
 # Removes up to `amount` from the node; returns how much was taken.
 # Every harvested cell's remaining amount, so a saved game can rebuild the
 # world from (seed + deltas) instead of serializing every chunk.
