@@ -14,6 +14,11 @@ const PLAYER_ORIGINS: Array[Vector2i] = [
 const CLEARING_RADIUS: float = 9.0
 const CLEARING_CORE_RADIUS: float = 5.0
 
+# River channel half-width in |river-noise| units. Tiles below this are the
+# river itself; várzea forms the wet margin immediately outside it, so both
+# _water_at and biome_at must share this threshold to stay contiguous.
+const RIVER_CHANNEL_THRESHOLD: float = 0.042
+
 var seed_val: int
 
 var _elevation: FastNoiseLite
@@ -85,6 +90,14 @@ func biome_at(x: int, y: int) -> int:
 			return Constants.Biome.WATER_SHALLOW if Constants.WALKABLE[water] else Constants.Biome.GRASS
 		return water
 
+	# Várzea: flooded forest flanking rivers. Moist low-mid land whose river
+	# noise sits just outside the water channel (a wet margin, not the river);
+	# the upper bound sets the margin width (~the river's own width again).
+	if clearing <= 0.0 and e < 0.5 and m > 0.55:
+		var rv: float = absf(_river.get_noise_2d(float(x), float(y)))
+		if rv >= RIVER_CHANNEL_THRESHOLD and rv < 0.075:
+			return Constants.Biome.VARZEA
+
 	if e > 0.86:
 		return Constants.Biome.CLIFF
 	if e > 0.76:
@@ -112,7 +125,7 @@ func _water_at(x: int, y: int, e: float) -> int:
 	# Rivers: |river noise| near zero. High ground pinches them off.
 	if e < 0.72:
 		var r: float = absf(_river.get_noise_2d(float(x), float(y)))
-		if r < 0.042:
+		if r < RIVER_CHANNEL_THRESHOLD:
 			var ford: bool = _n01(_detail, x, y) > 0.62
 			if r < 0.018 and not ford:
 				return Constants.Biome.WATER_DEEP
@@ -156,6 +169,11 @@ func resource_at(x: int, y: int, biome: int) -> Dictionary:
 			# Berry patches: gated by a slow noise so bushes cluster.
 			if h < 0.16 and _n01(_berry, x, y) > 0.64:
 				return { "type": Constants.ResourceType.FOOD, "amount": 100 }
+		Constants.Biome.VARZEA:
+			# Floodplain food — richer than a berry bush, the reward for
+			# braving the bog.
+			if h < 0.14:
+				return { "type": Constants.ResourceType.FOOD, "amount": 140 }
 		Constants.Biome.HIGH_GROUND:
 			if h < 0.055:
 				return { "type": Constants.ResourceType.JADE, "amount": 80 }

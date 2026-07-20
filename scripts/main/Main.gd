@@ -11,6 +11,11 @@ extends Node2D
 
 var unit_scene: PackedScene = preload("res://scenes/units/Unit.tscn")
 
+# Fixed seed for --test-world content assertions. Chosen because it places
+# varzea near the origin on both axes and a varzea FOOD cell on the diagonals,
+# giving the placement checks a deterministic, reproducible world to run against.
+const WORLD_TEST_SEED: int = 3
+
 func _ready() -> void:
 	var args: PackedStringArray = OS.get_cmdline_user_args()
 
@@ -1293,7 +1298,11 @@ func _run_world_test() -> void:
 	print("[test-world] varzea walkable=%s buildable=%s" % [
 		Constants.WALKABLE.get(b, false), Constants.BUILDABLE.get(b, false)])
 	# A cell known to be varzea: walkable-for-move but not buildable.
-	var w: WorldData = GameManager.world
+	# The playable world (GameManager.world) uses a random seed, so near-origin
+	# content is unpredictable. WorldGen is a pure function of the seed, so we
+	# assert varzea placement against a fixed-seed world for a deterministic,
+	# reproducible regression guard (a placement regression still fails here).
+	var w := WorldData.new(WORLD_TEST_SEED)
 	var found := false
 	for r in range(4, 60):
 		for c: Vector2i in [Vector2i(r, 0), Vector2i(0, r), Vector2i(-r, 0), Vector2i(0, -r)]:
@@ -1303,5 +1312,15 @@ func _run_world_test() -> void:
 				found = true
 				break
 		if found: break
-	print("[test-world] found-varzea: %s" % ("OK" if found else "SKIP (no varzea near origin yet — placement is Task A3)"))
+	print("[test-world] found-varzea: %s" % ("OK" if found else "FAILED"))
+	var food_on_varzea := false
+	for r in range(4, 80):
+		for c: Vector2i in [Vector2i(r, r), Vector2i(-r, r), Vector2i(r, -r), Vector2i(-r, -r)]:
+			if w.get_biome(c) == Constants.Biome.VARZEA:
+				var res: Dictionary = w.gen.resource_at(c.x, c.y, Constants.Biome.VARZEA)
+				if res.get("type") == Constants.ResourceType.FOOD:
+					food_on_varzea = true
+					break
+		if food_on_varzea: break
+	print("[test-world] varzea-food: %s" % ("OK" if food_on_varzea else "FAILED"))
 	get_tree().quit()
