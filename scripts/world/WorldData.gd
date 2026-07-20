@@ -55,6 +55,30 @@ func get_poi_at(cell: Vector2i) -> Dictionary:
 	var chunk: ChunkData = get_chunk(Constants.tile_to_chunk(cell))
 	return chunk.pois.get(cell, {})
 
+# Claimed POIs (one-time rewards already taken). Serialized for save/restore,
+# same pattern as resource_deltas — a saved game rebuilds the world from
+# (seed + deltas + claimed POIs).
+var claimed_pois: Dictionary = {}  # Vector2i cell -> true
+
+func is_poi_claimed(cell: Vector2i) -> bool:
+	return claimed_pois.has(cell)
+
+# Marks a POI claimed. Returns true only on the FIRST claim (idempotent);
+# false if already claimed or if there is no POI on this cell.
+func claim_poi(cell: Vector2i) -> bool:
+	if claimed_pois.has(cell):
+		return false
+	if get_poi_at(cell).is_empty():
+		return false
+	claimed_pois[cell] = true
+	return true
+
+# Unconditionally marks a cell claimed (save-restore only — the POI existence
+# check is skipped because the world is rebuilt from the same seed, so the POI
+# is guaranteed present). Mirrors set_resource_amount's restore role.
+func restore_claimed_poi(cell: Vector2i) -> void:
+	claimed_pois[cell] = true
+
 # Removes up to `amount` from the node; returns how much was taken.
 # Every harvested cell's remaining amount, so a saved game can rebuild the
 # world from (seed + deltas) instead of serializing every chunk.

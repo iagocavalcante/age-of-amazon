@@ -15,6 +15,10 @@ var unit_scene: PackedScene = preload("res://scenes/units/Unit.tscn")
 # varzea near the origin on both axes and a varzea FOOD cell on the diagonals,
 # giving the placement checks a deterministic, reproducible world to run against.
 const WORLD_TEST_SEED: int = 3
+# Fixed seed for the POI claim test. Ancient ruins are very rare (POI_RARITY),
+# so the live random seed can't be relied on to place one near origin; this
+# seed is verified to yield at least one ruin within the ±160 claim scan.
+const POI_TEST_SEED: int = 3
 
 func _ready() -> void:
 	var args: PackedStringArray = OS.get_cmdline_user_args()
@@ -243,6 +247,8 @@ func _restore_world(data: Dictionary) -> void:
 	for delta: Array in data.get("deltas", []):
 		GameManager.world.set_resource_amount(
 			Vector2i(int(delta[0]), int(delta[1])), int(delta[2]))
+	for c: Array in data.get("claimed_pois", []):
+		GameManager.world.restore_claimed_poi(Vector2i(int(c[0]), int(c[1])))
 	for b: Array in data.get("buildings", []):
 		var building: Building = Building.new()
 		building.name = String(b[0])
@@ -1388,4 +1394,30 @@ func _run_poi_test() -> void:
 	var cc: Vector2i = Constants.tile_to_chunk(Vector2i(0, 0))
 	var chunk: ChunkData = w.get_chunk(cc)
 	print("[test-poi] chunk store is Dictionary: %s" % ("OK" if chunk.pois is Dictionary else "FAILED"))
+	# Claim semantics + save round-trip, against a FIXED seed so a ruin is
+	# guaranteed present near origin (ruins are rare; the live seed is random).
+	var fw: WorldData = WorldData.new(POI_TEST_SEED)
+	var ruin := Vector2i(999999, 999999)
+	for yy in range(-160, 160):
+		for xx in range(-160, 160):
+			if fw.get_poi_at(Vector2i(xx, yy)).get("type") == "ancient_ruins":
+				ruin = Vector2i(xx, yy); break
+		if ruin.x != 999999: break
+	if ruin.x == 999999:
+		print("[test-poi] claim-setup: FAILED (no ruin for POI_TEST_SEED — pick another seed)")
+	else:
+		print("[test-poi] pre-claim: %s" % ("OK" if not fw.is_poi_claimed(ruin) else "FAILED"))
+		var first: bool = fw.claim_poi(ruin)
+		var second: bool = fw.claim_poi(ruin)
+		print("[test-poi] claim-once: %s" % ("OK" if first and not second else "FAILED"))
+		print("[test-poi] now-claimed: %s" % ("OK" if fw.is_poi_claimed(ruin) else "FAILED"))
+		# Save round-trip: serialize (as SaveGame does) then restore into a fresh
+		# same-seed world (as Main._restore_world does). Must survive.
+		var serialized: Array = []
+		for cell: Vector2i in fw.claimed_pois:
+			serialized.append([cell.x, cell.y])
+		var restored: WorldData = WorldData.new(POI_TEST_SEED)
+		for arr: Array in serialized:
+			restored.restore_claimed_poi(Vector2i(int(arr[0]), int(arr[1])))
+		print("[test-poi] claim-roundtrip: %s" % ("OK" if restored.is_poi_claimed(ruin) else "FAILED"))
 	get_tree().quit()

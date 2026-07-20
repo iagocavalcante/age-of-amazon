@@ -69,6 +69,9 @@ func save_now() -> void:
 	var deltas: Array = []
 	for cell: Vector2i in GameManager.world.resource_deltas:
 		deltas.append([cell.x, cell.y, GameManager.world.resource_deltas[cell]])
+	var claimed: Array = []
+	for cell: Vector2i in GameManager.world.claimed_pois:
+		claimed.append([cell.x, cell.y])
 
 	var camera: Camera2D = tree.current_scene.get_node_or_null("GameCamera")
 	var data: Dictionary = {
@@ -81,6 +84,7 @@ func save_now() -> void:
 		"buildings": buildings,
 		"animals": animals,
 		"deltas": deltas,
+		"claimed_pois": claimed,
 		"explored": _explored_out(GameManager.fog.vision if GameManager.fog != null else null),
 		"ai_explored": _explored_out(_enemy_vision()),
 		"camera": [camera.global_position.x, camera.global_position.y,

@@ -26,6 +26,7 @@ signal population_changed(player_id: int)
 
 # A gather swing landed on this cell (drives the tree-shake effect).
 signal resource_worked(cell: Vector2i)
+signal poi_claimed(cell: Vector2i, poi_type: String, player_id: int)
 
 # Wildlife signals
 signal animal_died(animal: Node2D)
