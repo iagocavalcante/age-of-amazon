@@ -302,7 +302,7 @@ func _placement_valid(base_cell: Vector2i) -> bool:
 	for dy in range(footprint.y):
 		for dx in range(footprint.x):
 			var cell: Vector2i = base_cell + Vector2i(dx, dy)
-			if not GameManager.world.is_walkable(cell):
+			if not GameManager.world.is_buildable(cell):
 				return false
 			if GameManager.world.building_at(cell) != null:
 				return false

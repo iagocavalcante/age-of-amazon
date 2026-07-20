@@ -149,7 +149,7 @@ func _exec_place(command: Dictionary) -> void:
 	for dy in range(footprint.y):
 		for dx in range(footprint.x):
 			var cell: Vector2i = base_cell + Vector2i(dx, dy)
-			if not GameManager.world.is_walkable(cell):
+			if not GameManager.world.is_buildable(cell):
 				return
 			if GameManager.world.building_at(cell) != null:
 				return

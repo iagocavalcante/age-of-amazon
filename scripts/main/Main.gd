@@ -1283,11 +1283,25 @@ func _run_world_test() -> void:
 	var tables := {
 		"MOVEMENT_COST": Constants.MOVEMENT_COST,
 		"WALKABLE": Constants.WALKABLE,
+		"BUILDABLE": Constants.BUILDABLE,
 		"BIOME_RAMPS": Constants.BIOME_RAMPS,
 		"BIOME_COLORS": Constants.BIOME_COLORS,
 	}
 	for table_name: String in tables:
 		var present: bool = tables[table_name].has(b)
 		print("[test-world] %s has VARZEA: %s" % [table_name, "OK" if present else "FAILED"])
-	print("[test-world] varzea walkable=%s" % Constants.WALKABLE.get(b, false))
+	print("[test-world] varzea walkable=%s buildable=%s" % [
+		Constants.WALKABLE.get(b, false), Constants.BUILDABLE.get(b, false)])
+	# A cell known to be varzea: walkable-for-move but not buildable.
+	var w: WorldData = GameManager.world
+	var found := false
+	for r in range(4, 60):
+		for c: Vector2i in [Vector2i(r, 0), Vector2i(0, r), Vector2i(-r, 0), Vector2i(0, -r)]:
+			if w.get_biome(c) == Constants.Biome.VARZEA:
+				print("[test-world] varzea cell %s walkable=%s buildable=%s" % [
+					c, w.is_walkable(c), w.is_buildable(c)])
+				found = true
+				break
+		if found: break
+	print("[test-world] found-varzea: %s" % ("OK" if found else "SKIP (no varzea near origin yet — placement is Task A3)"))
 	get_tree().quit()

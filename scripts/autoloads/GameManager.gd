@@ -150,7 +150,7 @@ func find_buildable_cell(origin: Vector2i, building_type: String, player_id: int
 				for fy in range(footprint.y):
 					for fx in range(footprint.x):
 						var cell: Vector2i = base + Vector2i(fx, fy)
-						if not world.is_walkable(cell) \
+						if not world.is_buildable(cell) \
 								or world.building_at(cell) != null \
 								or not world.get_resource_at(cell).is_empty() \
 								or not has_explored(player_id, cell):

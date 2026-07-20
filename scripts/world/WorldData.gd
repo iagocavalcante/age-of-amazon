@@ -33,6 +33,11 @@ func is_walkable(cell: Vector2i) -> bool:
 		return false
 	return Constants.WALKABLE.get(get_biome(cell), false)
 
+func is_buildable(cell: Vector2i) -> bool:
+	if occupied.has(cell):
+		return false
+	return Constants.BUILDABLE.get(get_biome(cell), false)
+
 func movement_cost(cell: Vector2i) -> float:
 	if occupied.has(cell):
 		return INF

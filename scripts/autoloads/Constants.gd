@@ -243,6 +243,12 @@ func _ready() -> void:
 		Biome.VARZEA: true,
 	}
 
+	# Can a building's footprint occupy this biome? Defaults to WALKABLE, but
+	# wetland and shallow water reject construction while still allowing movement.
+	BUILDABLE = WALKABLE.duplicate()
+	BUILDABLE[Biome.VARZEA] = false
+	BUILDABLE[Biome.WATER_SHALLOW] = false
+
 	BIOME_RAMPS = {
 		Biome.GRASS: [
 			Color8(74, 120, 44), Color8(96, 148, 54),
