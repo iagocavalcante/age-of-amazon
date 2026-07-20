@@ -16,7 +16,8 @@ enum Biome {
 	WATER_SHALLOW,
 	SWAMP,
 	CLIFF,
-	HIGH_GROUND
+	HIGH_GROUND,
+	VARZEA,
 }
 
 enum ResourceType { FOOD, WOOD, JADE }
@@ -202,6 +203,7 @@ const MONUMENT_VICTORY_SECS: float = 90.0
 # Movement costs per biome (keyed by int)
 var MOVEMENT_COST: Dictionary = {}
 var WALKABLE: Dictionary = {}
+var BUILDABLE: Dictionary = {}
 
 # Per-biome color ramps: [shadow, dark, base, light, highlight]
 var BIOME_RAMPS: Dictionary = {}
@@ -226,6 +228,7 @@ func _ready() -> void:
 		Biome.SWAMP: 2.5,
 		Biome.CLIFF: INF,
 		Biome.HIGH_GROUND: 1.1,
+		Biome.VARZEA: 2.2,
 	}
 
 	WALKABLE = {
@@ -237,6 +240,7 @@ func _ready() -> void:
 		Biome.SWAMP: true,
 		Biome.CLIFF: false,
 		Biome.HIGH_GROUND: true,
+		Biome.VARZEA: true,
 	}
 
 	BIOME_RAMPS = {
@@ -271,6 +275,10 @@ func _ready() -> void:
 		Biome.HIGH_GROUND: [
 			Color8(112, 100, 64), Color8(132, 118, 76),
 			Color8(150, 136, 88), Color8(166, 152, 102), Color8(182, 168, 118),
+		],
+		Biome.VARZEA: [
+			Color8(40, 70, 58), Color8(52, 88, 70),
+			Color8(64, 104, 82), Color8(80, 120, 96), Color8(98, 138, 112),
 		],
 	}
 

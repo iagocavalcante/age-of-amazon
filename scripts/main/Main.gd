@@ -66,6 +66,9 @@ func _ready() -> void:
 		_run_fish_test()
 	if "--test-victory" in args:
 		_run_victory_test()
+	if "--test-world" in args:
+		_run_world_test()
+		return
 	if "--test-systems" in args:
 		_run_systems_test()
 	if "--test-scout" in args:
@@ -1273,4 +1276,18 @@ func _run_systems_test() -> void:
 				hidden_enemies += 1
 	print("[test-systems] enemy units hidden=", hidden_enemies, " visible=", visible_enemies,
 		" (culling ", "OK" if hidden_enemies > 0 else "CHECK", ")")
+	get_tree().quit()
+
+func _run_world_test() -> void:
+	var b: int = Constants.Biome.VARZEA
+	var tables := {
+		"MOVEMENT_COST": Constants.MOVEMENT_COST,
+		"WALKABLE": Constants.WALKABLE,
+		"BIOME_RAMPS": Constants.BIOME_RAMPS,
+		"BIOME_COLORS": Constants.BIOME_COLORS,
+	}
+	for table_name: String in tables:
+		var present: bool = tables[table_name].has(b)
+		print("[test-world] %s has VARZEA: %s" % [table_name, "OK" if present else "FAILED"])
+	print("[test-world] varzea walkable=%s" % Constants.WALKABLE.get(b, false))
 	get_tree().quit()
