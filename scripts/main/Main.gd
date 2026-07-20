@@ -84,6 +84,8 @@ func _ready() -> void:
 		_run_capture_help()
 	if "--capture-animals" in args:
 		_run_capture_animals()
+	if "--capture-world" in args:
+		_run_capture_world()
 
 func _is_harness(args: PackedStringArray) -> bool:
 	for arg: String in args:
@@ -1207,6 +1209,39 @@ func _run_capture_animals() -> void:
 	var path: String = "user://animals_capture.png"
 	img.save_png(path)
 	print("[capture-animals] saved ", ProjectSettings.globalize_path(path), " size=", img.get_size())
+	get_tree().quit()
+
+func _run_capture_world() -> void:
+	await get_tree().process_frame
+	# Scan outward from the origin for the nearest varzea cell. The playable
+	# world uses a random seed, so we locate it dynamically rather than assume.
+	var target := Vector2i(0, 0)
+	var found := false
+	for r in range(2, 120):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				var c := Vector2i(dx, dy)
+				if GameManager.world.get_biome(c) == Constants.Biome.VARZEA:
+					target = c
+					found = true
+					break
+			if found: break
+		if found: break
+	print("[capture-world] varzea near origin: ", found, " at ", target)
+	# Drop units on the varzea cell to prove it is walkable land, not water.
+	_spawn_unit("villager", 0, target + Vector2i(1, 0))
+	_spawn_unit("warrior", 0, target + Vector2i(0, 1))
+	camera.global_position = Constants.grid_to_world(target.x, target.y)
+	camera.target_zoom = 1.9
+	camera.zoom = Vector2(1.9, 1.9)
+	fog.force_update()
+	for _i in range(10):
+		await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var img: Image = get_viewport().get_texture().get_image()
+	var path: String = "user://world_capture.png"
+	img.save_png(path)
+	print("[capture-world] saved ", ProjectSettings.globalize_path(path), " size=", img.get_size())
 	get_tree().quit()
 
 func _find_tc(player_id: int) -> Building:
