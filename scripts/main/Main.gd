@@ -81,6 +81,9 @@ func _ready() -> void:
 	if "--test-poi" in args:
 		_run_poi_test()
 		return
+	if "--test-poi-claim" in args:
+		_run_poi_claim_test()
+		return
 	if "--test-systems" in args:
 		_run_systems_test()
 	if "--test-scout" in args:
@@ -111,6 +114,11 @@ func _arg_value(args: PackedStringArray, prefix: String, fallback: String = "") 
 # Single-player: this process is the authority; the classic asymmetric start
 # (player villagers vs AI warriors) and the EnemyAI opponent.
 func _boot_offline(args: PackedStringArray) -> void:
+	# The POI claim harness sweeps the LIVE world for a ruin near origin. Ruins
+	# are rare, so pin the world to the seed verified to place one within the
+	# scan (same seed --test-poi asserts against) before the world is built.
+	if "--test-poi-claim" in args:
+		GameManager.map_seed = POI_TEST_SEED
 	var resume: Dictionary = {}
 	if SaveGame.pending_resume:
 		SaveGame.pending_resume = false
@@ -152,6 +160,11 @@ func _boot_offline(args: PackedStringArray) -> void:
 	GameManager.game_time_secs = 0.0
 	EventBus.world_ready.emit()
 	GameManager.change_state(GameManager.GameState.RUNNING)
+
+	# Point-of-interest claiming (ancient ruin loot). Authority-only sim node;
+	# it exists here because offline is the authority. Its _process self-gates
+	# on Net.is_authority(), so it is inert on any non-authority path.
+	_spawn_poi_manager()
 
 	# Ambient wildlife runs in normal play; harnesses seed their own animals
 	# (or none) so the simulation stays deterministic.
@@ -205,6 +218,9 @@ func _boot_server(args: PackedStringArray) -> void:
 	chunk_manager.load_now()
 	EventBus.world_ready.emit()
 	GameManager.change_state(GameManager.GameState.RUNNING)
+
+	# Authoritative POI claiming, symmetric across all tribes (see _boot_offline).
+	_spawn_poi_manager()
 
 # Headless lobby: no game world at all — just the Gateway autoload's room
 # service. The Main scene's world/UI nodes are dropped.
@@ -282,6 +298,15 @@ func _place_building(type: String, player_id: int, base_cell: Vector2i) -> Build
 	building.setup(type, player_id, base_cell)
 	buildings.add_child(building)
 	return building
+
+# Instantiate the authority-only POI claim manager in code (no scene visuals;
+# rendering is a separate task). Named so harnesses can reach it via
+# get_node_or_null("PoiManager").
+func _spawn_poi_manager() -> PoiManager:
+	var poi_manager: PoiManager = PoiManager.new()
+	poi_manager.name = "PoiManager"
+	add_child(poi_manager)
+	return poi_manager
 
 func _spawn_unit(unit_type: String, player_id: int, cell: Vector2i) -> UnitBase:
 	var unit: UnitBase = unit_scene.instantiate() as UnitBase
@@ -1420,4 +1445,57 @@ func _run_poi_test() -> void:
 		for arr: Array in serialized:
 			restored.restore_claimed_poi(Vector2i(int(arr[0]), int(arr[1])))
 		print("[test-poi] claim-roundtrip: %s" % ("OK" if restored.is_poi_claimed(ruin) else "FAILED"))
+	get_tree().quit()
+
+# Prove ancient ruins are looted on proximity: a unit reaching an unclaimed ruin
+# banks its loot for that unit's player, once and only once. Runs on the live
+# (authority) world, which _boot_offline pins to POI_TEST_SEED so a ruin sits
+# within the scan below.
+func _run_poi_claim_test() -> void:
+	await get_tree().create_timer(0.5).timeout
+	var w: WorldData = GameManager.world
+	# Nearest unclaimed ancient ruin by outward ring scan. r goes to 160 to cover
+	# the same ±160 region --test-poi verifies a ruin exists in for this seed.
+	var ruin := Vector2i(999999, 999999)
+	for r in range(0, 161):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if absi(dx) != r and absi(dy) != r:
+					continue  # ring only — skip interior already scanned
+				var c := Vector2i(dx, dy)
+				if w.get_poi_at(c).get("type") == "ancient_ruins" and not w.is_poi_claimed(c):
+					ruin = c; break
+			if ruin.x != 999999: break
+		if ruin.x != 999999: break
+	if ruin.x == 999999:
+		print("[test-poi-claim] setup: FAILED (no ruin found within r=160)")
+		get_tree().quit(); return
+	print("[test-poi-claim] ruin at ", ruin)
+
+	var pm: PoiManager = get_node_or_null("PoiManager")
+	print("[test-poi-claim] manager-present: %s" % ("OK" if pm != null else "FAILED"))
+
+	var jade_before: int = GameManager.get_resource(0, Constants.ResourceType.JADE)
+	var wood_before: int = GameManager.get_resource(0, Constants.ResourceType.WOOD)
+
+	# Spawn a player-0 unit ON the ruin cell (ruins sit on buildable, hence
+	# walkable, land) and sweep.
+	_spawn_unit("warrior", 0, ruin)
+	await get_tree().process_frame
+	if pm != null:
+		pm.check_claims()
+	await get_tree().process_frame
+
+	var jade_after: int = GameManager.get_resource(0, Constants.ResourceType.JADE)
+	var wood_after: int = GameManager.get_resource(0, Constants.ResourceType.WOOD)
+	print("[test-poi-claim] looted-jade: %s" % ("OK" if jade_after == jade_before + 40 else "FAILED (%d->%d)" % [jade_before, jade_after]))
+	print("[test-poi-claim] looted-wood: %s" % ("OK" if wood_after == wood_before + 60 else "FAILED (%d->%d)" % [wood_before, wood_after]))
+	print("[test-poi-claim] claimed: %s" % ("OK" if w.is_poi_claimed(ruin) else "FAILED"))
+
+	# No double-claim: sweeping again must not credit more.
+	if pm != null:
+		pm.check_claims()
+	await get_tree().process_frame
+	var jade_after2: int = GameManager.get_resource(0, Constants.ResourceType.JADE)
+	print("[test-poi-claim] no-double: %s" % ("OK" if jade_after2 == jade_after else "FAILED"))
 	get_tree().quit()

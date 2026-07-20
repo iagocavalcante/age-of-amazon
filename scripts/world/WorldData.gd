@@ -55,6 +55,15 @@ func get_poi_at(cell: Vector2i) -> Dictionary:
 	var chunk: ChunkData = get_chunk(Constants.tile_to_chunk(cell))
 	return chunk.pois.get(cell, {})
 
+# Non-generating variant of get_poi_at: returns {} if the owning chunk has not
+# been generated yet (so proximity scanners never force far-off generation —
+# same discipline as find_nearest_resource).
+func peek_poi_at(cell: Vector2i) -> Dictionary:
+	var chunk: ChunkData = chunks.get(Constants.tile_to_chunk(cell))
+	if chunk == null:
+		return {}
+	return chunk.pois.get(cell, {})
+
 # Claimed POIs (one-time rewards already taken). Serialized for save/restore,
 # same pattern as resource_deltas — a saved game rebuilds the world from
 # (seed + deltas + claimed POIs).
