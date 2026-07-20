@@ -16,6 +16,9 @@ var visual: Node2D = null          # ground + water sprites
 var doodad_visual: Node2D = null   # y-sorted trees/bushes/rocks
 # Sprites for resource nodes, so depletion can remove them: cell -> Sprite2D
 var resource_sprites: Dictionary = {}
+# Sprites for POI landmarks (ancient ruins), so claiming can remove them:
+# cell -> Sprite2D
+var poi_sprites: Dictionary = {}
 
 func _init(p_coords: Vector2i, gen: WorldGen) -> void:
 	coords = p_coords

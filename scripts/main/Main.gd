@@ -96,6 +96,8 @@ func _ready() -> void:
 		_run_capture_animals()
 	if "--capture-world" in args:
 		_run_capture_world()
+	if "--capture-ruins" in args:
+		_run_capture_ruins()
 
 func _is_harness(args: PackedStringArray) -> bool:
 	for arg: String in args:
@@ -117,7 +119,7 @@ func _boot_offline(args: PackedStringArray) -> void:
 	# The POI claim harness sweeps the LIVE world for a ruin near origin. Ruins
 	# are rare, so pin the world to the seed verified to place one within the
 	# scan (same seed --test-poi asserts against) before the world is built.
-	if "--test-poi-claim" in args:
+	if "--test-poi-claim" in args or "--capture-ruins" in args:
 		GameManager.map_seed = POI_TEST_SEED
 	var resume: Dictionary = {}
 	if SaveGame.pending_resume:
@@ -1278,6 +1280,43 @@ func _run_capture_world() -> void:
 	print("[capture-world] saved ", ProjectSettings.globalize_path(path), " size=", img.get_size())
 	get_tree().quit()
 
+# Pan to an unclaimed ancient ruin (POI_TEST_SEED pins one near origin) and
+# screenshot it so the coordinator can eyeball the landmark sprite.
+func _run_capture_ruins() -> void:
+	await get_tree().process_frame
+	var w: WorldData = GameManager.world
+	var ruin := Vector2i(999999, 999999)
+	for r in range(0, 161):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if absi(dx) != r and absi(dy) != r:
+					continue  # ring only
+				var c := Vector2i(dx, dy)
+				if w.get_poi_at(c).get("type") == "ancient_ruins" and not w.is_poi_claimed(c):
+					ruin = c; break
+			if ruin.x != 999999: break
+		if ruin.x != 999999: break
+	if ruin.x == 999999:
+		print("[capture-ruins] setup: FAILED (no ruin found within r=160)")
+		get_tree().quit(); return
+	# Reveal the ruin without claiming it: a scout 2 tiles away sits inside unit
+	# vision (radius >= 4) but outside the claim radius (1), so the fog lifts and
+	# the unclaimed landmark renders under the fog shader.
+	_spawn_unit("villager", 0, ruin + Vector2i(2, 0))
+	camera.global_position = Constants.grid_to_world(ruin.x, ruin.y)
+	camera.target_zoom = 1.9
+	camera.zoom = Vector2(1.9, 1.9)
+	chunk_manager.load_now()
+	fog.force_update()
+	for _i in range(10):
+		await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var img: Image = get_viewport().get_texture().get_image()
+	var path: String = "user://ruins_capture.png"
+	img.save_png(path)
+	print("[capture-ruins] saved ", ProjectSettings.globalize_path(path), " ruin at ", ruin)
+	get_tree().quit()
+
 func _find_tc(player_id: int) -> Building:
 	for node: Node in get_tree().get_nodes_in_group("buildings"):
 		var building: Building = node as Building
@@ -1472,6 +1511,14 @@ func _run_poi_claim_test() -> void:
 		get_tree().quit(); return
 	print("[test-poi-claim] ruin at ", ruin)
 
+	# Render-wiring: build the ruin's chunk visual near the camera and confirm
+	# an unclaimed ruin gets a landmark sprite (Sprite2D nodes exist headlessly).
+	var ruin_chunk: ChunkData = w.get_chunk(Constants.tile_to_chunk(ruin))
+	camera.global_position = Constants.grid_to_world(ruin.x, ruin.y)
+	chunk_manager.load_now()
+	await get_tree().process_frame
+	print("[test-poi-claim] sprite-built: %s" % ("OK" if ruin_chunk.poi_sprites.has(ruin) else "FAILED"))
+
 	var pm: PoiManager = get_node_or_null("PoiManager")
 	print("[test-poi-claim] manager-present: %s" % ("OK" if pm != null else "FAILED"))
 
@@ -1491,6 +1538,8 @@ func _run_poi_claim_test() -> void:
 	print("[test-poi-claim] looted-jade: %s" % ("OK" if jade_after == jade_before + 40 else "FAILED (%d->%d)" % [jade_before, jade_after]))
 	print("[test-poi-claim] looted-wood: %s" % ("OK" if wood_after == wood_before + 60 else "FAILED (%d->%d)" % [wood_before, wood_after]))
 	print("[test-poi-claim] claimed: %s" % ("OK" if w.is_poi_claimed(ruin) else "FAILED"))
+	# The poi_claimed signal must have removed the landmark sprite.
+	print("[test-poi-claim] sprite-removed: %s" % ("OK" if not ruin_chunk.poi_sprites.has(ruin) else "FAILED"))
 
 	# No double-claim: sweeping again must not credit more.
 	if pm != null:

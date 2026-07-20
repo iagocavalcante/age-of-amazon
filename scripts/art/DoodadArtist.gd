@@ -176,6 +176,64 @@ func build_jade_deposit() -> ImageTexture:
 
 	return ImageTexture.create_from_image(img)
 
+# Ancient ruins landmark: a low crumbling slab with a few broken pale-grey
+# stone pillars of varying heights — a weathered monument, distinct from the
+# single boulder of build_rock and the vein-flecked rock of build_jade_deposit.
+func build_ruins() -> ImageTexture:
+	var w: int = 26
+	var h: int = 22
+	var img: Image = Image.create(w, h, false, Image.FORMAT_RGBA8)
+	var stone_dark: Color = Color8(120, 116, 104)
+	var stone_mid: Color = Color8(168, 162, 148)
+	var stone_light: Color = Color8(206, 200, 184)
+	var moss: Color = Color8(96, 128, 78)
+
+	var cx: float = w / 2.0
+	var base_y: float = h - 3.0
+
+	# Ground contact shadow.
+	PixelArt.draw_ellipse(img, cx, base_y, 11.0, 3.5, Color(0.0, 0.0, 0.0, 0.28), true)
+
+	# Crumbling base slab the pillars stand on.
+	var slab_top: int = h - 7
+	for y in range(slab_top, h - 2):
+		for x in range(3, w - 3):
+			var value: float = clampf(0.55 + (PixelArt.hash2(x, y, 611) - 0.5) * 0.7, 0.0, 1.0)
+			img.set_pixel(x, y, PixelArt.ramp_shade([stone_dark, stone_mid, stone_light], value, x, y))
+
+	# Broken pillars: [base_x, width, height], deterministic heights.
+	var pillars: Array = [
+		[5, 3, 14],
+		[11, 4, 18],
+		[18, 3, 11],
+	]
+	for pillar: Array in pillars:
+		var px: int = pillar[0]
+		var pw: int = pillar[1]
+		var ph: int = pillar[2]
+		var top: int = slab_top - ph
+		for y in range(maxi(top, 0), slab_top):
+			for dx in range(pw):
+				var x: int = px + dx
+				if x >= w:
+					continue
+				# Jagged crown: crumble a bite out of the top rows.
+				if y < top + 2 and PixelArt.hash2(x, y, 733) > 0.6:
+					continue
+				# Lit from the upper-left, dithered for weathered texture.
+				var lit: float = 1.0 - float(dx) / float(pw)
+				var value: float = clampf(0.4 + lit * 0.5 + (PixelArt.hash2(x, y, 421) - 0.5) * 0.4, 0.0, 1.0)
+				img.set_pixel(x, y, PixelArt.ramp_shade([stone_dark, stone_mid, stone_light], value, x, y))
+
+	# Moss speckles clinging to the old stone.
+	for i in range(6):
+		var mx: int = 4 + int(PixelArt.hash2(i, 5, 271) * (w - 8))
+		var my: int = slab_top - 2 - int(PixelArt.hash2(i, 8, 272) * 8.0)
+		if my >= 0 and my < h and img.get_pixel(mx, my).a > 0.0:
+			img.set_pixel(mx, my, moss)
+
+	return ImageTexture.create_from_image(img)
+
 func build_reeds() -> ImageTexture:
 	var w: int = 16
 	var h: int = 18

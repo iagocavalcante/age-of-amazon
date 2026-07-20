@@ -19,6 +19,7 @@ var reeds_texture: ImageTexture
 var berry_texture: ImageTexture
 var jade_texture: ImageTexture
 var fish_texture: ImageTexture
+var ruins_texture: ImageTexture
 
 var icons: Dictionary = {}  # "food"/"wood"/"jade"/"pop" -> ImageTexture
 
@@ -120,6 +121,7 @@ func _ready() -> void:
 	berry_texture = doodad_artist.build_berry_bush()
 	jade_texture = doodad_artist.build_jade_deposit()
 	fish_texture = doodad_artist.build_fish_school()
+	ruins_texture = doodad_artist.build_ruins()
 
 	var animal_artist: AnimalArtist = AnimalArtist.new()
 	animal_frames["capybara"] = animal_artist.build_capybara_frames()

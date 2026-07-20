@@ -35,6 +35,7 @@ func setup(p_camera: Camera2D, p_doodad_parent: Node2D) -> void:
 
 	world.resource_depleted.connect(_on_resource_depleted)
 	EventBus.resource_worked.connect(_on_resource_worked)
+	EventBus.poi_claimed.connect(_on_poi_claimed)
 
 func _process(_delta: float) -> void:
 	if camera == null:
@@ -142,6 +143,18 @@ func _build_visual(chunk: ChunkData) -> void:
 		var texture: Texture2D = AssetLibrary.reeds_texture if chunk.decor[cell] == "reeds" else AssetLibrary.rock_texture
 		doodads.add_child(_doodad_sprite(texture, cell))
 
+	# POI landmarks: unclaimed ruins render as a fog-gated sprite (an already
+	# claimed ruin has been razed, so it must not reappear on chunk reload).
+	# One POI type today (ancient_ruins) → one texture. Key off poi["type"]
+	# when a second POI type is added.
+	chunk.poi_sprites.clear()
+	for cell: Vector2i in chunk.pois:
+		if world.is_poi_claimed(cell):
+			continue
+		var poi_sprite: Sprite2D = _doodad_sprite(AssetLibrary.ruins_texture, cell)
+		doodads.add_child(poi_sprite)
+		chunk.poi_sprites[cell] = poi_sprite
+
 	doodad_parent.add_child(doodads)
 	chunk.doodad_visual = doodads
 
@@ -177,6 +190,7 @@ func _unload_visual(chunk: ChunkData) -> void:
 		chunk.doodad_visual.queue_free()
 		chunk.doodad_visual = null
 	chunk.resource_sprites.clear()
+	chunk.poi_sprites.clear()
 
 # A swing landed: give the resource sprite a little shake so chopping a
 # tree looks like chopping a tree.
@@ -196,3 +210,19 @@ func _on_resource_depleted(cell: Vector2i) -> void:
 	if sprite != null and is_instance_valid(sprite):
 		sprite.queue_free()
 	chunk.resource_sprites.erase(cell)
+
+# A ruin was claimed (and razed): remove its landmark sprite so the crumbling
+# stone doesn't linger after the loot is banked.
+# NOTE: this does NOT set claimed_pois — it relies on the claim already being
+# recorded there (offline: PoiManager sets it before emitting). Task B4b must
+# replicate the claimed STATE to clients (via restore_claimed_poi), not just
+# this signal, or the ruin resurrects on chunk reload and the minimap dot
+# reappears.
+func _on_poi_claimed(cell: Vector2i, _poi_type: String, _player_id: int) -> void:
+	var chunk: ChunkData = world.chunks.get(Constants.tile_to_chunk(cell))
+	if chunk == null:
+		return
+	var sprite: Sprite2D = chunk.poi_sprites.get(cell)
+	if sprite != null and is_instance_valid(sprite):
+		sprite.queue_free()
+	chunk.poi_sprites.erase(cell)

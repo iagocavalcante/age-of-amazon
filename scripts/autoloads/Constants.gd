@@ -94,6 +94,7 @@ const UNIT_DEFS: Dictionary = {
 # killing blow (see ADR 14). Prey flee; predators attack units of any player.
 const ANIMAL_NEUTRAL_ID: int = -1
 const WILDLIFE_COLOR: Color = Color(0.88, 0.80, 0.44)  # minimap dot
+const RUINS_MINIMAP_COLOR: Color = Color(0.85, 0.80, 0.55)  # pale stone/gold dot
 
 const ANIMAL_DEFS: Dictionary = {
 	"capybara": {

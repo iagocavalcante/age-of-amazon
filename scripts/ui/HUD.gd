@@ -662,6 +662,29 @@ func _redraw_minimap() -> void:
 		if animal != null and animal.visible:
 			_plot(animal, center, half, 1, Constants.WILDLIFE_COLOR)
 
+	# Discovered, unclaimed ancient ruins as pale stone dots — a breadcrumb to
+	# landmarks worth claiming. Gated on explored (never reveals unseen ruins)
+	# and unclaimed (a razed ruin drops off the map). Only already-generated
+	# chunks are consulted, like the terrain pass, so no generation is forced.
+	# One POI type today (ancient_ruins) → every POI dots the same. Key off the
+	# POI's "type" when a second POI type is added.
+	for py in range(MINIMAP_TILES):
+		for px in range(MINIMAP_TILES):
+			var cell: Vector2i = center + Vector2i(px - half, py - half)
+			var chunk: ChunkData = world.chunks.get(Constants.tile_to_chunk(cell))
+			if chunk == null or not chunk.pois.has(cell):
+				continue
+			if fog != null and not fog.is_explored(cell):
+				continue
+			if world.is_poi_claimed(cell):
+				continue
+			for dy in range(0, 2):
+				for dx in range(0, 2):
+					var x: int = px + dx
+					var y: int = py + dy
+					if x >= 0 and x < MINIMAP_TILES and y >= 0 and y < MINIMAP_TILES:
+						_minimap_image.set_pixel(x, y, Constants.RUINS_MINIMAP_COLOR)
+
 	_minimap_rect.texture = ImageTexture.create_from_image(_minimap_image)
 
 func _plot(entity: Node2D, center: Vector2i, half: int, radius: int, color_override: Color = Color(0, 0, 0, 0)) -> void:
