@@ -51,6 +51,10 @@ func _on_world_ready() -> void:
 				multiplayer.peer_disconnected.connect(
 					func(peer_id: int) -> void: _live_peers.erase(peer_id))
 			GameManager.world.resource_depleted.connect(_on_resource_depleted)
+			# POI claims execute only on the server (PoiManager is authority-
+			# gated); broadcast them so clients raze the ruin + record the state.
+			if not EventBus.poi_claimed.is_connected(_on_poi_claimed_server):
+				EventBus.poi_claimed.connect(_on_poi_claimed_server)
 		Net.Mode.CLIENT:
 			_client_world_ready.rpc_id(1)
 
@@ -70,6 +74,8 @@ func _client_world_ready() -> void:
 		_spawn_unit.rpc_id(sender, _unit_data(node as UnitBase))
 	for cell: Vector2i in _depleted_cells:
 		_deplete_resource.rpc_id(sender, cell)
+	for cell: Vector2i in GameManager.world.claimed_pois:
+		_claim_poi.rpc_id(sender, cell)
 	GameManager.push_stockpile_to_peer(sender)
 	print("[net] snapshot sent to player %d" % Net.peer_players[sender])
 
@@ -89,6 +95,12 @@ func _on_resource_depleted(cell: Vector2i) -> void:
 	_depleted_cells.append(cell)
 	for peer: int in _live_peers:
 		_deplete_resource.rpc_id(peer, cell)
+
+# GameManager.world.claimed_pois is the authoritative claimed set, so no
+# separate tracking array is needed for snapshots (unlike _depleted_cells).
+func _on_poi_claimed_server(cell: Vector2i, _poi_type: String, _player_id: int) -> void:
+	for peer: int in _live_peers:
+		_claim_poi.rpc_id(peer, cell)
 
 func _process(delta: float) -> void:
 	if Net.mode != Net.Mode.SERVER:
@@ -214,6 +226,24 @@ func _despawn(entity_name: String) -> void:
 func _deplete_resource(cell: Vector2i) -> void:
 	if Net.mode == Net.Mode.CLIENT and GameManager.world != null:
 		GameManager.world.take_resource(cell, 1 << 30)
+
+@rpc("authority", "call_remote", "reliable")
+func _claim_poi(cell: Vector2i) -> void:
+	if Net.mode != Net.Mode.CLIENT or GameManager.world == null:
+		return
+	# Idempotent: the join snapshot and a live claim event can both arrive.
+	if GameManager.world.is_poi_claimed(cell):
+		return
+	# Record the claimed STATE first: that alone stops the build-time skip and
+	# the minimap dot (HUD polls is_poi_claimed each frame). The emit only
+	# drives ChunkManager's LIVE-sprite removal. peek_poi_at is the non-
+	# generating lookup (B3 discipline): the join snapshot replays every claimed
+	# cell, so get_poi_at would force-generate not-yet-streamed chunks. For an
+	# ungenerated chunk peek returns {} -> ChunkManager's null guard returns
+	# cleanly (no live sprite there anyway). player_id = -1: the client credits
+	# no one locally; the reward already replicated via the stockpile sync.
+	GameManager.world.restore_claimed_poi(cell)
+	EventBus.poi_claimed.emit(cell, String(GameManager.world.peek_poi_at(cell).get("type", "")), -1)
 
 @rpc("authority", "call_remote", "unreliable")
 func _tick(unit_states: Array, building_states: Array) -> void:
