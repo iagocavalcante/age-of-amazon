@@ -1292,7 +1292,7 @@ func _run_capture_ruins() -> void:
 				if absi(dx) != r and absi(dy) != r:
 					continue  # ring only
 				var c := Vector2i(dx, dy)
-				if w.get_poi_at(c).get("type") == "ancient_ruins" and not w.is_poi_claimed(c):
+				if w.get_poi_at(c).get("type") == Constants.POI_ANCIENT_RUINS and not w.is_poi_claimed(c):
 					ruin = c; break
 			if ruin.x != 999999: break
 		if ruin.x != 999999: break
@@ -1464,7 +1464,7 @@ func _run_poi_test() -> void:
 	var ruin := Vector2i(999999, 999999)
 	for yy in range(-160, 160):
 		for xx in range(-160, 160):
-			if fw.get_poi_at(Vector2i(xx, yy)).get("type") == "ancient_ruins":
+			if fw.get_poi_at(Vector2i(xx, yy)).get("type") == Constants.POI_ANCIENT_RUINS:
 				ruin = Vector2i(xx, yy); break
 		if ruin.x != 999999: break
 	if ruin.x == 999999:
@@ -1502,7 +1502,7 @@ func _run_poi_claim_test() -> void:
 				if absi(dx) != r and absi(dy) != r:
 					continue  # ring only — skip interior already scanned
 				var c := Vector2i(dx, dy)
-				if w.get_poi_at(c).get("type") == "ancient_ruins" and not w.is_poi_claimed(c):
+				if w.get_poi_at(c).get("type") == Constants.POI_ANCIENT_RUINS and not w.is_poi_claimed(c):
 					ruin = c; break
 			if ruin.x != 999999: break
 		if ruin.x != 999999: break

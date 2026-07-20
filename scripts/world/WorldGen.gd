@@ -96,7 +96,8 @@ func biome_at(x: int, y: int) -> int:
 
 	# Várzea: flooded forest flanking rivers. Moist low-mid land whose river
 	# noise sits just outside the water channel (a wet margin, not the river);
-	# the upper bound sets the margin width (~the river's own width again).
+	# the upper bound sets the wet-margin width (~0.033 in |river-noise| units,
+	# comparable to the river channel's own 0.042).
 	if clearing <= 0.0 and e < 0.5 and m > 0.55:
 		var rv: float = absf(_river.get_noise_2d(float(x), float(y)))
 		if rv >= RIVER_CHANNEL_THRESHOLD and rv < 0.075:
@@ -205,8 +206,8 @@ func poi_at(x: int, y: int, biome: int) -> Dictionary:
 		return {}
 	var h: float = PixelArt.hash2(x, y, seed_val + 9001)
 	if h < POI_RARITY:
-		return { "type": "ancient_ruins",
-			"loot": { Constants.ResourceType.JADE: 40, Constants.ResourceType.WOOD: 60 } }
+		return { "type": Constants.POI_ANCIENT_RUINS,
+			"loot": Constants.POI_DEFS[Constants.POI_ANCIENT_RUINS]["loot"] }
 	return {}
 
 # Pure decoration (not harvestable): reeds on swamp, rocks on cliffs.

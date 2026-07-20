@@ -211,13 +211,12 @@ func _on_resource_depleted(cell: Vector2i) -> void:
 		sprite.queue_free()
 	chunk.resource_sprites.erase(cell)
 
-# A ruin was claimed (and razed): remove its landmark sprite so the crumbling
-# stone doesn't linger after the loot is banked.
-# NOTE: this does NOT set claimed_pois — it relies on the claim already being
-# recorded there (offline: PoiManager sets it before emitting). Task B4b must
-# replicate the claimed STATE to clients (via restore_claimed_poi), not just
-# this signal, or the ruin resurrects on chunk reload and the minimap dot
-# reappears.
+# Frees the live ruin sprite when a POI is claimed. It does NOT set claimed_pois
+# — it relies on the claim already being recorded there: offline, PoiManager sets
+# it before emitting; in multiplayer, Replication._claim_poi calls
+# restore_claimed_poi on the client before emitting this signal locally. That
+# recorded state (not this signal) is what stops the build-time skip and the
+# minimap dot; this handler only removes the currently-visible sprite.
 func _on_poi_claimed(cell: Vector2i, _poi_type: String, _player_id: int) -> void:
 	var chunk: ChunkData = world.chunks.get(Constants.tile_to_chunk(cell))
 	if chunk == null:

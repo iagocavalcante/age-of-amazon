@@ -199,6 +199,18 @@ const BUILDING_DEFS: Dictionary = {
 	},
 }
 
+# Point-of-interest type ids (see WorldGen.poi_at). Kept as string ids — POIs
+# are a separate taxonomy from ResourceType/Biome enums and are meant to grow.
+const POI_ANCIENT_RUINS: String = "ancient_ruins"
+
+# Per-POI-type data, mirroring UNIT_DEFS / ANIMAL_DEFS / BUILDING_DEFS. A new POI
+# type is a data entry here plus a placement rule in WorldGen.poi_at.
+const POI_DEFS: Dictionary = {
+	POI_ANCIENT_RUINS: {
+		"loot": { ResourceType.JADE: 40, ResourceType.WOOD: 60 },
+	},
+}
+
 const MONUMENT_VICTORY_SECS: float = 90.0
 
 # Movement costs per biome (keyed by int)
