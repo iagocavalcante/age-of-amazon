@@ -108,6 +108,9 @@ func _ready() -> void:
 	if "--test-hunter" in args:
 		_run_hunter_test()
 		return
+	if "--test-shaman" in args:
+		_run_shaman_test()
+		return
 	if "--capture-help" in args:
 		_run_capture_help()
 	if "--capture-animals" in args:
@@ -1782,6 +1785,70 @@ func _run_hunter_test() -> void:
 	var unlocked_ok: bool = GameManager.player_era(0) == Constants.ERA_VILLAGE \
 		and accepted and tc.train_queue.size() == q_v + 1
 	print("[test-hunter] train-ok-era1: %s" % ("OK" if unlocked_ok else "FAILED"))
+	get_tree().quit()
+
+# The Shaman is an Era-2 support caster: no attack, a passive heal aura that mends
+# nearby wounded OWN non-shaman allies (bounded, integer, capped at max_hp). It's
+# barracks-trained but Chiefdom-gated. Proves the aura's eligibility rules and the
+# era train gate.
+func _run_shaman_test() -> void:
+	await get_tree().create_timer(0.5).timeout
+
+	# (a) Heal aura. Place a shaman, a wounded ally, a FULL-HP ally, and a wounded
+	# ENEMY — all inside the 96-unit aura (adjacent iso cells are ~32-36 apart).
+	var shaman: UnitBase = _spawn_unit("shaman", 0, Vector2i(0, 0))
+	var ally: UnitBase = _spawn_unit("warrior", 0, Vector2i(1, 0))
+	var full_ally: UnitBase = _spawn_unit("warrior", 0, Vector2i(0, 1))
+	var enemy: UnitBase = _spawn_unit("warrior", 1, Vector2i(1, 1))
+	await get_tree().process_frame
+	# Freeze everyone but the shaman so positions/hp are deterministic — we drive
+	# the shaman's sim by hand below (no per-frame movement or incidental combat).
+	ally.stop_order()
+	full_ally.stop_order()
+	enemy.stop_order()
+	ally.current_hp = 20
+	enemy.current_hp = 20
+	full_ally.current_hp = full_ally.max_hp
+	var ally_before: int = ally.current_hp
+	var enemy_before: int = enemy.current_hp
+	var full_before: int = full_ally.current_hp
+	# Drive three heal intervals (offline = authority). heal 3 per 1.0s → +9.
+	for _i in range(3):
+		shaman._sim_step(1.0)
+	print("[test-shaman] heals-ally: %s" % ("OK" if ally.current_hp > ally_before and ally.current_hp <= ally.max_hp else "FAILED (%d->%d)" % [ally_before, ally.current_hp]))
+	print("[test-shaman] full-hp-unaffected: %s" % ("OK" if full_ally.current_hp == full_before else "FAILED"))
+	print("[test-shaman] enemy-not-healed: %s" % ("OK" if enemy.current_hp == enemy_before else "FAILED"))
+	print("[test-shaman] no-attack: %s" % ("OK" if Constants.UNIT_DEFS["shaman"]["attack_power"] == 0 and not Constants.UNIT_DEFS["shaman"].has("military") else "FAILED"))
+	# Cap at max_hp: wound to just below full, over-drive many intervals, never past.
+	ally.current_hp = ally.max_hp - 1
+	for _j in range(5):
+		shaman._sim_step(1.0)
+	print("[test-shaman] caps-at-max: %s" % ("OK" if ally.current_hp == ally.max_hp else "FAILED (%d)" % ally.current_hp))
+
+	# (b) Train gate: the barracks lists the shaman, but its Era-2 gate refuses the
+	# order until Chiefdom. Build the era buildings and fund richly so ONLY the
+	# gate — not cost — can block the queue.
+	var barracks: Building = _place_building("barracks", 0,
+		GameManager.find_buildable_cell(Vector2i.ZERO, "barracks", 0))
+	_place_building("house", 0, GameManager.find_buildable_cell(Vector2i.ZERO, "house", 0))
+	_place_building("house", 0, GameManager.find_buildable_cell(Vector2i.ZERO, "house", 0))
+	GameManager.add_resource(0, Constants.ResourceType.FOOD, 2000)
+	GameManager.add_resource(0, Constants.ResourceType.WOOD, 2000)
+	GameManager.add_resource(0, Constants.ResourceType.JADE, 2000)
+	await get_tree().process_frame
+	# Advance to Village; the shaman (era 2) must still be refused.
+	CommandRouter.submit({"type": "advance_era", "player_id": 0})
+	await get_tree().process_frame
+	var q_v: int = barracks.train_queue.size()
+	var refused: bool = not barracks.queue_train("shaman")
+	print("[test-shaman] train-locked-village: %s" % ("OK" if GameManager.player_era(0) == Constants.ERA_VILLAGE and refused and barracks.train_queue.size() == q_v else "FAILED"))
+	# Advance to Chiefdom; now the barracks accepts the shaman.
+	CommandRouter.submit({"type": "advance_era", "player_id": 0})
+	await get_tree().process_frame
+	var q_c: int = barracks.train_queue.size()
+	var accepted: bool = barracks.queue_train("shaman")
+	print("[test-shaman] train-ok-chiefdom: %s" % ("OK" if GameManager.player_era(0) == Constants.ERA_CHIEFDOM and accepted and barracks.train_queue.size() == q_c + 1 else "FAILED"))
+	print("[test-shaman] shaman-era-2: %s" % ("OK" if Constants.UNIT_DEFS["shaman"]["era"] == Constants.ERA_CHIEFDOM else "FAILED"))
 	get_tree().quit()
 
 # Renders a couple of animals up close so the procedural art can be reviewed.

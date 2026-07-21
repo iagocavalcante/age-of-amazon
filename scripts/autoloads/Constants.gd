@@ -113,6 +113,28 @@ const UNIT_DEFS: Dictionary = {
 		"cost": { ResourceType.FOOD: 50, ResourceType.WOOD: 30 },
 		"train_time": 10.0,
 	},
+	# Chiefdom support caster: no attack, a passive heal aura that mends nearby
+	# wounded allies over time. NOT `military` — support units skip the Chiefdom
+	# armor buff (which is warriors/archers only). The heal is data-keyed
+	# (heal_aura) so only the shaman heals; every other unit lacks the key and is
+	# unaffected (see Unit._tick_heal_aura, a no-op without it).
+	"shaman": {
+		"era": 2,
+		"max_hp": 50,
+		"move_speed": 90.0,
+		"attack_power": 0,
+		"armor": 0,
+		"attack_range": 26.0,
+		"attack_cooldown": 1.0,
+		"vision_range": 200.0,
+		"aggressive": false,
+		"can_gather": false,
+		"cost": { ResourceType.FOOD: 80 },
+		"train_time": 12.0,
+		# radius world units, heal HP applied every interval seconds to nearby
+		# wounded non-shaman allies.
+		"heal_aura": { "radius": 96.0, "heal": 3, "interval": 1.0 },
+	},
 }
 
 # Neutral wildlife. `food` is the one-time bounty paid to whoever lands the
@@ -206,7 +228,7 @@ const BUILDING_DEFS: Dictionary = {
 		"era": 1,
 		"max_hp": 400,
 		"footprint": Vector2i(2, 2),
-		"trains": ["warrior", "archer"],
+		"trains": ["warrior", "archer", "shaman"],
 		"vision_tiles": 7,
 		"cost": {ResourceType.WOOD: 60, ResourceType.FOOD: 20},
 	},

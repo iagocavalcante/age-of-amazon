@@ -214,6 +214,44 @@ func build_hunter_frames(player_color: Color) -> Array[ImageTexture]:
 		frames.append(PixelArt.sprite_from_rows(_with_spear(source), palette))
 	return frames
 
+# Shaman: the villager silhouette bearing a ritual staff topped with a glowing
+# jade crystal on the right. No spear head (hunter), bow (archer), or shield and
+# feather crest (warrior) — the crystal-crowned staff reads as the support caster.
+func build_shaman_frames(player_color: Color) -> Array[ImageTexture]:
+	var palette: Dictionary = {
+		"O": Color8(24, 18, 14),
+		"H": Color8(38, 28, 20),
+		"S": Color8(196, 144, 100),
+		"s": Color8(164, 116, 78),
+		"L": Color8(150, 106, 72),
+		"T": player_color,
+		"t": player_color.darkened(0.35),
+		"F": Color8(70, 48, 30),
+		"P": Color8(122, 86, 48),      # staff shaft
+		"K": Color8(120, 226, 170),    # glowing jade crystal
+	}
+	var frames: Array[ImageTexture] = []
+	for source: Array in [IDLE_ROWS, WALK_A_ROWS, WALK_B_ROWS]:
+		frames.append(PixelArt.sprite_from_rows(_with_staff(source), palette))
+	return frames
+
+# Widens each row and draws a ritual staff (shaft) topped with a 2px glowing
+# crystal on the right.
+func _with_staff(rows: Array) -> Array[String]:
+	var out: Array[String] = []
+	var shaft_col: int = 12
+	for i in range(rows.size()):
+		var chars: PackedStringArray = String(rows[i] + "...").split("")
+		if i == 0:
+			chars[shaft_col] = "K"              # crystal head
+			chars[shaft_col + 1] = "K"
+		elif i == 1:
+			chars[shaft_col] = "K"
+		elif i <= 14:
+			chars[shaft_col] = "P"              # shaft down the length of the body
+		out.append("".join(chars))
+	return out
+
 # Widens each row and draws a straight upright spear (shaft + head) on the right.
 func _with_spear(rows: Array) -> Array[String]:
 	var out: Array[String] = []

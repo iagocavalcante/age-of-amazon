@@ -64,6 +64,9 @@ var _cooldown_left: float = 0.0
 var _repath_timer: float = 0.0
 var _aggro_timer: float = 0.0
 
+# Shaman heal aura: seconds accumulated toward the next heal pulse.
+var _heal_accum: float = 0.0
+
 # Animation
 var _frames: Array = []
 var _anim_time: float = 0.0
@@ -121,6 +124,8 @@ func _physics_process(delta: float) -> void:
 func _sim_step(delta: float) -> void:
 	_cooldown_left = maxf(0.0, _cooldown_left - delta)
 
+	_tick_heal_aura(delta)
+
 	match current_state:
 		State.IDLE:
 			velocity = Vector2.ZERO
@@ -159,6 +164,34 @@ func _sim_step(delta: float) -> void:
 		State.BUILDING:
 			velocity = Vector2.ZERO
 			_process_building(delta)
+
+# Shaman passive: heals nearby wounded friendly non-shaman units. Runs only in
+# _sim_step (authority), and the healed HP replicates via the normal state ticks
+# (Replication._tick → net_apply) — no extra RPC. A no-op for every unit whose
+# def lacks a heal_aura (early return), so all other units are unaffected.
+func _tick_heal_aura(delta: float) -> void:
+	var aura: Dictionary = Constants.UNIT_DEFS.get(unit_type, {}).get("heal_aura", {})
+	if aura.is_empty():
+		return
+	_heal_accum += delta
+	if _heal_accum < float(aura["interval"]):
+		return
+	_heal_accum -= float(aura["interval"])  # carry the overshoot for accurate cadence
+	var radius: float = float(aura["radius"])
+	var amount: int = int(aura["heal"])
+	for node: Node in get_tree().get_nodes_in_group("player_%d" % player_id):
+		var u: UnitBase = node as UnitBase
+		if u == null or u == self:
+			continue  # skip buildings (also in this group) and self
+		if u.unit_type == "shaman":
+			continue  # heals non-shaman allies only
+		if u.current_hp <= 0 or u.current_hp >= u.max_hp:
+			continue  # no rez of the dead, no over-heal of the full
+		if global_position.distance_to(u.global_position) > radius:
+			continue
+		u.current_hp = mini(u.max_hp, u.current_hp + amount)
+		if not Net.is_headless_server():
+			u._update_health_bar()
 
 # Multiplayer client: the unit is a puppet — the server's 10 Hz state ticks
 # land in net_apply(), and _net_step eases the rendered position toward the
