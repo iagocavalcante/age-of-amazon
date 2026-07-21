@@ -99,10 +99,14 @@ func advance_era(player_id: int) -> bool:
 	_replicate_era(player_id)
 	return true
 
-# Replication stub — filled in Task A5. No-op for now so advance_era compiles
-# and runs offline correctly.
-func _replicate_era(_player_id: int) -> void:
-	pass
+# Era advancement is PUBLIC (announced to every tribe — the bible's "fair
+# knowledge" pillar), unlike the private stockpile — so it replicates to EVERY
+# peer, not just the owner. Inert offline/on clients (server-gated).
+func _replicate_era(player_id: int) -> void:
+	if Net.mode != Net.Mode.SERVER:
+		return
+	for peer_id: int in Net.peer_players:
+		_recv_era.rpc_id(peer_id, player_id, eras[player_id])
 
 # Match-server only: per-tribe fog knowledge (index = player_id), refreshed
 # by Replication. Empty everywhere else.
@@ -280,6 +284,25 @@ func push_stockpile_to_peer(peer_id: int) -> void:
 func _recv_stockpile(player_id: int, stockpile: Dictionary) -> void:
 	stockpiles[player_id] = stockpile
 	EventBus.resources_changed.emit(player_id)
+
+# Full era state push for a freshly joined peer (called from Replication's
+# snapshot). Public like _replicate_era — every tribe's current era is sent.
+func push_eras_to_peer(peer_id: int) -> void:
+	for pid: int in range(eras.size()):
+		_recv_era.rpc_id(peer_id, pid, eras[pid])
+
+@rpc("authority", "call_remote", "reliable")
+func _recv_era(player_id: int, era: int) -> void:
+	if player_id < 0 or player_id >= eras.size():
+		return
+	# Deliberate divergence from _recv_stockpile (which emits unconditionally):
+	# era_advanced is consumed as a TRANSITION (HUD fanfare/sound), so it must
+	# not fire on no-op state-syncs — the join snapshot re-pushes every tribe's
+	# era, including tribes still at Forest.
+	if eras[player_id] == era:
+		return
+	eras[player_id] = era
+	EventBus.era_advanced.emit(player_id, era)
 
 @rpc("authority", "call_remote", "reliable")
 func _recv_game_over(winner_player_id: int) -> void:

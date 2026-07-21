@@ -80,6 +80,7 @@ func save_now() -> void:
 		"next_id": GameManager._next_entity_id,
 		"player_count": GameManager.player_count,
 		"stockpiles": GameManager.stockpiles.map(_stockpile_out),
+		"eras": GameManager.eras.duplicate(),
 		"units": units,
 		"buildings": buildings,
 		"animals": animals,

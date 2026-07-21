@@ -136,6 +136,15 @@ func _boot_offline(args: PackedStringArray) -> void:
 		GameManager._next_entity_id = int(resume["next_id"])
 		for i in range(GameManager.stockpiles.size()):
 			GameManager.stockpiles[i] = SaveGame.stockpile_in(resume["stockpiles"][i])
+		# Per-tribe era, with a pre-Phase-2 back-compat guard: a save without the
+		# "eras" key (or a shorter array) defaults the missing tribes to Forest.
+		# JSON numbers round-trip as floats, so cast each back to int; clamp to a
+		# valid era so a corrupted/hand-edited save can't slip past every era gate.
+		var saved_eras: Array = resume.get("eras", [])
+		for pid: int in range(GameManager.eras.size()):
+			GameManager.eras[pid] = clampi(int(saved_eras[pid]), Constants.ERA_FOREST,
+				Constants.ERA_DEFS.size() - 1) if pid < saved_eras.size() \
+				else Constants.ERA_FOREST
 
 	chunk_manager.setup(camera, doodads)
 
@@ -795,6 +804,20 @@ func _run_save_test() -> void:
 		(villagers[0] as UnitBase).command_gather(tree_node["cell"])
 	await get_tree().create_timer(6.0).timeout
 
+	# Advance player 0 to Village so save/reload must preserve per-tribe era state.
+	# Place the two finished houses Village requires (find_buildable_cell keeps the
+	# footprints from colliding) and grant the advance cost, then advance via the
+	# command path.
+	_place_building("house", 0, GameManager.find_buildable_cell(Vector2i.ZERO, "house", 0))
+	_place_building("house", 0, GameManager.find_buildable_cell(Vector2i.ZERO, "house", 0))
+	GameManager.add_resource(0, Constants.ResourceType.FOOD, 500)
+	GameManager.add_resource(0, Constants.ResourceType.WOOD, 300)
+	await get_tree().process_frame
+	CommandRouter.submit({"type": "advance_era", "player_id": 0})
+	await get_tree().process_frame
+	print("[test-save] era-advanced ", "OK"
+		if GameManager.player_era(0) == Constants.ERA_VILLAGE else "FAILED")
+
 	SaveGame.save_now()
 	var expected: Dictionary = {
 		"wood": GameManager.get_resource(0, Constants.ResourceType.WOOD),
@@ -803,6 +826,7 @@ func _run_save_test() -> void:
 		"explored": GameManager.fog.vision.explored.size(),
 		"deltas": GameManager.world.resource_deltas.size(),
 		"unit_name": String(villagers[0].name),
+		"era": GameManager.player_era(0),
 	}
 	print("[test-save] saved (deltas=", expected["deltas"], ")")
 	SaveGame.set_meta("save_test_expected", expected)
@@ -826,6 +850,8 @@ func _run_save_test_phase2() -> void:
 		if String(node.name) == expected["unit_name"]:
 			named = true
 	print("[test-save] identity ", "OK" if named else "FAILED")
+	print("[test-save] era ", "OK"
+		if GameManager.player_era(0) == expected["era"] else "FAILED")
 	SaveGame.clear()
 	get_tree().quit()
 

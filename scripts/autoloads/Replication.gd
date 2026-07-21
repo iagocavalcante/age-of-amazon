@@ -77,6 +77,7 @@ func _client_world_ready() -> void:
 	for cell: Vector2i in GameManager.world.claimed_pois:
 		_claim_poi.rpc_id(sender, cell)
 	GameManager.push_stockpile_to_peer(sender)
+	GameManager.push_eras_to_peer(sender)
 	print("[net] snapshot sent to player %d" % Net.peer_players[sender])
 
 func _on_entity_spawned(entity: Node2D) -> void:
