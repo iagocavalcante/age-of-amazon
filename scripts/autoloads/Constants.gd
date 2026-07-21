@@ -228,6 +228,19 @@ const BUILDING_DEFS: Dictionary = {
 		"vision_tiles": 6,
 		"cost": {ResourceType.WOOD: 50},
 	},
+	# Cheap Era-1 defensive wall: a 1x1 building whose occupied cell becomes
+	# unwalkable, so the pathfinder routes around it (no pathfinder change — see
+	# WorldData.is_walkable / occupy). Low cost so players fence long lines; a
+	# stake has little sight (vision_tiles 2). The owner-passable GATE is a
+	# separate follow-up (needs pathfinder player-awareness).
+	"palisade": {
+		"era": 1,
+		"max_hp": 300,
+		"footprint": Vector2i(1, 1),
+		"trains": [],
+		"vision_tiles": 2,
+		"cost": {ResourceType.WOOD: 5},
+	},
 	# The jade endgame: finish it, defend it for MONUMENT_VICTORY_SECS, win.
 	"monument": {
 		"era": 2,

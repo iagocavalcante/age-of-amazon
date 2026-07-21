@@ -90,6 +90,9 @@ func _ready() -> void:
 	if "--test-storehouse" in args:
 		_run_storehouse_test()
 		return
+	if "--test-palisade" in args:
+		_run_palisade_test()
+		return
 	if "--test-ai-era" in args:
 		_run_ai_era_test()
 		return
@@ -1314,6 +1317,93 @@ func _run_storehouse_test() -> void:
 		else "FAILED (pick=%s)" % pick_built))
 
 	get_tree().quit()
+
+# A finished palisade is a 1x1 building whose occupied cell becomes unwalkable
+# (WorldData.occupy at Building.setup → is_walkable == false). This proves the
+# blocking is FREE via the shared occupy/is_walkable mechanism: a solid line of
+# palisades makes its cells unwalkable and the UNCHANGED pathfinder (ADR 6)
+# routes a unit around the wall — a strictly longer path than the open ground.
+func _run_palisade_test() -> void:
+	await get_tree().create_timer(0.5).timeout
+
+	# A 5x5 patch of open, buildable ground clear of the spawn structures. S/G sit
+	# on the middle row; a 3-tall wall column down the middle splits them.
+	var plot: Vector2i = _find_clear_plot(5, 5)
+	if plot == NO_PLOT:
+		print("[test-palisade] setup: FAILED (no clear 5x5 plot)")
+		get_tree().quit(1)
+		return
+
+	var start_cell: Vector2i = plot + Vector2i(0, 2)
+	var goal_cell: Vector2i = plot + Vector2i(4, 2)
+	var wall_cell: Vector2i = plot + Vector2i(2, 2)          # center of the wall line
+	var wall_line: Array[Vector2i] = [
+		plot + Vector2i(2, 1), wall_cell, plot + Vector2i(2, 3)]
+
+	var from_world: Vector2 = Constants.grid_to_world(start_cell.x, start_cell.y)
+	var to_world: Vector2 = Constants.grid_to_world(goal_cell.x, goal_cell.y)
+
+	# Baseline: straight across the open row before any wall exists.
+	var buildable_before: bool = GameManager.world.is_buildable(wall_cell)
+	var baseline_len: float = _path_length(
+		GameManager.pathfinder.find_path_world(from_world, to_world))
+	print("[test-palisade] buildable-land: %s" % ("OK" if buildable_before else "FAILED"))
+
+	# Build a finished palisade line across the direct route.
+	for cell: Vector2i in wall_line:
+		_place_building("palisade", 0, cell)
+	await get_tree().process_frame
+
+	# Core assertion: the finished wall's cell is no longer walkable.
+	var blocks: bool = not GameManager.world.is_walkable(wall_cell)
+	print("[test-palisade] blocks-cell: %s" % ("OK" if blocks else "FAILED"))
+
+	# The untouched pathfinder must now route AROUND the wall — a longer path (or,
+	# if it somehow can't, at least no straight path through the blocked cells).
+	var new_path: PackedVector2Array = GameManager.pathfinder.find_path_world(from_world, to_world)
+	var new_len: float = _path_length(new_path)
+	var passes_through: bool = false
+	for p: Vector2 in new_path:
+		if Constants.world_to_grid(p) in wall_line:
+			passes_through = true
+	var routes_around: bool = not passes_through and (new_len > baseline_len)
+	print("[test-palisade] path-routes-around: %s (baseline=%.1f detour=%.1f)"
+		% ["OK" if routes_around else "FAILED", baseline_len, new_len])
+
+	get_tree().quit()
+
+# Total world-space length of a path (sum of waypoint-to-waypoint distances).
+func _path_length(path: PackedVector2Array) -> float:
+	var total: float = 0.0
+	for i in range(1, path.size()):
+		total += path[i - 1].distance_to(path[i])
+	return total
+
+# Sentinel returned by _find_clear_plot when no qualifying region exists.
+const NO_PLOT := Vector2i(2147483647, 2147483647)
+
+# Scan outward from the origin for the top-left cell of a w x h block whose every
+# cell is buildable (hence walkable), unoccupied, and resource-free — a clean plot
+# for placement/pathing harnesses. Returns NO_PLOT if none is found.
+func _find_clear_plot(w: int, h: int) -> Vector2i:
+	for radius in range(4, 60):
+		for dy in range(-radius, radius + 1):
+			for dx in range(-radius, radius + 1):
+				var base: Vector2i = Vector2i(dx, dy)
+				var ok: bool = true
+				for cy in range(h):
+					for cx in range(w):
+						var cell: Vector2i = base + Vector2i(cx, cy)
+						if not GameManager.world.is_buildable(cell) \
+								or GameManager.world.building_at(cell) != null \
+								or not GameManager.world.get_resource_at(cell).is_empty():
+							ok = false
+							break
+					if not ok:
+						break
+				if ok:
+					return base
+	return NO_PLOT
 
 # Count buildings owned by a player: the `node as Building` cast drops any
 # non-building member of the group, and the player_id filter scopes the count

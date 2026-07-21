@@ -342,6 +342,56 @@ func build_monument(player_color: Color) -> ImageTexture:
 
 	return ImageTexture.create_from_image(img)
 
+# 1x1 palisade stake wall: sharpened vertical logs on rails, an ownership band,
+# no roof — a distinct low fence silhouette, not a hut.
+func build_palisade(player_color: Color) -> ImageTexture:
+	var w: int = 64
+	var h: int = 60
+	var img: Image = Image.create(w, h, false, Image.FORMAT_RGBA8)
+
+	var wood_dark: Color = Color8(92, 64, 38)
+	var wood_mid: Color = Color8(124, 90, 54)
+	var wood_light: Color = Color8(158, 118, 74)
+	var rail: Color = Color8(78, 54, 32)
+	var outline: Color = Color8(46, 34, 20)
+
+	var base_y: int = h - 8
+
+	PixelArt.draw_ellipse(img, w / 2.0, float(base_y), 28.0, 8.0, Color(0, 0, 0, 0.30), true)
+
+	# Five stakes across the tile; each is a vertical log tapering to a sharpened
+	# point at the top, with a lit and shaded side for round-log shading.
+	var stake_xs: Array[int] = [7, 19, 31, 43, 55]
+	var top_ys: Array[int] = [16, 12, 14, 11, 15]  # slight height variation
+	var stake_half: int = 4
+	for si in range(stake_xs.size()):
+		var sx: int = stake_xs[si]
+		var stake_top: int = top_ys[si]
+		# Sharpened point: rows above the shaft narrow to the tip.
+		for y in range(stake_top, base_y + 1):
+			var half: int = stake_half
+			if y < stake_top + 6:
+				half = int(round(float(y - stake_top) / 6.0 * stake_half))
+			for x in range(sx - half, sx + half + 1):
+				var t: float = float(x - (sx - half)) / float(max(1, 2 * half))
+				var band: float = PixelArt.hash2(sx, y, 71)
+				img.set_pixel(clampi(x, 0, w - 1), y, PixelArt.ramp_shade(
+					[wood_dark, wood_mid, wood_light], 0.25 + (1.0 - t) * 0.4 + band * 0.15, x, y))
+			img.set_pixel(clampi(sx - half, 0, w - 1), y, outline)
+			img.set_pixel(clampi(sx + half, 0, w - 1), y, outline)
+
+	# Two horizontal rails lashing the stakes together.
+	for ry: int in [base_y - 24, base_y - 8]:
+		for x in range(3, w - 3):
+			img.set_pixel(x, ry, rail if (x % 4) != 0 else rail.darkened(0.25))
+			img.set_pixel(x, ry + 1, rail.darkened(0.15))
+
+	# Player-color band on the upper rail (ownership marker).
+	for x in range(24, 40):
+		img.set_pixel(x, base_y - 24, player_color if (x % 3) != 0 else player_color.darkened(0.3))
+
+	return ImageTexture.create_from_image(img)
+
 # 1x1 stilted lookout: long legs, a railed platform, thatch cap, and a tall
 # player-color pennant — reads far vision at a glance.
 func build_watchtower(player_color: Color) -> ImageTexture:
