@@ -241,6 +241,16 @@ const BUILDING_DEFS: Dictionary = {
 		"vision_tiles": 2,
 		"cost": {ResourceType.WOOD: 5},
 	},
+	# Owner-passable wall segment: your units path through it, enemies are blocked
+	# (see WorldData.is_walkable_for). A gap in the palisade line you can defend.
+	"palisade_gate": {
+		"era": 1,
+		"max_hp": 250,
+		"footprint": Vector2i(1, 1),
+		"trains": [],
+		"vision_tiles": 2,
+		"cost": {ResourceType.WOOD: 10},
+	},
 	# The jade endgame: finish it, defend it for MONUMENT_VICTORY_SECS, win.
 	"monument": {
 		"era": 2,

@@ -8,6 +8,11 @@ extends RefCounted
 
 signal resource_depleted(cell: Vector2i)
 
+# Sentinel player_id meaning "no owner context" for the owner-aware pathing
+# variants: gates block everyone, so is_walkable_for/movement_cost_for reduce
+# to base walkability. The base is_walkable/movement_cost delegate with this.
+const NO_OWNER: int = -1
+
 var gen: WorldGen
 var chunks: Dictionary = {}   # Vector2i chunk coords -> ChunkData
 var occupied: Dictionary = {} # Vector2i cell -> building (Node2D)
@@ -29,9 +34,7 @@ func get_biome(cell: Vector2i) -> int:
 	return chunk.get_biome_local(cell.x - cc.x * size, cell.y - cc.y * size)
 
 func is_walkable(cell: Vector2i) -> bool:
-	if occupied.has(cell):
-		return false
-	return Constants.WALKABLE.get(get_biome(cell), false)
+	return is_walkable_for(cell, NO_OWNER)
 
 func is_buildable(cell: Vector2i) -> bool:
 	if occupied.has(cell):
@@ -39,9 +42,39 @@ func is_buildable(cell: Vector2i) -> bool:
 	return Constants.BUILDABLE.get(get_biome(cell), false)
 
 func movement_cost(cell: Vector2i) -> float:
+	return movement_cost_for(cell, NO_OWNER)
+
+# --- Owner-aware pathing (palisade gate) ---
+# The _for variants are the single source of the occupied/biome logic; the base
+# is_walkable/movement_cost above delegate with NO_OWNER, so their "gates block
+# everyone" behavior is structural, not merely hand-synced.
+
+# Is this cell walkable FOR a specific player's pathing? Same as is_walkable,
+# except the player's OWN constructed palisade gate is passable to them (enemies
+# and neutral pathing still see it as blocked). NO_OWNER -> base behavior.
+func is_walkable_for(cell: Vector2i, player_id: int) -> bool:
 	if occupied.has(cell):
+		if player_id != NO_OWNER and _is_own_gate(occupied[cell], player_id):
+			return true
+		return false
+	return Constants.WALKABLE.get(get_biome(cell), false)
+
+# Movement cost variant of is_walkable_for: the caller's own constructed gate
+# costs the underlying biome (as if unoccupied); everything else matches
+# movement_cost. NO_OWNER -> base behavior.
+func movement_cost_for(cell: Vector2i, player_id: int) -> float:
+	if occupied.has(cell):
+		if player_id != NO_OWNER and _is_own_gate(occupied[cell], player_id):
+			return Constants.MOVEMENT_COST.get(get_biome(cell), INF)
 		return INF
 	return Constants.MOVEMENT_COST.get(get_biome(cell), INF)
+
+# True only for a constructed palisade gate owned by player_id. Cheap int
+# compare first short-circuits the common non-gate reject before the string test.
+func _is_own_gate(b: Node2D, player_id: int) -> bool:
+	var building := b as Building
+	return building != null and building.player_id == player_id \
+		and building.building_type == "palisade_gate" and building.is_constructed
 
 # --- Resources ---
 

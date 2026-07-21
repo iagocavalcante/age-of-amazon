@@ -305,7 +305,7 @@ func _process_building(delta: float) -> void:
 func _start_path_to(target: Vector2) -> bool:
 	if GameManager.pathfinder == null:
 		return false
-	var path: PackedVector2Array = GameManager.pathfinder.find_path_world(global_position, target)
+	var path: PackedVector2Array = GameManager.pathfinder.find_path_world(global_position, target, player_id)
 	if path.is_empty():
 		return false
 	_path = path

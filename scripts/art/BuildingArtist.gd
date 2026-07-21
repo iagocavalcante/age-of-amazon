@@ -392,6 +392,48 @@ func build_palisade(player_color: Color) -> ImageTexture:
 
 	return ImageTexture.create_from_image(img)
 
+# 1x1 palisade GATE: two heavy corner posts flanking an OPEN doorway, capped by
+# a lintel crossbar — deliberately unlike the solid five-stake wall so an
+# owner-passable gap reads at a glance.
+func build_palisade_gate(player_color: Color) -> ImageTexture:
+	var w: int = 64
+	var h: int = 60
+	var img: Image = Image.create(w, h, false, Image.FORMAT_RGBA8)
+
+	var wood_dark: Color = Color8(92, 64, 38)
+	var wood_mid: Color = Color8(124, 90, 54)
+	var wood_light: Color = Color8(158, 118, 74)
+	var beam: Color = Color8(78, 54, 32)
+	var outline: Color = Color8(46, 34, 20)
+
+	var base_y: int = h - 8
+	var post_top: int = 8          # posts stand taller than the loose stakes
+	var post_half: int = 6         # and are thicker, reading as sturdy pillars
+
+	PixelArt.draw_ellipse(img, w / 2.0, float(base_y), 28.0, 8.0, Color(0, 0, 0, 0.30), true)
+
+	# Two square-topped posts (no sharpened point) hugging the tile edges; the
+	# centre is left empty — the passable doorway.
+	for px: int in [12, 52]:
+		for y in range(post_top, base_y + 1):
+			for x in range(px - post_half, px + post_half + 1):
+				var t: float = float(x - (px - post_half)) / float(max(1, 2 * post_half))
+				var band: float = PixelArt.hash2(px, y, 53)
+				img.set_pixel(clampi(x, 0, w - 1), y, PixelArt.ramp_shade(
+					[wood_dark, wood_mid, wood_light], 0.25 + (1.0 - t) * 0.4 + band * 0.15, x, y))
+			img.set_pixel(clampi(px - post_half, 0, w - 1), y, outline)
+			img.set_pixel(clampi(px + post_half, 0, w - 1), y, outline)
+
+	# Lintel crossbar spanning the posts over the open doorway (top of frame).
+	for ly: int in [post_top, post_top + 1, post_top + 2, post_top + 3]:
+		for x in range(6, w - 6):
+			img.set_pixel(x, ly, beam if (x % 4) != 0 else beam.darkened(0.25))
+	# Player-color band on the lintel (ownership marker).
+	for x in range(24, 40):
+		img.set_pixel(x, post_top + 1, player_color if (x % 3) != 0 else player_color.darkened(0.3))
+
+	return ImageTexture.create_from_image(img)
+
 # 1x1 stilted lookout: long legs, a railed platform, thatch cap, and a tall
 # player-color pennant — reads far vision at a glance.
 func build_watchtower(player_color: Color) -> ImageTexture:

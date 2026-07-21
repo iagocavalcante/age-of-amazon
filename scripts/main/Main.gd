@@ -93,6 +93,9 @@ func _ready() -> void:
 	if "--test-palisade" in args:
 		_run_palisade_test()
 		return
+	if "--test-palisade-gate" in args:
+		_run_palisade_gate_test()
+		return
 	if "--test-ai-era" in args:
 		_run_ai_era_test()
 		return
@@ -1369,6 +1372,68 @@ func _run_palisade_test() -> void:
 	var routes_around: bool = not passes_through and (new_len > baseline_len)
 	print("[test-palisade] path-routes-around: %s (baseline=%.1f detour=%.1f)"
 		% ["OK" if routes_around else "FAILED", baseline_len, new_len])
+
+	get_tree().quit()
+
+# Proves the palisade gate is owner-passable: a solid wall line with ONE gate
+# splits start from goal. Player 0 (owner) paths THROUGH the gate; player 1
+# (enemy) is blocked at the gate and must detour around the wall's open ends.
+func _run_palisade_gate_test() -> void:
+	await get_tree().create_timer(0.5).timeout
+
+	# A 5x7 clear patch. S/G sit on the middle row (y+3); a wall column down the
+	# middle (x+2) blocks rows 1,2,4,5 with a GATE at row 3 — the only opening on
+	# the straight route. Rows 0 and 6 stay open so the enemy can detour around.
+	var plot: Vector2i = _find_clear_plot(5, 7)
+	if plot == NO_PLOT:
+		print("[test-palisade-gate] setup: FAILED (no clear 5x7 plot)")
+		get_tree().quit(1)
+		return
+
+	var start_cell: Vector2i = plot + Vector2i(0, 3)
+	var goal_cell: Vector2i = plot + Vector2i(4, 3)
+	var gate_cell: Vector2i = plot + Vector2i(2, 3)          # single opening
+	var wall_line: Array[Vector2i] = [
+		plot + Vector2i(2, 1), plot + Vector2i(2, 2),
+		plot + Vector2i(2, 4), plot + Vector2i(2, 5)]
+
+	# Player 0's wall with a player-0 gate in the gap.
+	for cell: Vector2i in wall_line:
+		_place_building("palisade", 0, cell)
+	_place_building("palisade_gate", 0, gate_cell)
+	await get_tree().process_frame
+
+	# (1) Owner-aware walkability on the gate cell itself.
+	var owner_pass: bool = GameManager.world.is_walkable_for(gate_cell, 0)
+	var enemy_block: bool = not GameManager.world.is_walkable_for(gate_cell, 1)
+	print("[test-palisade-gate] owner-can-pass: %s" % ("OK" if owner_pass else "FAILED"))
+	print("[test-palisade-gate] enemy-blocked: %s" % ("OK" if enemy_block else "FAILED"))
+
+	# (2) Actual paths: owner crosses the gate; enemy routes around it (longer).
+	var start_w: Vector2 = Constants.grid_to_world(start_cell.x, start_cell.y)
+	var goal_w: Vector2 = Constants.grid_to_world(goal_cell.x, goal_cell.y)
+	var p0: PackedVector2Array = GameManager.pathfinder.find_path_world(start_w, goal_w, 0)
+	var p1: PackedVector2Array = GameManager.pathfinder.find_path_world(start_w, goal_w, 1)
+
+	var p0_through: bool = false
+	var p0_reaches: bool = false
+	for p: Vector2 in p0:
+		var c: Vector2i = Constants.world_to_grid(p)
+		if c == gate_cell:
+			p0_through = true
+		if c == goal_cell:
+			p0_reaches = true
+	var p1_avoids: bool = true
+	for p: Vector2 in p1:
+		if Constants.world_to_grid(p) == gate_cell:
+			p1_avoids = false
+
+	var p0_len: float = _path_length(p0)
+	var p1_len: float = _path_length(p1)
+	print("[test-palisade-gate] owner-path-through-gate: %s (len=%.1f)"
+		% ["OK" if (p0_through and p0_reaches) else "FAILED", p0_len])
+	print("[test-palisade-gate] enemy-path-avoids-gate: %s (owner=%.1f enemy=%.1f)"
+		% ["OK" if (p1_avoids and p1_len > p0_len) else "FAILED", p0_len, p1_len])
 
 	get_tree().quit()
 

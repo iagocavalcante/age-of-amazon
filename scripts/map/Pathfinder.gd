@@ -19,20 +19,22 @@ func is_walkable(cell: Vector2i) -> bool:
 	return _world.is_walkable(cell)
 
 # World-space waypoints (tile centers). Empty if start has no walkable spot.
-func find_path_world(from_world: Vector2, to_world: Vector2) -> PackedVector2Array:
-	var from_cell: Vector2i = _nearest_walkable(Constants.world_to_grid(from_world))
-	var to_cell: Vector2i = _nearest_walkable(Constants.world_to_grid(to_world))
+# player_id threads owner-aware walkability (own palisade gates are passable);
+# the default WorldData.NO_OWNER means "no owner context" -> base walkability.
+func find_path_world(from_world: Vector2, to_world: Vector2, player_id: int = WorldData.NO_OWNER) -> PackedVector2Array:
+	var from_cell: Vector2i = _nearest_walkable(Constants.world_to_grid(from_world), player_id)
+	var to_cell: Vector2i = _nearest_walkable(Constants.world_to_grid(to_world), player_id)
 
 	var result: PackedVector2Array = PackedVector2Array()
 	if from_cell == Vector2i(2147483647, 2147483647) or to_cell == Vector2i(2147483647, 2147483647):
 		return result
 
-	var cells: Array[Vector2i] = _astar(from_cell, to_cell)
+	var cells: Array[Vector2i] = _astar(from_cell, to_cell, player_id)
 	for cell: Vector2i in cells:
 		result.append(Constants.grid_to_world(cell.x, cell.y))
 	return result
 
-func _astar(start: Vector2i, goal: Vector2i) -> Array[Vector2i]:
+func _astar(start: Vector2i, goal: Vector2i, player_id: int = WorldData.NO_OWNER) -> Array[Vector2i]:
 	if start == goal:
 		return [start]
 
@@ -65,13 +67,13 @@ func _astar(start: Vector2i, goal: Vector2i) -> Array[Vector2i]:
 			best_h = h_current
 			best_cell = current
 
-		for neighbor_info: Array in _neighbors(current):
+		for neighbor_info: Array in _neighbors(current, player_id):
 			var neighbor: Vector2i = neighbor_info[0]
 			var step_mult: float = neighbor_info[1]
 			if closed.has(neighbor):
 				continue
 
-			var step_cost: float = _world.movement_cost(neighbor) * step_mult
+			var step_cost: float = _world.movement_cost_for(neighbor, player_id) * step_mult
 			if is_inf(step_cost):
 				continue
 
@@ -89,24 +91,24 @@ func _astar(start: Vector2i, goal: Vector2i) -> Array[Vector2i]:
 
 # 8-connected neighbors; diagonals only when both orthogonals are walkable
 # (no corner cutting). Each entry: [cell, distance multiplier].
-func _neighbors(cell: Vector2i) -> Array:
+func _neighbors(cell: Vector2i, player_id: int = WorldData.NO_OWNER) -> Array:
 	var result: Array = []
-	var n: bool = _world.is_walkable(cell + Vector2i(0, -1))
-	var s: bool = _world.is_walkable(cell + Vector2i(0, 1))
-	var w: bool = _world.is_walkable(cell + Vector2i(-1, 0))
-	var e: bool = _world.is_walkable(cell + Vector2i(1, 0))
+	var n: bool = _world.is_walkable_for(cell + Vector2i(0, -1), player_id)
+	var s: bool = _world.is_walkable_for(cell + Vector2i(0, 1), player_id)
+	var w: bool = _world.is_walkable_for(cell + Vector2i(-1, 0), player_id)
+	var e: bool = _world.is_walkable_for(cell + Vector2i(1, 0), player_id)
 
 	if n: result.append([cell + Vector2i(0, -1), 1.0])
 	if s: result.append([cell + Vector2i(0, 1), 1.0])
 	if w: result.append([cell + Vector2i(-1, 0), 1.0])
 	if e: result.append([cell + Vector2i(1, 0), 1.0])
-	if n and w and _world.is_walkable(cell + Vector2i(-1, -1)):
+	if n and w and _world.is_walkable_for(cell + Vector2i(-1, -1), player_id):
 		result.append([cell + Vector2i(-1, -1), SQRT2])
-	if n and e and _world.is_walkable(cell + Vector2i(1, -1)):
+	if n and e and _world.is_walkable_for(cell + Vector2i(1, -1), player_id):
 		result.append([cell + Vector2i(1, -1), SQRT2])
-	if s and w and _world.is_walkable(cell + Vector2i(-1, 1)):
+	if s and w and _world.is_walkable_for(cell + Vector2i(-1, 1), player_id):
 		result.append([cell + Vector2i(-1, 1), SQRT2])
-	if s and e and _world.is_walkable(cell + Vector2i(1, 1)):
+	if s and e and _world.is_walkable_for(cell + Vector2i(1, 1), player_id):
 		result.append([cell + Vector2i(1, 1), SQRT2])
 	return result
 
@@ -212,12 +214,13 @@ func _ring_offsets(radius: int) -> Array[Vector2i]:
 	return offsets
 
 # Sentinel Vector2i(2147483647, 2147483647) when nothing found nearby.
-func _nearest_walkable(cell: Vector2i) -> Vector2i:
-	if is_walkable(cell):
+# player_id threads owner-aware walkability (NO_OWNER -> base is_walkable).
+func _nearest_walkable(cell: Vector2i, player_id: int = WorldData.NO_OWNER) -> Vector2i:
+	if _world.is_walkable_for(cell, player_id):
 		return cell
 	for radius in range(1, 16):
 		for offset: Vector2i in _ring_offsets(radius):
 			var candidate: Vector2i = cell + offset
-			if is_walkable(candidate):
+			if _world.is_walkable_for(candidate, player_id):
 				return candidate
 	return Vector2i(2147483647, 2147483647)
