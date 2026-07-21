@@ -87,6 +87,9 @@ func _ready() -> void:
 	if "--test-era" in args:
 		_run_era_test()
 		return
+	if "--test-ai-era" in args:
+		_run_ai_era_test()
+		return
 	if "--test-systems" in args:
 		_run_systems_test()
 	if "--test-scout" in args:
@@ -1248,6 +1251,61 @@ func _count_buildings(player_id: int) -> int:
 		if building != null and building.player_id == player_id:
 			n += 1
 	return n
+
+# Count a player's buildings of one type, optionally only finished ones. Used by
+# the AI-era harness to look for construction SITES (constructed_only=false).
+func _count_typed_buildings(player_id: int, building_type: String, constructed_only: bool) -> int:
+	var n: int = 0
+	for node: Node in get_tree().get_nodes_in_group("player_%d" % player_id):
+		var building: Building = node as Building
+		if building != null and building.building_type == building_type \
+				and (not constructed_only or building.is_constructed):
+			n += 1
+	return n
+
+# Proves the AI advances eras through the REAL command path (P2 — no cheating):
+# it builds the era-requirement buildings on the same gates the human uses and
+# requests the identical advance_era command. Deterministic: we drive the AI's
+# tick directly (ai._tick) so no wall-clock waves interfere.
+func _run_ai_era_test() -> void:
+	var ai: Node = $EnemyAI
+	# Let the world settle so find_buildable_cell / _exec_place have scouted,
+	# buildable cells around the AI's base.
+	await get_tree().create_timer(0.5).timeout
+
+	# --- builds-required-first ---
+	# In Forest (Era 0) with no houses, the AI must build a HOUSE (the Village
+	# requirement), NEVER a barracks (era-locked until Village). Grant plenty of
+	# wood so the choice is purely era-driven, not a cost accident.
+	GameManager.add_resource(1, Constants.ResourceType.WOOD, 200)
+	var forest_era_ok: bool = GameManager.player_era(1) == Constants.ERA_FOREST
+	ai._tick()
+	await get_tree().process_frame
+	var made_house: bool = _count_typed_buildings(1, "house", false) >= 1
+	var made_barracks: bool = _count_typed_buildings(1, "barracks", false) >= 1
+	print("[test-ai-era] builds-required-first: %s" % (
+		"OK" if forest_era_ok and made_house and not made_barracks
+		else "FAILED (forest=%s house=%s barracks=%s)" % [forest_era_ok, made_house, made_barracks]))
+
+	# --- advances-village ---
+	# Genuinely meet the Village requirement: place TWO FINISHED houses near the
+	# AI's origin (find_buildable_cell so footprints don't collide), then grant
+	# the advance cost. Ticking the AI must drive advance_era → Village. No jade
+	# is granted, so it cannot over-advance into Chiefdom.
+	var house_a: Vector2i = GameManager.find_buildable_cell(WorldGen.PLAYER_ORIGINS[1], "house", 1)
+	_place_building("house", 1, house_a)
+	var house_b: Vector2i = GameManager.find_buildable_cell(WorldGen.PLAYER_ORIGINS[1], "house", 1)
+	_place_building("house", 1, house_b)
+	GameManager.add_resource(1, Constants.ResourceType.FOOD, 400)
+	GameManager.add_resource(1, Constants.ResourceType.WOOD, 300)
+	await get_tree().process_frame
+	for _i in range(4):
+		ai._tick()
+		await get_tree().process_frame
+	print("[test-ai-era] advances-village: %s" % (
+		"OK" if GameManager.player_era(1) == Constants.ERA_VILLAGE
+		else "FAILED (era=%d)" % GameManager.player_era(1)))
+	get_tree().quit()
 
 # Prove commands flow through CommandRouter: a move command relocates units,
 # a spoofed player_id is rejected, training queues via command.

@@ -27,16 +27,29 @@ var builds: bool = true
 # below what a real villager line produces. "grace" holds the first wave
 # back long enough to establish an economy; "wave_size" caps how many
 # warriors leave home at once (hard sends everyone).
+#
+# JADE trickle (Task A7, TUNABLE): Chiefdom costs 100 JADE to advance into, and
+# the AI mines nothing — jade is the new resource its trickle must supply (the
+# human MINES jade; the AI TRICKLES it, keeping ADR 10's economy concession
+# symmetric-in-spirit — an economy concession, not an information one). Jade is
+# NOT what paces the advance, though: Chiefdom also costs 300 food / 200 wood,
+# and at the normal wood rate (1/s) that 200 wood is ~200s from zero — the
+# dominant co-gate that actually sets the late-game timing (jade's 100 @ 1/s
+# clears sooner). Easy trickles 0 jade, so it stays at Village (which also has
+# builds:false, so it never advances at all — intended).
 const DIFFICULTY_PRESETS: Dictionary = {
 	"easy": {"wave": 130.0, "max": 4, "archers": 0.0, "builds": false,
 		"grace": 300.0, "wave_size": 3,
-		"trickle": {Constants.ResourceType.FOOD: 1, Constants.ResourceType.WOOD: 1}},
+		"trickle": {Constants.ResourceType.FOOD: 1, Constants.ResourceType.WOOD: 1,
+			Constants.ResourceType.JADE: 0}},
 	"normal": {"wave": 95.0, "max": 6, "archers": 0.2, "builds": true,
 		"grace": 210.0, "wave_size": 5,
-		"trickle": {Constants.ResourceType.FOOD: 2, Constants.ResourceType.WOOD: 1}},
+		"trickle": {Constants.ResourceType.FOOD: 2, Constants.ResourceType.WOOD: 1,
+			Constants.ResourceType.JADE: 1}},
 	"hard": {"wave": 55.0, "max": 14, "archers": 0.4, "builds": true,
 		"grace": 60.0, "wave_size": 999,
-		"trickle": {Constants.ResourceType.FOOD: 5, Constants.ResourceType.WOOD: 3}},
+		"trickle": {Constants.ResourceType.FOOD: 5, Constants.ResourceType.WOOD: 3,
+			Constants.ResourceType.JADE: 2}},
 }
 const SCOUT_DISTANCE_STEP: int = 12
 const SCOUT_DISTANCE_MAX: int = 80
@@ -53,6 +66,7 @@ var _elapsed: float = 0.0
 var trickle: Dictionary = {
 	Constants.ResourceType.FOOD: 3,
 	Constants.ResourceType.WOOD: 2,
+	Constants.ResourceType.JADE: 0,
 }
 
 var vision: PlayerVision = PlayerVision.new(ENEMY_ID)
@@ -167,13 +181,36 @@ func _has_any(building_type: String) -> Building:
 			return building
 	return null
 
-# Economy goals, in priority order: a barracks, then houses whenever the
-# army is near the cap, then one watchtower.
+# Building + era advancement, in priority order. The AI plays by the SAME rules
+# the human does (P2 — no cheating): it builds the era-requirement buildings on
+# the same gates and advances through the identical authoritative advance_era
+# command, which re-checks requirements + cost server-side.
+#  1. Toward the next era: place the FIRST still-missing required building
+#     (houses→Village, a barracks→Chiefdom), then request the advance once the
+#     requirements are met AND the cost is affordable. This replaces the old
+#     "build a barracks first" — a barracks is era-locked until Village, so that
+#     order left the AI permanently stuck in Forest.
+#  2. Economy upkeep: pop-cap houses so training isn't starved.
+#  3. One watchtower on hard.
 func _consider_building(tc: Building) -> void:
 	var home: Vector2i = Constants.world_to_grid(tc.global_position)
-	if _has_any("barracks") == null:
-		_try_place("barracks", home)
-		return
+	if GameManager.has_next_era(ENEMY_ID):
+		var missing: Dictionary = GameManager.missing_era_requirements(ENEMY_ID)
+		if not missing.is_empty():
+			# INVARIANT: requirement buildings for era N+1 must be unlockable by
+			# era N, or the AI deadlocks here (the is_unlocked guard in _try_place
+			# would refuse and this path returns without progress). Holds today:
+			# house is Era 0, barracks is Era 1 (buildable at Village).
+			var needed_type: String = missing.keys()[0]
+			_try_place(needed_type, home)
+			return
+		# Requirements met — request the advance if we can pay for it. If we can't
+		# yet (e.g. still trickling the Chiefdom jade), fall through to economy
+		# upkeep rather than idling.
+		var next_era: int = GameManager.player_era(ENEMY_ID) + 1
+		if GameManager.can_afford(ENEMY_ID, Constants.ERA_DEFS[next_era]["advance_cost"]):
+			CommandRouter.submit({"type": "advance_era", "player_id": ENEMY_ID})
+			return
 	if GameManager.get_population(ENEMY_ID) >= GameManager.population_cap(ENEMY_ID) - 1:
 		_try_place("house", home)
 		return
@@ -182,6 +219,10 @@ func _consider_building(tc: Building) -> void:
 
 func _try_place(building_type: String, origin: Vector2i) -> void:
 	var def: Dictionary = Constants.BUILDING_DEFS[building_type]
+	# Never waste an attempt on a building this era hasn't unlocked — the same
+	# gate the human's build menu and the authoritative _exec_place enforce.
+	if not GameManager.is_unlocked(ENEMY_ID, def):
+		return
 	if not GameManager.can_afford(ENEMY_ID, def["cost"]):
 		return
 	var cell: Vector2i = GameManager.find_buildable_cell(origin, building_type, ENEMY_ID)
