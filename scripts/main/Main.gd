@@ -99,6 +99,9 @@ func _ready() -> void:
 		_run_scout_test()
 	if "--test-hunt" in args:
 		_run_hunt_test()
+	if "--test-hunter" in args:
+		_run_hunter_test()
+		return
 	if "--capture-help" in args:
 		_run_capture_help()
 	if "--capture-animals" in args:
@@ -1525,6 +1528,105 @@ func _run_hunt_test() -> void:
 	var vhp_after: int = victim.current_hp if is_instance_valid(victim) else 0
 	print("[test-hunt] villager hp ", vhp_before, "->", vhp_after,
 		" (predator ", "OK" if vhp_after < vhp_before else "FAILED", ")")
+	get_tree().quit()
+
+# Hunter (Era 1 villager-line specialist): proves the two data-keyed bonuses and
+# the era-gated train button. (a) anti-animal damage runs through the real unit
+# attack path (Unit._strike), where the multiplier lives; (b) hunt yield runs
+# through the real bounty path (Animal._die), triggered by a lethal take_damage
+# whose killer is the hunter; (c) the Town Center trains hunter but the Era-1
+# gate refuses it until the tribe reaches Village.
+func _run_hunter_test() -> void:
+	await get_tree().create_timer(0.5).timeout
+
+	# (a) Anti-animal: one strike from each unit onto a capybara (armor 0). The
+	# hunter's 2x lands 8 (attack_power 4); the warrior's 1x lands 7. Both are
+	# measured at the FIRST hp drop, so exactly one strike is counted.
+	var cap_a: Animal = animals.spawn_at("capybara", Vector2i(4, 4))
+	var hunter_a: UnitBase = _spawn_unit("hunter", 0, Vector2i(4, 4))
+	await get_tree().process_frame
+	var cap_a_hp0: int = cap_a.current_hp
+	hunter_a.command_attack(cap_a)
+	var t: float = 0.0
+	while is_instance_valid(cap_a) and cap_a.current_hp == cap_a_hp0 and t < 6.0:
+		await get_tree().create_timer(0.1).timeout
+		t += 0.1
+	var hunter_drop: int = cap_a_hp0 - (cap_a.current_hp if is_instance_valid(cap_a) else 0)
+
+	var cap_b: Animal = animals.spawn_at("capybara", Vector2i(-4, -4))
+	var warrior_b: UnitBase = _spawn_unit("warrior", 0, Vector2i(-4, -4))
+	await get_tree().process_frame
+	var cap_b_hp0: int = cap_b.current_hp
+	warrior_b.command_attack(cap_b)
+	t = 0.0
+	while is_instance_valid(cap_b) and cap_b.current_hp == cap_b_hp0 and t < 6.0:
+		await get_tree().create_timer(0.1).timeout
+		t += 0.1
+	var warrior_drop: int = cap_b_hp0 - (cap_b.current_hp if is_instance_valid(cap_b) else 0)
+
+	var expect_hunter: int = int(round(hunter_a.attack_power * 2.0))
+	var anti_ok: bool = hunter_drop == expect_hunter and warrior_drop == warrior_b.attack_power \
+		and hunter_drop > warrior_drop
+	print("[test-hunter] anti-animal: %s (hunter %d vs warrior %d)" % [
+		"OK" if anti_ok else "FAILED", hunter_drop, warrior_drop])
+	if is_instance_valid(cap_a):
+		cap_a.queue_free()
+	if is_instance_valid(cap_b):
+		cap_b.queue_free()
+
+	# (b) Hunt yield: a hunter's kill banks round(bounty * 1.5); a warrior's banks
+	# the plain bounty. A lethal take_damage credited to each killer drives the
+	# real Animal._die bounty path deterministically (capybara bounty = 100).
+	var food0: int = GameManager.get_resource(0, Constants.ResourceType.FOOD)
+	var cap_h: Animal = animals.spawn_at("capybara", Vector2i(4, -4))
+	var hunter_k: UnitBase = _spawn_unit("hunter", 0, Vector2i(4, -4))
+	await get_tree().process_frame
+	var bounty: int = cap_h.food_bounty
+	cap_h.take_damage(cap_h.current_hp + 100, hunter_k)
+	await get_tree().process_frame
+	var hunter_gain: int = GameManager.get_resource(0, Constants.ResourceType.FOOD) - food0
+
+	var food1: int = GameManager.get_resource(0, Constants.ResourceType.FOOD)
+	var cap_w: Animal = animals.spawn_at("capybara", Vector2i(-4, 4))
+	var warrior_k: UnitBase = _spawn_unit("warrior", 0, Vector2i(-4, 4))
+	await get_tree().process_frame
+	cap_w.take_damage(cap_w.current_hp + 100, warrior_k)
+	await get_tree().process_frame
+	var warrior_gain: int = GameManager.get_resource(0, Constants.ResourceType.FOOD) - food1
+
+	var hunt_ok: bool = hunter_gain == int(round(bounty * 1.5)) and warrior_gain == bounty
+	print("[test-hunter] hunt-bonus: %s (hunter +%d vs warrior +%d, bounty %d)" % [
+		"OK" if hunt_ok else "FAILED", hunter_gain, warrior_gain, bounty])
+
+	# (c) Train gate: the Town Center lists hunter, but the Era-1 gate refuses the
+	# order in Era 0. Fund it richly so ONLY the era gate can block the queue.
+	GameManager.add_resource(0, Constants.ResourceType.FOOD, 2000)
+	GameManager.add_resource(0, Constants.ResourceType.WOOD, 2000)
+	var tc: Building = _find_tc(0)
+	if tc == null:
+		print("[test-hunter] setup: FAILED (no town center)")
+		get_tree().quit(1)
+		return
+	var q_before: int = tc.train_queue.size()
+	tc.queue_train("hunter")
+	var locked_ok: bool = GameManager.player_era(0) == Constants.ERA_FOREST \
+		and tc.train_queue.size() == q_before
+	print("[test-hunter] train-locked-era0: %s" % ("OK" if locked_ok else "FAILED"))
+
+	# Advance player 0 to Village (two finished houses + funds — the era recipe).
+	_place_building("house", 0, GameManager.find_buildable_cell(Vector2i.ZERO, "house", 0))
+	_place_building("house", 0, GameManager.find_buildable_cell(Vector2i.ZERO, "house", 0))
+	GameManager.add_resource(0, Constants.ResourceType.FOOD, 500)
+	GameManager.add_resource(0, Constants.ResourceType.WOOD, 300)
+	await get_tree().process_frame
+	CommandRouter.submit({"type": "advance_era", "player_id": 0})
+	await get_tree().process_frame
+
+	var q_v: int = tc.train_queue.size()
+	var accepted: bool = tc.queue_train("hunter")
+	var unlocked_ok: bool = GameManager.player_era(0) == Constants.ERA_VILLAGE \
+		and accepted and tc.train_queue.size() == q_v + 1
+	print("[test-hunter] train-ok-era1: %s" % ("OK" if unlocked_ok else "FAILED"))
 	get_tree().quit()
 
 # Renders a couple of animals up close so the procedural art can be reviewed.

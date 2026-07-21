@@ -77,6 +77,26 @@ const UNIT_DEFS: Dictionary = {
 		"cost": { ResourceType.FOOD: 40, ResourceType.WOOD: 20 },
 		"train_time": 9.0,
 	},
+	# Villager-line hunter: gathers and builds like a villager, but specializes
+	# in wildlife — deals 2x to animals and banks 1.5x the food bounty on a kill.
+	# Both bonuses are data-keyed (anti_animal_mult / hunt_food_mult) so only the
+	# hunter benefits; every other unit defaults to 1.0 and is unaffected.
+	"hunter": {
+		"era": 1,
+		"max_hp": 45,
+		"move_speed": 100.0,
+		"attack_power": 4,
+		"armor": 0,
+		"attack_range": 26.0,
+		"attack_cooldown": 1.2,
+		"vision_range": 200.0,
+		"aggressive": false,
+		"can_gather": true,
+		"cost": { ResourceType.FOOD: 55, ResourceType.WOOD: 10 },
+		"train_time": 6.0,
+		"anti_animal_mult": 2.0,   # damage multiplier vs units in the `animals` group
+		"hunt_food_mult": 1.5,     # food bounty multiplier when a hunter lands the kill
+	},
 	# Glass cannon: outranges everything, melts if anything reaches it.
 	"archer": {
 		"era": 1,
@@ -170,7 +190,7 @@ const BUILDING_DEFS: Dictionary = {
 		"era": 0,
 		"max_hp": 600,
 		"footprint": Vector2i(2, 2),
-		"trains": ["villager", "warrior"],
+		"trains": ["villager", "warrior", "hunter"],
 		"vision_tiles": 9,
 	},
 	"house": {

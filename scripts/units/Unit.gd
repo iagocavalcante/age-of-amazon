@@ -516,7 +516,12 @@ func _strike(target: Node2D) -> void:
 			tween.tween_property(sprite, "position", Vector2.ZERO, 0.10)
 
 	if target.has_method("take_damage"):
-		target.take_damage(attack_power, self)
+		# Data-keyed anti-animal bonus: a hunter deals its `anti_animal_mult`
+		# against wildlife (group `animals`); every other unit defaults to 1.0.
+		var dmg: int = attack_power
+		if target.is_in_group("animals"):
+			dmg = int(round(dmg * Constants.UNIT_DEFS.get(unit_type, {}).get("anti_animal_mult", 1.0)))
+		target.take_damage(dmg, self)
 
 # Purely cosmetic: damage is instant on the authority; the arrow just sells
 # the shot on whatever screen is watching.

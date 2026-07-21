@@ -336,10 +336,17 @@ func _die(killer: Node2D) -> void:
 	if killer != null and is_instance_valid(killer):
 		var pid: Variant = killer.get("player_id")
 		if pid != null and int(pid) >= 0:
-			GameManager.add_resource(int(pid), Constants.ResourceType.FOOD, food_bounty)
-			EventBus.animal_hunted.emit(self, killer, food_bounty)
+			# Data-keyed hunt yield: a hunter banks its `hunt_food_mult` of the
+			# bounty; any other killer defaults to 1.0 (bounty unchanged).
+			var mult: float = 1.0
+			var killer_type: Variant = killer.get("unit_type")
+			if killer_type != null:
+				mult = Constants.UNIT_DEFS.get(killer_type, {}).get("hunt_food_mult", 1.0)
+			var payout: int = int(round(food_bounty * mult))
+			GameManager.add_resource(int(pid), Constants.ResourceType.FOOD, payout)
+			EventBus.animal_hunted.emit(self, killer, payout)
 			if int(pid) == GameManager.local_player_id:
-				_spawn_food_popup(food_bounty)
+				_spawn_food_popup(payout)
 
 	EventBus.animal_died.emit(self)
 
