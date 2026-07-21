@@ -84,6 +84,9 @@ func _ready() -> void:
 	if "--test-poi-claim" in args:
 		_run_poi_claim_test()
 		return
+	if "--test-era" in args:
+		_run_era_test()
+		return
 	if "--test-systems" in args:
 		_run_systems_test()
 	if "--test-scout" in args:
@@ -1062,6 +1065,22 @@ func _run_victory_test() -> void:
 	print("[test-victory] last-standing ",
 		"OK" if over and winner_seen[0] == 0 else "FAILED",
 		" winner=", winner_seen[0])
+	get_tree().quit()
+
+# Prove the era data model: every tribe starts in Era 0, ERA_DEFS has exactly
+# three ages, and every unit/building def carries an era gate.
+func _run_era_test() -> void:
+	# Every player starts in Era 0 (Forest Age).
+	print("[test-era] start-era-0: %s" % ("OK" if GameManager.player_era(0) == 0 and GameManager.player_era(1) == 0 else "FAILED"))
+	# ERA_DEFS defines exactly 3 eras.
+	print("[test-era] three-eras: %s" % ("OK" if Constants.ERA_DEFS.size() == 3 else "FAILED"))
+	# Every unit/building def carries an era gate.
+	var all_gated := true
+	for t: String in Constants.UNIT_DEFS:
+		if not Constants.UNIT_DEFS[t].has("era"): all_gated = false
+	for t: String in Constants.BUILDING_DEFS:
+		if not Constants.BUILDING_DEFS[t].has("era"): all_gated = false
+	print("[test-era] defs-gated: %s" % ("OK" if all_gated else "FAILED"))
 	get_tree().quit()
 
 # Prove commands flow through CommandRouter: a move command relocates units,

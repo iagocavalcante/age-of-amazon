@@ -27,6 +27,14 @@ var fog: FogOfWar = null
 # Per-player resource stockpiles: player_id -> {ResourceType -> int}
 var stockpiles: Array[Dictionary] = []
 
+# Per-player current era (index into Constants.ERA_DEFS). Advanced only via the
+# authoritative advance_era command (later task); replicated + saved like
+# stockpiles.
+var eras: Array[int] = []
+
+func player_era(player_id: int) -> int:
+	return eras[player_id] if player_id >= 0 and player_id < eras.size() else 0
+
 # Match-server only: per-tribe fog knowledge (index = player_id), refreshed
 # by Replication. Empty everywhere else.
 var player_visions: Array[PlayerVision] = []
@@ -95,6 +103,9 @@ func reset_players(count: int = 2) -> void:
 			Constants.ResourceType.WOOD: 50,
 			Constants.ResourceType.JADE: 0,
 		})
+	eras.clear()
+	for _i in range(player_count):
+		eras.append(Constants.ERA_FOREST)
 
 func get_resource(player_id: int, type: int) -> int:
 	return stockpiles[player_id].get(type, 0)

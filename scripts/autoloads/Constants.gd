@@ -49,6 +49,7 @@ const SITE_STARTING_HP_FRACTION: float = 0.1
 # Unit definitions
 const UNIT_DEFS: Dictionary = {
 	"villager": {
+		"era": 0,
 		"max_hp": 40,
 		"move_speed": 100.0,
 		"attack_power": 2,
@@ -62,6 +63,7 @@ const UNIT_DEFS: Dictionary = {
 		"train_time": 6.0,
 	},
 	"warrior": {
+		"era": 0,
 		"max_hp": 70,
 		"move_speed": 90.0,
 		"attack_power": 7,
@@ -76,6 +78,7 @@ const UNIT_DEFS: Dictionary = {
 	},
 	# Glass cannon: outranges everything, melts if anything reaches it.
 	"archer": {
+		"era": 1,
 		"max_hp": 45,
 		"move_speed": 95.0,
 		"attack_power": 8,
@@ -162,12 +165,14 @@ const ANIMAL_DEFS: Dictionary = {
 # the town center exists only from the match start.
 const BUILDING_DEFS: Dictionary = {
 	"town_center": {
+		"era": 0,
 		"max_hp": 600,
 		"footprint": Vector2i(2, 2),
 		"trains": ["villager", "warrior"],
 		"vision_tiles": 9,
 	},
 	"house": {
+		"era": 0,
 		"max_hp": 200,
 		"footprint": Vector2i(1, 1),
 		"trains": [],
@@ -176,6 +181,7 @@ const BUILDING_DEFS: Dictionary = {
 		"pop_bonus": 5,
 	},
 	"barracks": {
+		"era": 1,
 		"max_hp": 400,
 		"footprint": Vector2i(2, 2),
 		"trains": ["warrior", "archer"],
@@ -183,6 +189,7 @@ const BUILDING_DEFS: Dictionary = {
 		"cost": {ResourceType.WOOD: 60, ResourceType.FOOD: 20},
 	},
 	"watchtower": {
+		"era": 0,
 		"max_hp": 250,
 		"footprint": Vector2i(1, 1),
 		"trains": [],
@@ -191,6 +198,7 @@ const BUILDING_DEFS: Dictionary = {
 	},
 	# The jade endgame: finish it, defend it for MONUMENT_VICTORY_SECS, win.
 	"monument": {
+		"era": 2,
 		"max_hp": 800,
 		"footprint": Vector2i(2, 2),
 		"trains": [],
@@ -208,6 +216,37 @@ const POI_ANCIENT_RUINS: String = "ancient_ruins"
 const POI_DEFS: Dictionary = {
 	POI_ANCIENT_RUINS: {
 		"loot": { ResourceType.JADE: 40, ResourceType.WOOD: 60 },
+	},
+}
+
+# --- Eras (Phase 2) --------------------------------------------------------
+# Ascending ages. `advance_cost` is paid to ENTER this era from the previous;
+# era 0 has none. `requires_buildings` is a {building_type: count} map of
+# buildings that must be FINISHED before advancing INTO this era. `buff` (filled
+# in a later task) applies tribe-wide. TUNABLE — grounded in the current economy
+# (start 100 food/50 wood; villager 50 food; monument 40 jade).
+const ERA_FOREST: int = 0
+const ERA_VILLAGE: int = 1
+const ERA_CHIEFDOM: int = 2
+
+const ERA_DEFS: Dictionary = {
+	ERA_FOREST: {
+		"name": "Forest Age",
+		"advance_cost": {},
+		"requires_buildings": {},
+		"buff": {},
+	},
+	ERA_VILLAGE: {
+		"name": "Village Age",
+		"advance_cost": { ResourceType.FOOD: 200, ResourceType.WOOD: 100 },
+		"requires_buildings": { "house": 2 },
+		"buff": {},
+	},
+	ERA_CHIEFDOM: {
+		"name": "Chiefdom Age",
+		"advance_cost": { ResourceType.FOOD: 300, ResourceType.WOOD: 200, ResourceType.JADE: 100 },
+		"requires_buildings": { "barracks": 1 },
+		"buff": {},
 	},
 }
 
