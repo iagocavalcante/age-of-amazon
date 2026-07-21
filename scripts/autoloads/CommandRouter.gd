@@ -147,6 +147,9 @@ func _exec_place(command: Dictionary) -> void:
 	var player_id: int = int(command["player_id"])
 	var base_cell: Vector2i = command["cell"]
 
+	if not GameManager.is_unlocked(player_id, def):
+		return  # building not unlocked in this era
+
 	var footprint: Vector2i = def["footprint"]
 	for dy in range(footprint.y):
 		for dx in range(footprint.x):

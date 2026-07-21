@@ -388,6 +388,18 @@ func _run_build_test() -> void:
 	print("[test-build] pop-cap ", "OK"
 		if GameManager.population_cap(0) == cap_before + 5 else "FAILED")
 
+	# Barracks + archer are now Era 1, so player 0 must reach Village Age before
+	# the remaining steps can exercise them. Grant the advance cost and stand up
+	# a second finished house (Village requires 2; only `site` exists so far).
+	GameManager.add_resource(0, Constants.ResourceType.FOOD, 500)
+	GameManager.add_resource(0, Constants.ResourceType.WOOD, 300)
+	_place_building("house", 0, _find_buildable_cell(Vector2i.ZERO, "house", 0))
+	await get_tree().process_frame
+	CommandRouter.submit({"type": "advance_era", "player_id": 0})
+	await get_tree().process_frame
+	print("[test-build] advanced-village ", "OK"
+		if GameManager.player_era(0) == Constants.ERA_VILLAGE else "FAILED")
+
 	GameManager.add_resource(0, Constants.ResourceType.WOOD, 100)
 	var barracks_cell: Vector2i = _find_buildable_cell(Vector2i.ZERO, "barracks", 0)
 	CommandRouter.submit({"type": "place", "player_id": 0, "building_type": "barracks",
@@ -1111,7 +1123,42 @@ func _run_era_test() -> void:
 	CommandRouter.submit({"type": "advance_era", "player_id": 0})
 	await get_tree().process_frame
 	print("[test-era] no-recharge: %s" % ("OK" if GameManager.get_resource(0, Constants.ResourceType.FOOD) == food_after else "FAILED"))
+
+	# --- era gates on the authoritative build path ---
+	# Barracks is Era 1. Player 1 is still Era 0 → placement must be refused even
+	# when perfectly affordable (proving the block is the era gate, not cost).
+	GameManager.add_resource(1, Constants.ResourceType.WOOD, 200)
+	GameManager.add_resource(1, Constants.ResourceType.FOOD, 200)
+	var p1_builds_before: int = _count_buildings(1)
+	var cell1: Vector2i = GameManager.find_buildable_cell(WorldGen.PLAYER_ORIGINS[1], "barracks", 1)
+	CommandRouter.submit({"type": "place", "player_id": 1, "building_type": "barracks",
+		"cell": cell1, "actor_names": []})
+	await get_tree().process_frame
+	print("[test-era] barracks-locked-era0: %s" % ("OK" if _count_buildings(1) == p1_builds_before else "FAILED"))
+	# Player 0 was advanced to Village (Era 1) above → barracks placement allowed.
+	GameManager.add_resource(0, Constants.ResourceType.WOOD, 200)
+	GameManager.add_resource(0, Constants.ResourceType.FOOD, 200)
+	var p0_builds_before: int = _count_buildings(0)
+	var p0_villagers: Array = get_tree().get_nodes_in_group("player_0").filter(
+		func(n: Node) -> bool: return n is UnitBase and (n as UnitBase).can_gather)
+	var p0_names: Array = p0_villagers.map(func(u: Node2D) -> String: return String(u.name))
+	var cell0: Vector2i = GameManager.find_buildable_cell(Vector2i.ZERO, "barracks", 0)
+	CommandRouter.submit({"type": "place", "player_id": 0, "building_type": "barracks",
+		"cell": cell0, "actor_names": p0_names})
+	await get_tree().process_frame
+	print("[test-era] barracks-ok-era1: %s" % ("OK" if _count_buildings(0) > p0_builds_before else "FAILED"))
 	get_tree().quit()
+
+# Count buildings owned by a player: the `node as Building` cast drops any
+# non-building member of the group, and the player_id filter scopes the count
+# to a single owner.
+func _count_buildings(player_id: int) -> int:
+	var n: int = 0
+	for node: Node in get_tree().get_nodes_in_group("buildings"):
+		var building: Building = node as Building
+		if building != null and building.player_id == player_id:
+			n += 1
+	return n
 
 # Prove commands flow through CommandRouter: a move command relocates units,
 # a spoofed player_id is rejected, training queues via command.

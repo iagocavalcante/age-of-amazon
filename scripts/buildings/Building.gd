@@ -116,6 +116,8 @@ func queue_train(unit_type: String) -> bool:
 	if not (unit_type in Constants.BUILDING_DEFS[building_type]["trains"]):
 		return false
 	var def: Dictionary = Constants.UNIT_DEFS[unit_type]
+	if not GameManager.is_unlocked(player_id, def):
+		return false  # unit not unlocked in this era
 	var planned: int = GameManager.get_population(player_id) + train_queue.size()
 	if planned >= GameManager.population_cap(player_id):
 		return false

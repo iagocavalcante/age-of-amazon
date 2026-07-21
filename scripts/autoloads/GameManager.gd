@@ -35,6 +35,13 @@ var eras: Array[int] = []
 func player_era(player_id: int) -> int:
 	return eras[player_id] if player_id >= 0 and player_id < eras.size() else 0
 
+# Is this content unlocked for the player, per its def's era gate? Buildings and
+# units both carry an int "era"; ungated defs (no key) count as Era 0. The
+# authoritative validators (_exec_place, queue_train) AND the HUD all consult
+# this, so the gate has one definition.
+func is_unlocked(player_id: int, def: Dictionary) -> bool:
+	return player_era(player_id) >= int(def.get("era", 0))
+
 # True if there is a next era to advance into (i.e. not already at Chiefdom).
 func has_next_era(player_id: int) -> bool:
 	return Constants.ERA_DEFS.has(player_era(player_id) + 1)
