@@ -30,7 +30,7 @@ var _hotkeys: Dictionary = {}
 
 const TRAIN_KEYS: Dictionary = { "villager": KEY_V, "warrior": KEY_C, "archer": KEY_R }
 const BUILD_KEYS: Dictionary = { "house": KEY_B, "barracks": KEY_N,
-	"watchtower": KEY_T, "monument": KEY_M }
+	"watchtower": KEY_T, "storehouse": KEY_S, "monument": KEY_M }
 var _queue_label: Label
 
 var _minimap_rect: TextureRect
@@ -366,7 +366,7 @@ func _build_selection_panel() -> void:
 	_build_box.alignment = FlowContainer.ALIGNMENT_CENTER
 	_build_box.visible = false
 	box.add_child(_build_box)
-	for building_type: String in ["house", "barracks", "watchtower", "monument"]:
+	for building_type: String in ["house", "barracks", "watchtower", "storehouse", "monument"]:
 		var def: Dictionary = Constants.BUILDING_DEFS[building_type]
 		var button: Button = Button.new()
 		button.text = "%s · %s  [%s]" % [building_type.capitalize().replace("_", " "),

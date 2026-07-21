@@ -414,11 +414,11 @@ func _process_gathering(delta: float) -> void:
 		_find_next_resource_node()
 
 func _go_deposit() -> void:
-	var tc: Node2D = _nearest_own_town_center()
-	if tc == null:
+	var dropoff: Node2D = _nearest_own_dropoff()
+	if dropoff == null:
 		current_state = State.IDLE
 		return
-	var spot: Dictionary = GameManager.pathfinder.adjacent_walkable(tc.footprint_cells, Constants.world_to_grid(global_position))
+	var spot: Dictionary = GameManager.pathfinder.adjacent_walkable(dropoff.footprint_cells, Constants.world_to_grid(global_position))
 	if not spot["found"]:
 		current_state = State.IDLE
 		return
@@ -462,14 +462,19 @@ func _find_next_resource_node() -> void:
 	else:
 		current_state = State.IDLE
 
-func _nearest_own_town_center() -> Node2D:
+# Nearest CONSTRUCTED drop-off (town center or storehouse) owned by this player.
+# The town center is always constructed, so the is_constructed gate only excludes
+# half-built storehouses — a site can't accept deposits until it's finished.
+func _nearest_own_dropoff() -> Node2D:
 	var best: Node2D = null
 	var best_dist: float = INF
 	for node: Node in get_tree().get_nodes_in_group("buildings"):
 		var building: Node2D = node as Node2D
 		if building == null or building.get("player_id") != player_id:
 			continue
-		if building.get("building_type") != "town_center":
+		if not (building.get("building_type") in Constants.DROP_OFF_TYPES):
+			continue
+		if not building.get("is_constructed"):
 			continue
 		var dist: float = building.global_position.distance_to(global_position)
 		if dist < best_dist:

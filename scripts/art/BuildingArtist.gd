@@ -201,6 +201,84 @@ func build_barracks(player_color: Color) -> ImageTexture:
 
 	return ImageTexture.create_from_image(img)
 
+# 2x2 granary: a fat barrel-bodied store hut with woven hoop bands, a conical
+# thatch cap, an open storage bay, and stacked grain sacks (one player-color) —
+# a squat, rounded silhouette distinct from the longhouse barracks.
+func build_storehouse(player_color: Color) -> ImageTexture:
+	var w: int = 112
+	var h: int = 84
+	var img: Image = Image.create(w, h, false, Image.FORMAT_RGBA8)
+
+	var wall_dark: Color = Color8(150, 118, 66)
+	var wall_mid: Color = Color8(184, 150, 88)
+	var wall_light: Color = Color8(212, 182, 116)
+	var hoop: Color = Color8(96, 66, 40)
+	var thatch_dark: Color = Color8(122, 98, 48)
+	var thatch_mid: Color = Color8(152, 126, 62)
+	var thatch_light: Color = Color8(180, 152, 80)
+	var outline: Color = Color8(52, 38, 22)
+	var bay_color: Color = Color8(40, 30, 18)
+
+	var cx: float = w / 2.0
+	var base_y: int = h - 8
+	var body_top: int = base_y - 40
+
+	PixelArt.draw_ellipse(img, cx, float(base_y), 44.0, 15.0, Color(0, 0, 0, 0.30), true)
+
+	# Barrel body: half-width bulges toward the middle for a rounded silhouette.
+	for y in range(body_top, base_y + 1):
+		var t: float = float(y - body_top) / float(base_y - body_top)
+		var bulge: float = sin(t * PI)  # 0 at top/bottom, 1 at the waist
+		var half: int = int(26.0 + bulge * 8.0)
+		for x in range(int(cx) - half, int(cx) + half + 1):
+			var speckle: float = PixelArt.hash2(x, y, 61)
+			var band: float = PixelArt.hash2(0, int(y / 4), 62)
+			img.set_pixel(x, y, PixelArt.ramp_shade(
+				[wall_dark, wall_mid, wall_light], 0.3 + band * 0.25 + speckle * 0.2, x, y))
+		img.set_pixel(clampi(int(cx) - half, 0, w - 1), y, outline)
+		img.set_pixel(clampi(int(cx) + half, 0, w - 1), y, outline)
+
+	# Woven hoop bands wrapping the barrel.
+	for hy: int in [body_top + 8, body_top + 20, body_top + 32]:
+		var ht: float = float(hy - body_top) / float(base_y - body_top)
+		var hhalf: int = int(26.0 + sin(ht * PI) * 8.0)
+		for x in range(int(cx) - hhalf + 1, int(cx) + hhalf):
+			img.set_pixel(x, hy, hoop if (x % 3) != 0 else hoop.darkened(0.25))
+
+	# Conical thatch cap, overhanging the barrel top.
+	for y in range(body_top - 26, body_top + 3):
+		var ct: float = float(y - (body_top - 26)) / 29.0
+		var chalf: int = int(2.0 + ct * 34.0)
+		for x in range(int(cx) - chalf, int(cx) + chalf + 1):
+			var band: float = PixelArt.hash2(0, int(y / 3), 63)
+			var speckle: float = PixelArt.hash2(x, y, 64)
+			img.set_pixel(x, y, PixelArt.ramp_shade(
+				[thatch_dark, thatch_mid, thatch_light], 0.25 + band * 0.35 + speckle * 0.25, x, y))
+		img.set_pixel(clampi(int(cx) - chalf, 0, w - 1), y, outline)
+		img.set_pixel(clampi(int(cx) + chalf, 0, w - 1), y, outline)
+	# Cap finial with a player-color pennant.
+	for y in range(body_top - 34, body_top - 24):
+		img.set_pixel(int(cx), y, outline)
+	for fy in range(body_top - 34, body_top - 27):
+		for fx in range(1, 9):
+			img.set_pixel(clampi(int(cx) + fx, 0, w - 1), fy,
+				player_color if (fx + fy) % 5 != 0 else player_color.darkened(0.25))
+
+	# Open storage bay (arched dark mouth) where the sacks go in and out.
+	for y in range(base_y - 18, base_y + 1):
+		var bt: float = float(y - (base_y - 18)) / 18.0
+		var bhalf: int = int(10.0 * (1.0 - bt * 0.25))
+		for x in range(int(cx) - bhalf, int(cx) + bhalf + 1):
+			img.set_pixel(x, y, bay_color)
+
+	# Stacked grain sacks by the bay; the front one carries the tribe color.
+	PixelArt.draw_ellipse(img, cx - 24.0, float(base_y - 6), 7.0, 8.0, wall_mid, false)
+	PixelArt.draw_ellipse(img, cx - 24.0, float(base_y - 6), 7.0, 8.0, outline, false)
+	PixelArt.draw_ellipse(img, cx + 22.0, float(base_y - 7), 8.0, 9.0, player_color, false)
+	PixelArt.draw_ellipse(img, cx + 22.0, float(base_y - 4), 4.0, 4.0, player_color.darkened(0.3), true)
+
+	return ImageTexture.create_from_image(img)
+
 # 2x2 jade monument: a carved green monolith on a stone base with gold
 # inlays and a jade capstone — the endgame made visible.
 func build_monument(player_color: Color) -> ImageTexture:

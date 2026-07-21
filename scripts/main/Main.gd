@@ -87,6 +87,9 @@ func _ready() -> void:
 	if "--test-era" in args:
 		_run_era_test()
 		return
+	if "--test-storehouse" in args:
+		_run_storehouse_test()
+		return
 	if "--test-ai-era" in args:
 		_run_ai_era_test()
 		return
@@ -311,10 +314,11 @@ func _restore_world(data: Dictionary) -> void:
 	camera.target_zoom = float(cam[2])
 	camera.zoom = Vector2(camera.target_zoom, camera.target_zoom)
 
-func _place_building(type: String, player_id: int, base_cell: Vector2i) -> Building:
+func _place_building(type: String, player_id: int, base_cell: Vector2i,
+		constructed: bool = true) -> Building:
 	var building: Building = Building.new()
 	building.name = GameManager.claim_entity_name("B")
-	building.setup(type, player_id, base_cell)
+	building.setup(type, player_id, base_cell, constructed)
 	buildings.add_child(building)
 	return building
 
@@ -1239,6 +1243,73 @@ func _run_era_test() -> void:
 	var chief_loss: int = chief_hp0 - w_chief.current_hp
 	var forest_loss: int = forest_hp0 - w_forest.current_hp
 	print("[test-era] armor-buff-wired: %s" % ("OK" if forest_loss - chief_loss == 1 else "FAILED (chief_loss=%d forest_loss=%d)" % [chief_loss, forest_loss]))
+	get_tree().quit()
+
+# The Storehouse is a forward resource drop-off: a villager deposits at the
+# NEAREST CONSTRUCTED drop-off (town center OR storehouse). This proves the
+# selector picks a nearer storehouse over the distant town center, and that an
+# unfinished storehouse is excluded (a site can't accept deposits).
+func _run_storehouse_test() -> void:
+	await get_tree().create_timer(0.5).timeout
+
+	# Advance player 0 to Village — the storehouse is an Era 1 building. Two
+	# finished houses + funds, driven through the command path (era-test recipe).
+	_place_building("house", 0, GameManager.find_buildable_cell(Vector2i.ZERO, "house", 0))
+	_place_building("house", 0, GameManager.find_buildable_cell(Vector2i.ZERO, "house", 0))
+	GameManager.add_resource(0, Constants.ResourceType.FOOD, 500)
+	GameManager.add_resource(0, Constants.ResourceType.WOOD, 300)
+	await get_tree().process_frame
+	CommandRouter.submit({"type": "advance_era", "player_id": 0})
+	await get_tree().process_frame
+	print("[test-storehouse] village-reached: %s" % ("OK"
+		if GameManager.player_era(0) == Constants.ERA_VILLAGE else "FAILED"))
+
+	# The always-on default drop-off (town center at the origin) and a gatherer.
+	var tc: Building = null
+	for node: Node in get_tree().get_nodes_in_group("buildings"):
+		var b: Building = node as Building
+		if b != null and b.player_id == 0 and b.building_type == "town_center":
+			tc = b
+	var villager: UnitBase = null
+	for node: Node in get_tree().get_nodes_in_group("player_0"):
+		if node is UnitBase and (node as UnitBase).can_gather:
+			villager = node as UnitBase
+			break
+	if tc == null or villager == null:
+		print("[test-storehouse] setup: FAILED (tc=%s villager=%s)" % [tc, villager])
+		get_tree().quit(1)
+		return
+
+	# A finished storehouse beside a wood node — the forward drop-off, far from
+	# the origin town center.
+	var wood: Dictionary = GameManager.world.find_nearest_resource(
+		Vector2i.ZERO, Constants.ResourceType.WOOD)
+	var store_cell: Vector2i = GameManager.find_buildable_cell(wood["cell"], "storehouse", 0)
+	var store: Building = _place_building("storehouse", 0, store_cell)
+	await get_tree().process_frame
+
+	# (1) dropoff-nearest: standing at the storehouse, the selector must prefer it
+	# over the distant town center.
+	villager.global_position = store.global_position
+	var pick_near: Node2D = villager._nearest_own_dropoff()
+	var store_dist: float = store.global_position.distance_to(villager.global_position)
+	var tc_dist: float = tc.global_position.distance_to(villager.global_position)
+	print("[test-storehouse] dropoff-nearest: %s" % ("OK"
+		if pick_near == store and store_dist < tc_dist
+		else "FAILED (pick=%s store_d=%.0f tc_d=%.0f)" % [pick_near, store_dist, tc_dist]))
+
+	# (2) constructed-only: an UNFINISHED storehouse placed right under the villager
+	# (physically the closest building of all) must be SKIPPED — the selector falls
+	# back to a finished drop-off (the storehouse above or the town center).
+	var site_cell: Vector2i = GameManager.find_buildable_cell(store_cell, "storehouse", 0)
+	var site: Building = _place_building("storehouse", 0, site_cell, false)
+	await get_tree().process_frame
+	villager.global_position = site.global_position
+	var pick_built: Node2D = villager._nearest_own_dropoff()
+	print("[test-storehouse] constructed-only: %s" % ("OK"
+		if pick_built != null and pick_built != site and pick_built.get("is_constructed")
+		else "FAILED (pick=%s)" % pick_built))
+
 	get_tree().quit()
 
 # Count buildings owned by a player: the `node as Building` cast drops any

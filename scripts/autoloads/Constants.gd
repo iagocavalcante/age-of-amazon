@@ -198,6 +198,16 @@ const BUILDING_DEFS: Dictionary = {
 		"vision_tiles": 16,
 		"cost": {ResourceType.WOOD: 40},
 	},
+	# Forward resource drop-off: villagers deposit here when it's nearer than the
+	# town center, shortening gather routes. See DROP_OFF_TYPES / Unit._go_deposit.
+	"storehouse": {
+		"era": 1,
+		"max_hp": 250,
+		"footprint": Vector2i(2, 2),
+		"trains": [],
+		"vision_tiles": 6,
+		"cost": {ResourceType.WOOD: 50},
+	},
 	# The jade endgame: finish it, defend it for MONUMENT_VICTORY_SECS, win.
 	"monument": {
 		"era": 2,
@@ -208,6 +218,10 @@ const BUILDING_DEFS: Dictionary = {
 		"cost": {ResourceType.JADE: 40, ResourceType.WOOD: 100},
 	},
 }
+
+# Building types that accept gatherer deposits. A villager banks its load at the
+# nearest CONSTRUCTED building of one of these types (see Unit._nearest_own_dropoff).
+const DROP_OFF_TYPES: Array[String] = ["town_center", "storehouse"]
 
 # Point-of-interest type ids (see WorldGen.poi_at). Kept as string ids — POIs
 # are a separate taxonomy from ResourceType/Biome enums and are meant to grow.
