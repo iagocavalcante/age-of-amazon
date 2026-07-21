@@ -41,3 +41,4 @@ signal help_requested()
 # Game signals
 signal game_state_changed(new_state: String)
 signal game_over(winner_player_id: int)
+signal era_advanced(player_id: int, era: int)

@@ -1081,6 +1081,36 @@ func _run_era_test() -> void:
 	for t: String in Constants.BUILDING_DEFS:
 		if not Constants.BUILDING_DEFS[t].has("era"): all_gated = false
 	print("[test-era] defs-gated: %s" % ("OK" if all_gated else "FAILED"))
+
+	# --- advance_era ---
+	# Give the world a moment to settle so find_buildable_cell has scouted cells.
+	await get_tree().create_timer(0.5).timeout
+	# Fresh player 0 has no houses → cannot advance to Village.
+	print("[test-era] advance-requires-houses: %s" % ("OK" if not GameManager.can_advance_era(0) else "FAILED"))
+	# Place the two finished houses the Village era requires. _place_building
+	# constructs the building finished (is_constructed defaults true); use
+	# find_buildable_cell so the two footprints don't collide.
+	var house_a: Vector2i = GameManager.find_buildable_cell(Vector2i.ZERO, "house", 0)
+	_place_building("house", 0, house_a)
+	var house_b: Vector2i = GameManager.find_buildable_cell(Vector2i.ZERO, "house", 0)
+	_place_building("house", 0, house_b)
+	await get_tree().process_frame
+	print("[test-era] requirements-met: %s" % ("OK" if GameManager.can_advance_era(0) else "FAILED"))
+	# Grant enough resources and advance via the COMMAND path (not by calling
+	# advance_era directly — exercise CommandRouter).
+	GameManager.add_resource(0, Constants.ResourceType.FOOD, 500)
+	GameManager.add_resource(0, Constants.ResourceType.WOOD, 300)
+	var food_before: int = GameManager.get_resource(0, Constants.ResourceType.FOOD)
+	CommandRouter.submit({"type": "advance_era", "player_id": 0})
+	await get_tree().process_frame
+	print("[test-era] advanced: %s" % ("OK" if GameManager.player_era(0) == Constants.ERA_VILLAGE else "FAILED"))
+	print("[test-era] charged: %s" % ("OK" if GameManager.get_resource(0, Constants.ResourceType.FOOD) == food_before - 200 else "FAILED"))
+	# Idempotent-ish: advancing again to Village must fail (already there); and it
+	# should not double-charge.
+	var food_after: int = GameManager.get_resource(0, Constants.ResourceType.FOOD)
+	CommandRouter.submit({"type": "advance_era", "player_id": 0})
+	await get_tree().process_frame
+	print("[test-era] no-recharge: %s" % ("OK" if GameManager.get_resource(0, Constants.ResourceType.FOOD) == food_after else "FAILED"))
 	get_tree().quit()
 
 # Prove commands flow through CommandRouter: a move command relocates units,

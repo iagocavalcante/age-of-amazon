@@ -35,6 +35,58 @@ var eras: Array[int] = []
 func player_era(player_id: int) -> int:
 	return eras[player_id] if player_id >= 0 and player_id < eras.size() else 0
 
+# True if there is a next era to advance into (i.e. not already at Chiefdom).
+func has_next_era(player_id: int) -> bool:
+	return Constants.ERA_DEFS.has(player_era(player_id) + 1)
+
+# The still-unmet building requirements for the next era, as {building_type:
+# still_needed} (counts). Empty when requirements are met OR there is no next
+# era. The HUD/AI use this to show/decide WHY advancing is blocked without
+# re-counting buildings.
+func missing_era_requirements(player_id: int) -> Dictionary:
+	var next: int = player_era(player_id) + 1
+	if not Constants.ERA_DEFS.has(next):
+		return {}
+	var need: Dictionary = Constants.ERA_DEFS[next]["requires_buildings"]
+	var have: Dictionary = {}
+	for node: Node in get_tree().get_nodes_in_group("player_%d" % player_id):
+		var b: Building = node as Building
+		if b != null and b.is_constructed:
+			have[b.building_type] = have.get(b.building_type, 0) + 1
+	var missing: Dictionary = {}
+	for bt: String in need:
+		var short: int = int(need[bt]) - have.get(bt, 0)
+		if short > 0:
+			missing[bt] = short
+	return missing
+
+# Requirements-only check (buildings finished). Cost is checked+charged in
+# advance_era. False at max era.
+func can_advance_era(player_id: int) -> bool:
+	return has_next_era(player_id) and missing_era_requirements(player_id).is_empty()
+
+# Authoritative advance: checks requirements + cost, charges, bumps era, emits.
+# Returns true on success. Callers must be the authority (CommandRouter).
+func advance_era(player_id: int) -> bool:
+	var next: int = player_era(player_id) + 1
+	if not Constants.ERA_DEFS.has(next):
+		return false
+	if not can_advance_era(player_id):
+		return false
+	var cost: Dictionary = Constants.ERA_DEFS[next]["advance_cost"]
+	if not can_afford(player_id, cost):
+		return false
+	spend(player_id, cost)
+	eras[player_id] = next
+	EventBus.era_advanced.emit(player_id, next)
+	_replicate_era(player_id)
+	return true
+
+# Replication stub — filled in Task A5. No-op for now so advance_era compiles
+# and runs offline correctly.
+func _replicate_era(_player_id: int) -> void:
+	pass
+
 # Match-server only: per-tribe fog knowledge (index = player_id), refreshed
 # by Replication. Empty everywhere else.
 var player_visions: Array[PlayerVision] = []

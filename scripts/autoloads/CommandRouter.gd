@@ -49,6 +49,8 @@ func _validate_and_execute(command: Dictionary) -> void:
 			_exec_stop(command)
 		"build":
 			_exec_build(command)
+		"advance_era":
+			GameManager.advance_era(int(command["player_id"]))
 		_:
 			push_warning("CommandRouter: unknown command %s" % [command])
 
