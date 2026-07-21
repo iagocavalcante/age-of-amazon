@@ -101,6 +101,8 @@ func _ready() -> void:
 		_run_capture_world()
 	if "--capture-ruins" in args:
 		_run_capture_ruins()
+	if "--capture-era" in args:
+		_run_capture_era()
 
 func _is_harness(args: PackedStringArray) -> bool:
 	for arg: String in args:
@@ -591,6 +593,42 @@ func _run_hud_test() -> void:
 				stays = false
 				print("  off-screen after ", target.name, " at vp=", vp, " rect=", r)
 	print("[test-hud] panel-stays-on-screen ", "OK" if stays else "FAILED")
+
+	# --- Era gate reaches the build menu (Task A6) ---
+	# Re-select a villager so the build row is populated + affordability applied.
+	SelectionManager.select_only(unit)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var barracks_btn: Button = null
+	for child: Node in hud._build_box.get_children():
+		var bb: Button = child as Button
+		if bb != null and bb.has_meta("btype") and String(bb.get_meta("btype")) == "barracks":
+			barracks_btn = bb
+	# Barracks is Era 1 → locked (disabled) while player 0 is still Forest.
+	print("[test-hud] barracks-locked-era0 ", "OK" if barracks_btn != null
+		and barracks_btn.disabled else "FAILED")
+	# Advance player 0 to Village (2 finished houses + funded), via the command path.
+	_place_building("house", 0, GameManager.find_buildable_cell(Vector2i.ZERO, "house", 0))
+	_place_building("house", 0, GameManager.find_buildable_cell(Vector2i.ZERO, "house", 0))
+	GameManager.add_resource(0, Constants.ResourceType.FOOD, 400)
+	GameManager.add_resource(0, Constants.ResourceType.WOOD, 300)
+	await get_tree().process_frame
+	CommandRouter.submit({"type": "advance_era", "player_id": 0})
+	await get_tree().process_frame
+	print("[test-hud] advanced-village ", "OK" if GameManager.player_era(0)
+		== Constants.ERA_VILLAGE else "FAILED")
+	# Re-run the affordability pass under the new era + granted resources.
+	SelectionManager.select_only(unit)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	print("[test-hud] barracks-unlocked-village ", "OK" if barracks_btn != null
+		and not barracks_btn.disabled else "FAILED")
+	# The Advance button now points at Chiefdom (the next era) and is disabled
+	# (no barracks yet) — proving the indicator + reason reach the top bar.
+	print("[test-hud] advance-next-chiefdom ", "OK" if hud._advance_button.text.contains(
+		"Chiefdom") and hud._advance_button.disabled else "FAILED text=%s" % hud._advance_button.text)
+	print("[test-hud] era-label-village ", "OK" if hud._era_label.text.contains(
+		"Village") else "FAILED text=%s" % hud._era_label.text)
 	get_tree().quit()
 
 func _push_key(keycode: Key) -> void:
@@ -1462,6 +1500,40 @@ func _run_capture_ruins() -> void:
 	var path: String = "user://ruins_capture.png"
 	img.save_png(path)
 	print("[capture-ruins] saved ", ProjectSettings.globalize_path(path), " ruin at ", ruin)
+	get_tree().quit()
+
+# Screenshot the era HUD for visual review: advance player 0 to Village so the
+# capture shows a non-Forest indicator, an enabled/updated Advance button, and a
+# now-unlocked barracks in the build menu. Self-quits after saving (no
+# --quit-after, which raced the save in a prior task).
+func _run_capture_era() -> void:
+	await get_tree().create_timer(0.5).timeout
+	# Meet the Village requirement (2 finished houses) and fund the advance, then
+	# drive it through the authoritative command path — the HUD reacts via signals.
+	_place_building("house", 0, GameManager.find_buildable_cell(Vector2i.ZERO, "house", 0))
+	_place_building("house", 0, GameManager.find_buildable_cell(Vector2i.ZERO, "house", 0))
+	GameManager.add_resource(0, Constants.ResourceType.FOOD, 400)
+	GameManager.add_resource(0, Constants.ResourceType.WOOD, 300)
+	await get_tree().process_frame
+	CommandRouter.submit({"type": "advance_era", "player_id": 0})
+	await get_tree().process_frame
+	# Select a villager so the era-gated build menu is on screen in the shot.
+	var villagers: Array = get_tree().get_nodes_in_group("player_0").filter(
+		func(n: Node) -> bool: return n is UnitBase and (n as UnitBase).can_gather)
+	if not villagers.is_empty():
+		SelectionManager.select_only(villagers[0])
+	camera.center_on(Constants.grid_to_world(0, 0))
+	camera.target_zoom = 1.4
+	camera.zoom = Vector2(1.4, 1.4)
+	fog.force_update()
+	for _i in range(10):
+		await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var img: Image = get_viewport().get_texture().get_image()
+	var path: String = "user://era_capture.png"
+	img.save_png(path)
+	print("[capture-era] saved ", ProjectSettings.globalize_path(path),
+		" era=", Constants.ERA_DEFS[GameManager.player_era(0)]["name"])
 	get_tree().quit()
 
 func _find_tc(player_id: int) -> Building:

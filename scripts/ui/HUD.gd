@@ -12,6 +12,8 @@ const REFRESH_INTERVAL: float = 0.5
 var _resource_labels: Dictionary = {}  # ResourceType -> Label
 var _pop_label: Label
 var _daily_label: Label
+var _era_label: Label
+var _advance_button: Button
 var _pause_button: Button
 
 var _sel_panel: PanelContainer
@@ -64,7 +66,12 @@ func _ready() -> void:
 	_build_game_over()
 
 	EventBus.resources_changed.connect(_on_resources_changed)
-	EventBus.population_changed.connect(func(_pid: int) -> void: _refresh_top_bar())
+	EventBus.population_changed.connect(func(_pid: int) -> void:
+		_refresh_top_bar()
+		_refresh_era_ui())
+	EventBus.era_advanced.connect(_on_era_advanced)
+	EventBus.building_constructed.connect(_on_buildings_changed)
+	EventBus.building_destroyed.connect(_on_buildings_changed)
 	EventBus.selection_changed.connect(_refresh_selection_panel)
 	EventBus.selection_cleared.connect(_refresh_selection_panel)
 	EventBus.training_queued.connect(func(_b: Node2D, _t: String) -> void: _refresh_selection_panel())
@@ -89,6 +96,7 @@ func _ready() -> void:
 	timer.start()
 
 	_refresh_top_bar()
+	_refresh_era_ui()
 	_refresh_selection_panel()
 
 # The selection panel is a fixed-width command bar: anchored bottom-wide
@@ -151,6 +159,21 @@ func _build_top_bar() -> void:
 	_pop_label = Label.new()
 	_pop_label.text = "0/%d" % Constants.POPULATION_CAP
 	row.add_child(_pop_label)
+
+	# Era indicator + the button that drives progression. Both read from live
+	# era state (see _refresh_era_ui); the label is gold like the daily clock so
+	# "what age am I in" reads at a glance beside the stats.
+	_era_label = Label.new()
+	_era_label.add_theme_color_override("font_color", Color(0.89, 0.71, 0.36))
+	_era_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(_era_label)
+
+	_advance_button = Button.new()
+	_advance_button.focus_mode = Control.FOCUS_NONE
+	_advance_button.pressed.connect(func() -> void:
+		CommandRouter.submit({"type": "advance_era",
+			"player_id": GameManager.local_player_id}))
+	row.add_child(_advance_button)
 
 	_daily_label = Label.new()
 	_daily_label.add_theme_color_override("font_color", Color(0.89, 0.71, 0.36))
@@ -217,8 +240,62 @@ func _refresh_top_bar() -> void:
 func _on_resources_changed(player_id: int) -> void:
 	if player_id == GameManager.local_player_id:
 		_refresh_top_bar()
+		_refresh_era_ui()
 		if _sel_panel.visible:
 			_refresh_selection_panel()
+
+# The era indicator + Advance button, driven entirely from current era state so
+# it is safe to call on any signal (idempotent, no transient assumptions). The
+# gate itself lives in GameManager (is_unlocked / missing_era_requirements /
+# can_afford) — this only renders it.
+func _refresh_era_ui() -> void:
+	if _era_label == null:
+		return
+	var pid: int = GameManager.local_player_id
+	_era_label.text = Constants.ERA_DEFS[GameManager.player_era(pid)]["name"]
+	if not GameManager.has_next_era(pid):
+		_advance_button.disabled = true
+		_advance_button.text = "Chiefdom Age (max)"
+		_advance_button.tooltip_text = ""
+		return
+	var next: int = GameManager.player_era(pid) + 1
+	var next_def: Dictionary = Constants.ERA_DEFS[next]
+	var cost: Dictionary = next_def["advance_cost"]
+	var missing: Dictionary = GameManager.missing_era_requirements(pid)
+	var affordable: bool = GameManager.can_afford(pid, cost)
+	_advance_button.text = "Advance to %s (%s)" % [next_def["name"], _cost_text(cost)]
+	_advance_button.disabled = not (missing.is_empty() and affordable)
+	if _advance_button.disabled:
+		var reasons: Array[String] = []
+		for bt: String in missing:
+			reasons.append("%d more %s" % [int(missing[bt]),
+				bt.capitalize().replace("_", " ")])
+		for res_type: int in cost:
+			var short: int = int(cost[res_type]) - GameManager.get_resource(pid, res_type)
+			if short > 0:
+				reasons.append("%d more %s" % [short, Constants.RESOURCE_NAMES[res_type]])
+		_advance_button.tooltip_text = "Need " + " and ".join(reasons)
+	else:
+		_advance_button.tooltip_text = ""
+
+# A real era transition (the signal now fires only on those): refresh the label
+# and menu for everyone, and give the local tribe a subtle cue.
+func _on_era_advanced(player_id: int, _era: int) -> void:
+	_refresh_era_ui()
+	if _sel_panel.visible:
+		_refresh_selection_panel()  # un-greys buildings this era unlocks
+	if player_id == GameManager.local_player_id:
+		Sfx.play("built")
+		var tween: Tween = _era_label.create_tween()
+		_era_label.modulate = Color(1.5, 1.3, 0.6)
+		tween.tween_property(_era_label, "modulate", Color(1, 1, 1, 1), 1.2)
+
+# Finishing/losing a building can change the still-unmet era requirements, so
+# the Advance button (and any era-gated build buttons) must re-evaluate.
+func _on_buildings_changed(_building: Node2D) -> void:
+	_refresh_era_ui()
+	if _sel_panel.visible:
+		_refresh_selection_panel()
 
 func _rebuild_hotkeys() -> void:
 	_hotkeys.clear()
@@ -334,9 +411,31 @@ func _cost_text(cost: Dictionary) -> String:
 		parts.append("%d %s" % [cost[res_type], Constants.RESOURCE_NAMES[res_type]])
 	return ", ".join(parts)
 
+# The era-lock reason for a gated def, or "" if the local tribe has unlocked it.
+# Uses the SHARED gate (GameManager.is_unlocked) so the menu can never disagree
+# with the authoritative place/train validators.
+func _era_lock_reason(def: Dictionary) -> String:
+	if GameManager.is_unlocked(GameManager.local_player_id, def):
+		return ""
+	return "Unlocks in %s" % Constants.ERA_DEFS[int(def.get("era", 0))]["name"]
+
 # Disable what the player cannot pay for, and say why.
 func _apply_affordability(button: Button, cost: Dictionary, pop_gated: bool) -> void:
 	var pid: int = GameManager.local_player_id
+	# Era lock takes precedence over cost: content the tribe's age hasn't unlocked
+	# greys out with a "comes later" reason, never a "can't afford" one. Applies
+	# to both build buttons (btype) and train buttons (utype) so an era-gated unit
+	# offered by an earlier-era building (e.g. Hunter at the Town Center) can't
+	# show as an enabled-but-inert button.
+	var lock_reason: String = ""
+	if button.has_meta("btype"):
+		lock_reason = _era_lock_reason(Constants.BUILDING_DEFS[button.get_meta("btype")])
+	elif button.has_meta("utype"):
+		lock_reason = _era_lock_reason(Constants.UNIT_DEFS[button.get_meta("utype")])
+	if lock_reason != "":
+		button.disabled = true
+		button.tooltip_text = lock_reason
+		return
 	var lacking: Array[String] = []
 	for res_type: int in cost:
 		var short: int = cost[res_type] - GameManager.get_resource(pid, res_type)
@@ -429,6 +528,7 @@ func _populate_train_buttons(building_type: String) -> void:
 		button.pressed.connect(func() -> void: _train(captured))
 		button.set_meta("cost", def["cost"])
 		button.set_meta("hotkey", TRAIN_KEYS.get(unit_type, 0))
+		button.set_meta("utype", unit_type)
 		_train_box.add_child(button)
 
 func _train(unit_type: String) -> void:
@@ -610,6 +710,7 @@ func _on_refresh_tick() -> void:
 	_refresh_monument_banner()
 	_refresh_idle_button()
 	_refresh_top_bar()
+	_refresh_era_ui()
 	if _sel_panel.visible:
 		_refresh_selection_panel()
 
