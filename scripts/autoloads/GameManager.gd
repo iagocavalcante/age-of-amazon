@@ -35,6 +35,16 @@ var eras: Array[int] = []
 func player_era(player_id: int) -> int:
 	return eras[player_id] if player_id >= 0 and player_id < eras.size() else 0
 
+# A cumulative era buff value: folds over eras 0..current so each era's dict
+# lists only what it introduces or changes (later eras override earlier keys).
+# Read-through (never stored on the unit), so it can't desync and replicates
+# for free with the era index.
+func era_buff(player_id: int, key: String, fallback: float) -> float:
+	var val: float = fallback
+	for i in range(player_era(player_id) + 1):
+		val = float(Constants.ERA_DEFS[i].get("buff", {}).get(key, val))
+	return val
+
 # Is this content unlocked for the player, per its def's era gate? Buildings and
 # units both carry an int "era"; ungated defs (no key) count as Era 0. The
 # authoritative validators (_exec_place, queue_train) AND the HUD all consult

@@ -1147,6 +1147,31 @@ func _run_era_test() -> void:
 		"cell": cell0, "actor_names": p0_names})
 	await get_tree().process_frame
 	print("[test-era] barracks-ok-era1: %s" % ("OK" if _count_buildings(0) > p0_builds_before else "FAILED"))
+
+	# --- era buffs (Task A4) ---
+	# Gather buff: an Era-1+ player's gather_mult exceeds 1.0. (player 0 is Village by now.)
+	print("[test-era] gather-buff-value: %s" % ("OK" if GameManager.era_buff(0, "gather_mult", 1.0) > 1.0 else "FAILED"))
+	# Armor buff WIRING: a warrior owned by a Chiefdom player takes 1 less damage
+	# than an identical warrior owned by a Forest player. Advance player 0 to
+	# Chiefdom first (finished barracks meets the requirement; grant resources).
+	_place_building("barracks", 0, GameManager.find_buildable_cell(Vector2i.ZERO, "barracks", 0))
+	GameManager.add_resource(0, Constants.ResourceType.FOOD, 400)
+	GameManager.add_resource(0, Constants.ResourceType.WOOD, 300)
+	GameManager.add_resource(0, Constants.ResourceType.JADE, 200)
+	await get_tree().process_frame
+	CommandRouter.submit({"type": "advance_era", "player_id": 0})
+	await get_tree().process_frame
+	print("[test-era] chiefdom: %s" % ("OK" if GameManager.player_era(0) == Constants.ERA_CHIEFDOM else "FAILED"))
+	var w_chief: UnitBase = _spawn_unit("warrior", 0, Vector2i(6, 6))
+	var w_forest: UnitBase = _spawn_unit("warrior", 1, WorldGen.PLAYER_ORIGINS[1] + Vector2i(3, 3))
+	await get_tree().process_frame
+	var chief_hp0: int = w_chief.current_hp
+	var forest_hp0: int = w_forest.current_hp
+	w_chief.take_damage(10, null)
+	w_forest.take_damage(10, null)
+	var chief_loss: int = chief_hp0 - w_chief.current_hp
+	var forest_loss: int = forest_hp0 - w_forest.current_hp
+	print("[test-era] armor-buff-wired: %s" % ("OK" if forest_loss - chief_loss == 1 else "FAILED (chief_loss=%d forest_loss=%d)" % [chief_loss, forest_loss]))
 	get_tree().quit()
 
 # Count buildings owned by a player: the `node as Building` cast drops any

@@ -73,6 +73,7 @@ const UNIT_DEFS: Dictionary = {
 		"vision_range": 260.0,
 		"aggressive": true,
 		"can_gather": false,
+		"military": true,  # combat unit: eligible for the Chiefdom armor buff
 		"cost": { ResourceType.FOOD: 40, ResourceType.WOOD: 20 },
 		"train_time": 9.0,
 	},
@@ -88,6 +89,7 @@ const UNIT_DEFS: Dictionary = {
 		"vision_range": 300.0,
 		"aggressive": true,
 		"can_gather": false,
+		"military": true,  # combat unit: eligible for the Chiefdom armor buff
 		"cost": { ResourceType.FOOD: 50, ResourceType.WOOD: 30 },
 		"train_time": 10.0,
 	},
@@ -222,9 +224,11 @@ const POI_DEFS: Dictionary = {
 # --- Eras (Phase 2) --------------------------------------------------------
 # Ascending ages. `advance_cost` is paid to ENTER this era from the previous;
 # era 0 has none. `requires_buildings` is a {building_type: count} map of
-# buildings that must be FINISHED before advancing INTO this era. `buff` (filled
-# in a later task) applies tribe-wide. TUNABLE — grounded in the current economy
-# (start 100 food/50 wood; villager 50 food; monument 40 jade).
+# buildings that must be FINISHED before advancing INTO this era. `buff` applies
+# tribe-wide and is CUMULATIVE via a fold in GameManager.era_buff: each entry
+# lists only what its era introduces or changes (later eras override earlier
+# keys), so a tunable lives in exactly one place. TUNABLE — grounded in the
+# current economy (start 100 food/50 wood; villager 50 food; monument 40 jade).
 const ERA_FOREST: int = 0
 const ERA_VILLAGE: int = 1
 const ERA_CHIEFDOM: int = 2
@@ -240,13 +244,16 @@ const ERA_DEFS: Dictionary = {
 		"name": "Village Age",
 		"advance_cost": { ResourceType.FOOD: 200, ResourceType.WOOD: 100 },
 		"requires_buildings": { "house": 2 },
-		"buff": {},
+		# What Village introduces: the tribe-wide gather speed buff.
+		"buff": { "gather_mult": 1.15 },
 	},
 	ERA_CHIEFDOM: {
 		"name": "Chiefdom Age",
 		"advance_cost": { ResourceType.FOOD: 300, ResourceType.WOOD: 200, ResourceType.JADE: 100 },
 		"requires_buildings": { "barracks": 1 },
-		"buff": {},
+		# Only what Chiefdom introduces: the military armor bonus. gather_mult is
+		# inherited from Village via the fold in GameManager.era_buff.
+		"buff": { "armor_bonus": 1 },
 	},
 }
 

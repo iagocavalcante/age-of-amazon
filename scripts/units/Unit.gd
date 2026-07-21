@@ -389,7 +389,12 @@ func _go_to_gather_site() -> void:
 
 func _process_gathering(delta: float) -> void:
 	_gather_timer += delta
-	if _gather_timer < Constants.GATHER_INTERVAL:
+	# Era gather buff: a gather_mult > 1 shortens the effective interval, so a
+	# unit banks resources faster. Applied here (not to the per-tick amount) so
+	# the loop stays integer-exact (still 1 unit / tick via take_resource) and
+	# deterministic. Read-through: recomputed each tick from the owner's era.
+	var gather_mult: float = GameManager.era_buff(player_id, "gather_mult", 1.0)
+	if _gather_timer < Constants.GATHER_INTERVAL / gather_mult:
 		return
 	_gather_timer = 0.0
 
@@ -547,7 +552,15 @@ func _find_enemy_in_range(radius: float) -> Node2D:
 	return best
 
 func take_damage(amount: int, attacker: Node2D = null) -> void:
-	var actual: int = maxi(1, amount - armor)
+	# Military units (flagged `military` in UNIT_DEFS: warriors/archers) get the
+	# era armor bonus on top of their base armor. The flag is positive and
+	# fail-safe — a non-combat unit only gains combat armor if explicitly
+	# flagged. Read-through: recomputed here every hit from the owner's current
+	# era, never stored on the unit.
+	var eff_armor: int = armor
+	if Constants.UNIT_DEFS.get(unit_type, {}).get("military", false):
+		eff_armor += int(GameManager.era_buff(player_id, "armor_bonus", 0.0))
+	var actual: int = maxi(1, amount - eff_armor)
 	current_hp = maxi(0, current_hp - actual)
 	_update_health_bar()
 	_flash_hit()
