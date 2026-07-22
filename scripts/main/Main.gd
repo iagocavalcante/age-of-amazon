@@ -118,6 +118,9 @@ func _ready() -> void:
 	if "--test-shaman" in args:
 		_run_shaman_test()
 		return
+	if "--test-dock" in args:
+		_run_dock_test()
+		return
 	if "--capture-help" in args:
 		_run_capture_help()
 	if "--capture-animals" in args:
@@ -151,7 +154,8 @@ func _boot_offline(args: PackedStringArray) -> void:
 	# scan (same seed --test-poi asserts against) before the world is built.
 	if "--test-poi-claim" in args or "--capture-ruins" in args:
 		GameManager.map_seed = POI_TEST_SEED
-	if "--test-water" in args:
+	if "--test-water" in args or "--test-dock" in args:
+		# Both need water near origin; seed 3 is verified to place it (Task 1).
 		GameManager.map_seed = WATER_TEST_SEED
 	var resume: Dictionary = {}
 	if SaveGame.pending_resume:
@@ -1895,6 +1899,111 @@ func _run_shaman_test() -> void:
 	var accepted: bool = barracks.queue_train("shaman")
 	print("[test-shaman] train-ok-chiefdom: %s" % ("OK" if GameManager.player_era(0) == Constants.ERA_CHIEFDOM and accepted and barracks.train_queue.size() == q_c + 1 else "FAILED"))
 	print("[test-shaman] shaman-era-2: %s" % ("OK" if Constants.UNIT_DEFS["shaman"]["era"] == Constants.ERA_CHIEFDOM else "FAILED"))
+	get_tree().quit()
+
+# The dock is a Chiefdom shore building: it places like any land structure but its
+# footprint must touch water (requires_adjacent_water), and its trained water units
+# launch onto the adjacent navigable cell. Seed 3 (WATER_TEST_SEED, pinned in
+# _boot_offline) guarantees water near origin so the shore cell is deterministic.
+func _run_dock_test() -> void:
+	await get_tree().create_timer(0.5).timeout
+	var w: WorldData = GameManager.world
+
+	# Advance player 0 to Chiefdom (era 2) — the dock's era gate. Barracks + two
+	# houses meet the era requirements; fund richly so ONLY the era (not cost)
+	# governs; advance twice (Forest -> Village -> Chiefdom). Recipe from --test-shaman.
+	_place_building("barracks", 0, GameManager.find_buildable_cell(Vector2i.ZERO, "barracks", 0))
+	_place_building("house", 0, GameManager.find_buildable_cell(Vector2i.ZERO, "house", 0))
+	_place_building("house", 0, GameManager.find_buildable_cell(Vector2i.ZERO, "house", 0))
+	GameManager.add_resource(0, Constants.ResourceType.FOOD, 2000)
+	GameManager.add_resource(0, Constants.ResourceType.WOOD, 2000)
+	GameManager.add_resource(0, Constants.ResourceType.JADE, 2000)
+	await get_tree().process_frame
+	CommandRouter.submit({"type": "advance_era", "player_id": 0})
+	await get_tree().process_frame
+	CommandRouter.submit({"type": "advance_era", "player_id": 0})
+	await get_tree().process_frame
+	if GameManager.player_era(0) != Constants.ERA_CHIEFDOM:
+		print("[test-dock] setup: FAILED (era=%d)" % GameManager.player_era(0)); get_tree().quit(); return
+
+	# The dock's own find path already honors requires_adjacent_water, so this
+	# returns a SHORE 2x2. Separately scan for an INLAND buildable 2x2 that touches
+	# NO water — it must pass every OTHER placement check (buildable, unoccupied,
+	# resource-free, explored) so the sole difference from the shore cell is water
+	# adjacency, making reject-inland a clean test of the gate itself.
+	var shore_cell: Vector2i = GameManager.find_buildable_cell(Vector2i.ZERO, "dock", 0)
+	var inland_cell := Vector2i(999999, 999999)
+	for radius in range(3, 30):
+		for dy in range(-radius, radius + 1):
+			for dx in range(-radius, radius + 1):
+				var base := Vector2i(dx, dy)
+				var ok := true
+				for fy in range(2):
+					for fx in range(2):
+						var c := base + Vector2i(fx, fy)
+						if not w.is_buildable(c) or w.building_at(c) != null \
+								or not w.get_resource_at(c).is_empty() \
+								or not GameManager.has_explored(0, c):
+							ok = false; break
+					if not ok: break
+				if ok and not w.footprint_touches_water(base, Vector2i(2, 2)):
+					inland_cell = base; break
+			if inland_cell.x != 999999: break
+		if inland_cell.x != 999999: break
+	if shore_cell.x == 9999 or inland_cell.x == 999999:
+		print("[test-dock] setup: FAILED (shore=%s inland=%s)" % [shore_cell, inland_cell]); get_tree().quit(); return
+
+	# A villager to issue the place order through the authority (the real command path).
+	var villager: UnitBase = null
+	for node: Node in get_tree().get_nodes_in_group("player_0"):
+		if node is UnitBase and (node as UnitBase).can_gather:
+			villager = node as UnitBase; break
+	if villager == null:
+		print("[test-dock] setup: FAILED (no villager)"); get_tree().quit(); return
+
+	# reject-inland: the requires_adjacent_water gate refuses a dock off the coast —
+	# the dock count must not move.
+	var before_inland: int = _count_typed_buildings(0, "dock", false)
+	CommandRouter.submit({"type": "place", "player_id": 0, "building_type": "dock",
+		"cell": inland_cell, "actor_names": [String(villager.name)]})
+	await get_tree().process_frame
+	var after_inland: int = _count_typed_buildings(0, "dock", false)
+	print("[test-dock] reject-inland: %s" % ("OK"
+		if after_inland == before_inland else "FAILED (%d->%d)" % [before_inland, after_inland]))
+
+	# accept-shore: the same command on the coast builds a dock.
+	CommandRouter.submit({"type": "place", "player_id": 0, "building_type": "dock",
+		"cell": shore_cell, "actor_names": [String(villager.name)]})
+	await get_tree().process_frame
+	var dock: Building = null
+	for node: Node in get_tree().get_nodes_in_group("player_0"):
+		var b: Building = node as Building
+		if b != null and b.building_type == "dock":
+			dock = b; break
+	print("[test-dock] accept-shore: %s" % ("OK" if dock != null else "FAILED"))
+	if dock == null:
+		get_tree().quit(); return
+
+	# launch-cell-is-water: war_canoe (the real water unit) arrives in Task 3, so we
+	# prove the LAUNCH MECHANISM directly — the same adjacent_walkable(..., water=true)
+	# call Building._spawn_unit makes for a water unit must return a NAVIGABLE cell
+	# next to the dock. That cell being is_water confirms a canoe would launch onto
+	# water, not land.
+	var near: Vector2i = dock.footprint_cells[dock.footprint_cells.size() - 1] + Vector2i(1, 1)
+	var launch: Dictionary = GameManager.pathfinder.adjacent_walkable(dock.footprint_cells, near, true)
+	var launch_ok: bool = launch["found"] and w.is_water(launch["cell"])
+	print("[test-dock] launch-cell-is-water: %s" % ("OK"
+		if launch_ok else "FAILED (found=%s cell=%s)" % [launch.get("found"), launch.get("cell")]))
+
+	# undefined-train-safe: war_canoe is in the dock's trains but not defined until
+	# Task 3. queue_train must GUARD the undefined unit (return false, no crash, queue
+	# unchanged) rather than bare-access UNIT_DEFS["war_canoe"] and error out. The HUD's
+	# _populate_train_buttons carries the symmetric guard (skips the undefined unit),
+	# so selecting a dock no longer script-errors on every selection.
+	var q_before: int = dock.train_queue.size()
+	var canoe_refused: bool = not dock.queue_train("war_canoe")
+	print("[test-dock] undefined-train-safe: %s" % ("OK"
+		if canoe_refused and dock.train_queue.size() == q_before else "FAILED"))
 	get_tree().quit()
 
 # Renders a couple of animals up close so the procedural art can be reviewed.

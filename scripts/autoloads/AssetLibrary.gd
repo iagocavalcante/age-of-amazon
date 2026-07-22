@@ -94,6 +94,7 @@ func _ready() -> void:
 			"storehouse": building_artist.build_storehouse(color),
 			"palisade": building_artist.build_palisade(color),
 			"palisade_gate": building_artist.build_palisade_gate(color),
+			"dock": building_artist.build_dock(color),
 			"monument": building_artist.build_monument(color),
 		}
 		var building_set: Dictionary = {}

@@ -226,6 +226,10 @@ func has_population_room(player_id: int) -> bool:
 # build harnesses and the AI. Mirrors CommandRouter's placement validation.
 func find_buildable_cell(origin: Vector2i, building_type: String, player_id: int) -> Vector2i:
 	var footprint: Vector2i = Constants.BUILDING_DEFS[building_type]["footprint"]
+	# Water buildings (the dock) may only be sited on the shore — mirror the
+	# authority's requires_adjacent_water gate (CommandRouter._exec_place) via the
+	# shared WorldData helper so the AI/harness never propose an inland dock.
+	var needs_water: bool = Constants.BUILDING_DEFS[building_type].get("requires_adjacent_water", false)
 	for radius in range(3, 10):
 		for dy in range(-radius, radius + 1):
 			for dx in range(-radius, radius + 1):
@@ -242,6 +246,8 @@ func find_buildable_cell(origin: Vector2i, building_type: String, player_id: int
 							break
 					if not ok:
 						break
+				if ok and needs_water and not world.footprint_touches_water(base, footprint):
+					ok = false
 				if ok:
 					return base
 	return Vector2i(9999, 9999)

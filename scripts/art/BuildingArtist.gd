@@ -279,6 +279,91 @@ func build_storehouse(player_color: Color) -> ImageTexture:
 
 	return ImageTexture.create_from_image(img)
 
+# 2x2 dock: a wooden jetty reaching out over shallow water. A planked deck on
+# pilings, mooring posts with a rope, and a player-color pennant — the shore
+# gateway that launches canoes. Distinct low, horizontal silhouette (vs the
+# vertical huts/temples) so it reads as "on the water" at a glance.
+func build_dock(player_color: Color) -> ImageTexture:
+	var w: int = 112
+	var h: int = 84
+	var img: Image = Image.create(w, h, false, Image.FORMAT_RGBA8)
+
+	var water_dark: Color = Color8(38, 78, 96)
+	var water_light: Color = Color8(62, 116, 138)
+	var plank_dark: Color = Color8(122, 88, 52)
+	var plank_mid: Color = Color8(158, 118, 72)
+	var plank_light: Color = Color8(190, 150, 96)
+	var post_dark: Color = Color8(96, 66, 40)
+	var post_light: Color = Color8(140, 100, 62)
+	var rope: Color = Color8(206, 186, 132)
+	var outline: Color = Color8(46, 32, 20)
+
+	var cx: float = w / 2.0
+	var deck_top: int = 34
+	var deck_bottom: int = 54
+	var deck_half: int = 44
+
+	# Rippling water the jetty sits over (fills the lower two-thirds).
+	for y in range(deck_top - 4, h):
+		for x in range(w):
+			var wob: float = sin(float(x) * 0.28 + float(y) * 0.5)
+			var speckle: float = PixelArt.hash2(x, int(y / 2), 71)
+			var t: float = 0.5 + wob * 0.25 + speckle * 0.25
+			img.set_pixel(x, y, water_dark.lerp(water_light, clampf(t, 0.0, 1.0)))
+
+	# Contact/reflection shadow just under the deck.
+	PixelArt.draw_ellipse(img, cx, float(deck_bottom + 4), 46.0, 10.0, Color(0, 0, 0, 0.28), true)
+
+	# Pilings driven into the water, poking out below the deck front edge.
+	for px: int in [int(cx) - 36, int(cx) - 12, int(cx) + 12, int(cx) + 36]:
+		for y in range(deck_bottom - 2, deck_bottom + 16):
+			img.set_pixel(clampi(px, 0, w - 1), y, post_dark)
+			img.set_pixel(clampi(px + 1, 0, w - 1), y, post_light)
+
+	# Planked deck: a flat board field with vertical seams between planks and a
+	# lit front lip, giving the horizontal jetty silhouette.
+	for y in range(deck_top, deck_bottom + 1):
+		var row_half: int = deck_half - int(float(y - deck_top) * 0.15)
+		for x in range(int(cx) - row_half, int(cx) + row_half + 1):
+			var seam: bool = ((x - int(cx)) % 8) == 0
+			var speckle: float = PixelArt.hash2(x, y, 72)
+			var shade: Color
+			if y >= deck_bottom - 2:
+				shade = plank_dark  # shaded front lip
+			elif seam:
+				shade = plank_dark
+			else:
+				shade = PixelArt.ramp_shade([plank_dark, plank_mid, plank_light], 0.35 + speckle * 0.4, x, y)
+			img.set_pixel(clampi(x, 0, w - 1), y, shade)
+		img.set_pixel(clampi(int(cx) - row_half, 0, w - 1), y, outline)
+		img.set_pixel(clampi(int(cx) + row_half, 0, w - 1), y, outline)
+	# Deck top edge highlight.
+	for x in range(int(cx) - deck_half, int(cx) + deck_half + 1):
+		img.set_pixel(clampi(x, 0, w - 1), deck_top, plank_light)
+
+	# Two mooring posts standing above the deck, with a slung rope between them.
+	var post_a: int = int(cx) - 30
+	var post_b: int = int(cx) + 30
+	for px: int in [post_a, post_b]:
+		for y in range(deck_top - 14, deck_top + 2):
+			img.set_pixel(clampi(px, 0, w - 1), y, post_dark)
+			img.set_pixel(clampi(px + 1, 0, w - 1), y, post_light)
+	# Draped rope: a shallow catenary between the two post tops.
+	for x in range(post_a, post_b + 1):
+		var u: float = float(x - post_a) / float(post_b - post_a)
+		var sag: int = int(4.0 * sin(u * PI))
+		img.set_pixel(clampi(x, 0, w - 1), deck_top - 12 + sag, rope)
+
+	# Player-color pennant on the taller left post.
+	for y in range(deck_top - 26, deck_top - 14):
+		img.set_pixel(clampi(post_a, 0, w - 1), y, post_dark)
+	for fy in range(deck_top - 26, deck_top - 19):
+		for fx in range(1, 10):
+			img.set_pixel(clampi(post_a + fx, 0, w - 1), fy,
+				player_color if (fx + fy) % 5 != 0 else player_color.darkened(0.25))
+
+	return ImageTexture.create_from_image(img)
+
 # 2x2 jade monument: a carved green monolith on a stone base with gold
 # inlays and a jade capstone — the endgame made visible.
 func build_monument(player_color: Color) -> ImageTexture:

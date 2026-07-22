@@ -32,7 +32,7 @@ const TRAIN_KEYS: Dictionary = { "villager": KEY_V, "warrior": KEY_C, "archer": 
 	"hunter": KEY_J, "shaman": KEY_L }
 const BUILD_KEYS: Dictionary = { "house": KEY_B, "barracks": KEY_N,
 	"watchtower": KEY_T, "storehouse": KEY_S, "palisade": KEY_P,
-	"palisade_gate": KEY_K, "monument": KEY_M }
+	"palisade_gate": KEY_K, "monument": KEY_M, "dock": KEY_D }
 var _queue_label: Label
 
 var _minimap_rect: TextureRect
@@ -368,7 +368,7 @@ func _build_selection_panel() -> void:
 	_build_box.alignment = FlowContainer.ALIGNMENT_CENTER
 	_build_box.visible = false
 	box.add_child(_build_box)
-	for building_type: String in ["house", "barracks", "watchtower", "storehouse", "palisade", "palisade_gate", "monument"]:
+	for building_type: String in ["house", "barracks", "watchtower", "storehouse", "palisade", "palisade_gate", "dock", "monument"]:
 		var def: Dictionary = Constants.BUILDING_DEFS[building_type]
 		var button: Button = Button.new()
 		button.text = "%s · %s  [%s]" % [building_type.capitalize().replace("_", " "),
@@ -516,6 +516,8 @@ func _populate_train_buttons(building_type: String) -> void:
 	for child: Node in _train_box.get_children():
 		child.queue_free()
 	for unit_type: String in Constants.BUILDING_DEFS[building_type]["trains"]:
+		if not Constants.UNIT_DEFS.has(unit_type):
+			continue  # unit not defined yet (forward-referenced, e.g. war_canoe) — no button
 		var def: Dictionary = Constants.UNIT_DEFS[unit_type]
 		var button: Button = Button.new()
 		button.text = "%s · %s  [%s]" % [unit_type.capitalize(),

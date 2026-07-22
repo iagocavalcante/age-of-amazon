@@ -273,6 +273,19 @@ const BUILDING_DEFS: Dictionary = {
 		"vision_tiles": 2,
 		"cost": {ResourceType.WOOD: 10},
 	},
+	# Shore building: a normal land structure with a placement constraint — its
+	# footprint must touch water (requires_adjacent_water), so it sits on the coast.
+	# Its trained water units launch onto the adjacent navigable cell rather than
+	# onto land (see Building._spawn_unit). Chiefdom-era gateway to the water game.
+	"dock": {
+		"era": 2,
+		"max_hp": 350,
+		"footprint": Vector2i(2, 2),
+		"trains": ["war_canoe"],
+		"vision_tiles": 6,
+		"cost": {ResourceType.WOOD: 80},
+		"requires_adjacent_water": true,
+	},
 	# The jade endgame: finish it, defend it for MONUMENT_VICTORY_SECS, win.
 	"monument": {
 		"era": 2,

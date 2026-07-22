@@ -115,6 +115,8 @@ func queue_train(unit_type: String) -> bool:
 		return false
 	if not (unit_type in Constants.BUILDING_DEFS[building_type]["trains"]):
 		return false
+	if not Constants.UNIT_DEFS.has(unit_type):
+		return false  # unit not defined yet (e.g. a forward-referenced unit like war_canoe)
 	var def: Dictionary = Constants.UNIT_DEFS[unit_type]
 	if not GameManager.is_unlocked(player_id, def):
 		return false  # unit not unlocked in this era
@@ -153,8 +155,12 @@ func _update_construction_look() -> void:
 		else Color(0.9, 0.78, 0.6, 0.55)
 
 func _spawn_unit(unit_type: String) -> void:
+	# A water unit (the war canoe) launches onto an adjacent NAVIGABLE cell; land
+	# units keep their old land search. The domain comes from the unit's def, passed
+	# as a named local so the intent is legible at the call site (no bare boolean).
+	var water_unit: bool = Constants.UNIT_DEFS.get(unit_type, {}).get("water", false)
 	var spot: Dictionary = GameManager.pathfinder.adjacent_walkable(
-		footprint_cells, footprint_cells[footprint_cells.size() - 1] + Vector2i(1, 1))
+		footprint_cells, footprint_cells[footprint_cells.size() - 1] + Vector2i(1, 1), water_unit)
 	if not spot["found"]:
 		return
 

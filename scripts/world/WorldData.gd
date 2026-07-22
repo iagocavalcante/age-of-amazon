@@ -33,6 +33,29 @@ func get_biome(cell: Vector2i) -> int:
 	var size: int = Constants.CHUNK_SIZE
 	return chunk.get_biome_local(cell.x - cc.x * size, cell.y - cc.y * size)
 
+func is_water(cell: Vector2i) -> bool:
+	var b: int = get_biome(cell)
+	return b == Constants.Biome.WATER_SHALLOW or b == Constants.Biome.WATER_DEEP
+
+# Shore test for water buildings (the dock's requires_adjacent_water gate). True
+# if any cell orthogonally adjacent to the base_cell..base_cell+footprint block —
+# the ring OUTSIDE the footprint — is water. Shared by CommandRouter._exec_place
+# (authority) and GameManager.find_buildable_cell (AI/harness) so the two placement
+# paths can never disagree on what "touches water" means.
+func footprint_touches_water(base_cell: Vector2i, footprint: Vector2i) -> bool:
+	var cells: Dictionary = {}
+	for dy in range(footprint.y):
+		for dx in range(footprint.x):
+			cells[base_cell + Vector2i(dx, dy)] = true
+	for cell: Vector2i in cells:
+		for offset: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var neighbor: Vector2i = cell + offset
+			if cells.has(neighbor):
+				continue  # interior edge, not the outer ring
+			if is_water(neighbor):
+				return true
+	return false
+
 func is_walkable(cell: Vector2i) -> bool:
 	return is_walkable_for(cell, NO_OWNER)
 

@@ -162,6 +162,12 @@ func _exec_place(command: Dictionary) -> void:
 				return
 			if not GameManager.has_explored(player_id, cell):
 				return
+	# Water buildings (the dock) must sit on the shore: their footprint has to
+	# touch a water cell so trained water units can launch. Shared with
+	# GameManager.find_buildable_cell so the AI/harness see the same rule.
+	if def.get("requires_adjacent_water", false) \
+			and not GameManager.world.footprint_touches_water(base_cell, footprint):
+		return  # not on the coast — can't launch canoes here
 	if not GameManager.spend(player_id, def["cost"]):
 		return
 
