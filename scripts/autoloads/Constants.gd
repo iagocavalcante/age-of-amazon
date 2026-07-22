@@ -253,8 +253,8 @@ const BUILDING_DEFS: Dictionary = {
 	# Cheap Era-1 defensive wall: a 1x1 building whose occupied cell becomes
 	# unwalkable, so the pathfinder routes around it (no pathfinder change — see
 	# WorldData.is_walkable / occupy). Low cost so players fence long lines; a
-	# stake has little sight (vision_tiles 2). The owner-passable GATE is a
-	# separate follow-up (needs pathfinder player-awareness).
+	# stake has little sight (vision_tiles 2). Blocks all pathing (occupies its
+	# cell); see `palisade_gate` below for the owner-passable variant.
 	"palisade": {
 		"era": 1,
 		"max_hp": 300,

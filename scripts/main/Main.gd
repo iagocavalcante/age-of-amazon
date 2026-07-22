@@ -566,6 +566,18 @@ func _run_hud_test() -> void:
 	print("[test-hud] cmd-row ", "OK" if hud._cmd_box.visible else "FAILED")
 	print("[test-hud] hotkeys-mapped ", "OK" if hud._hotkeys.has(KEY_G)
 		and hud._hotkeys.has(KEY_X) and hud._hotkeys.has(KEY_B) else "FAILED")
+	# Every trainable unit needs a non-zero, unique train hotkey (else its
+	# button renders an empty [] bracket and has no shortcut).
+	var train_keys: Array = hud.TRAIN_KEYS.values()
+	var unique_keys: Dictionary = {}
+	for k: int in train_keys:
+		unique_keys[k] = true
+	var train_keys_ok: bool = hud.TRAIN_KEYS.has("hunter") \
+		and hud.TRAIN_KEYS.has("shaman") \
+		and not train_keys.has(0) \
+		and train_keys.size() == unique_keys.size()
+	print("[test-hud] train-hotkeys-unique ", "OK" if train_keys_ok else "FAILED",
+		" keys=", hud.TRAIN_KEYS)
 
 	_push_key(KEY_G)
 	await get_tree().process_frame

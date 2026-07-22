@@ -28,7 +28,8 @@ var _idle_cycle: int = 0
 # keycode -> Callable, rebuilt with the panel (see _unhandled_key_input)
 var _hotkeys: Dictionary = {}
 
-const TRAIN_KEYS: Dictionary = { "villager": KEY_V, "warrior": KEY_C, "archer": KEY_R }
+const TRAIN_KEYS: Dictionary = { "villager": KEY_V, "warrior": KEY_C, "archer": KEY_R,
+	"hunter": KEY_J, "shaman": KEY_L }
 const BUILD_KEYS: Dictionary = { "house": KEY_B, "barracks": KEY_N,
 	"watchtower": KEY_T, "storehouse": KEY_S, "palisade": KEY_P,
 	"palisade_gate": KEY_K, "monument": KEY_M }
