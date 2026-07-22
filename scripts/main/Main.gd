@@ -124,6 +124,11 @@ func _ready() -> void:
 	if "--test-canoe" in args:
 		_run_canoe_test()
 		return
+	if "--test-ai-water-safety" in args:
+		_run_ai_water_safety_test()
+		return
+	if "--capture-water" in args:
+		_run_capture_water()
 	if "--capture-help" in args:
 		_run_capture_help()
 	if "--capture-animals" in args:
@@ -157,7 +162,8 @@ func _boot_offline(args: PackedStringArray) -> void:
 	# scan (same seed --test-poi asserts against) before the world is built.
 	if "--test-poi-claim" in args or "--capture-ruins" in args:
 		GameManager.map_seed = POI_TEST_SEED
-	if "--test-water" in args or "--test-dock" in args or "--test-canoe" in args:
+	if "--test-water" in args or "--test-dock" in args or "--test-canoe" in args \
+			or "--test-ai-water-safety" in args or "--capture-water" in args:
 		# All need water near origin; seed 3 is verified to place it (Task 1).
 		GameManager.map_seed = WATER_TEST_SEED
 	var resume: Dictionary = {}
@@ -2105,6 +2111,184 @@ func _run_canoe_test() -> void:
 	# (d) era-2 gate: the canoe is Chiefdom-tier.
 	print("[test-canoe] era-2: %s" % ("OK"
 		if Constants.UNIT_DEFS["war_canoe"]["era"] == Constants.ERA_CHIEFDOM else "FAILED"))
+	get_tree().quit()
+
+# AI-safety (Task 4): Phase 2.5 must not BREAK the land-focused AI. The AI builds
+# no docks and trains no canoes (it hardcodes warrior/archer), so the one water
+# risk is a PLAYER war canoe sitting on water the AI has scouted — does the land
+# AI hang or crash trying to path to that unreachable target? It must not: a land
+# unit's goal on water is snapped to the nearest walkable shore, and a truly
+# hopeless A* request returns a bounded best-effort partial path (ADR 6, capped by
+# MAX_EXPANSIONS) — never an infinite loop. This drives the REAL AI tick with a
+# visible player canoe and, deterministically, commands an inland AI warrior to
+# attack it, asserting the AI degrades gracefully (paths to shore / gives up) with
+# no crash and its own units intact. Seed 3 pins water near origin.
+func _run_ai_water_safety_test() -> void:
+	var ai: Node = $EnemyAI
+	await get_tree().create_timer(0.5).timeout
+	var w: WorldData = GameManager.world
+
+	# Nearest deep-water cell with a grass shore neighbor (same scan as --test-canoe).
+	var water_cell := Vector2i(999999, 999999)
+	var land_cell := Vector2i(999999, 999999)
+	for r in range(1, 140):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if absi(dx) != r and absi(dy) != r: continue  # ring only
+				var c := Vector2i(dx, dy)
+				if w.occupied.has(c): continue
+				if w.get_biome(c) != Constants.Biome.WATER_DEEP: continue
+				for off: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+					var n := c + off
+					if w.occupied.has(n): continue
+					if w.get_biome(n) == Constants.Biome.GRASS:
+						water_cell = c; land_cell = n; break
+				if water_cell.x != 999999: break
+			if water_cell.x != 999999: break
+		if water_cell.x != 999999: break
+	if water_cell.x == 999999:
+		print("[test-ai-water] setup: FAILED (no shore water/land near origin)"); get_tree().quit(); return
+
+	# A PLAYER war canoe on the water — the land AI's unreachable target.
+	var canoe: UnitBase = _spawn_unit("war_canoe", 0, water_cell)
+
+	# Give the AI (player 1) warriors ON the shore beside the canoe so its OWN fog
+	# covers the canoe cell (the AI only acts on what it has scouted). Enough to
+	# clear WAVE_MIN_WARRIORS so a genuine attack wave can fire.
+	var ai_warriors: Array[UnitBase] = []
+	for off: Vector2i in [Vector2i(0, 0), Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 1)]:
+		var cell := land_cell + off
+		if w.occupied.has(cell) or w.get_biome(cell) != Constants.Biome.GRASS:
+			continue
+		ai_warriors.append(_spawn_unit("warrior", ai.ENEMY_ID, cell))
+		if ai_warriors.size() >= 4: break
+
+	# Force the AI to attack immediately (no grace, wave ready) so ticking exercises
+	# its real command path against the water target.
+	ai.wave_grace = 0.0
+	ai.wave_interval = 0.0
+	ai._elapsed = 999.0
+	ai._wave_accum = 999.0
+	await get_tree().process_frame
+
+	# saw-canoe: after a vision update the AI can see the player canoe (its cell is
+	# inside the shore warriors' fog). This confirms the scenario is actually set up.
+	ai._tick()
+	await get_tree().process_frame
+	var saw_canoe := false
+	for node: Node in get_tree().get_nodes_in_group("player_%d" % GameManager.local_player_id):
+		var u := node as UnitBase
+		if u == canoe and ai.vision.can_see_entity(u):
+			saw_canoe = true
+	print("[test-ai-water] saw-canoe: %s" % ("OK" if saw_canoe else "FAILED"))
+
+	# graceful-water-path (deterministic): an inland AI warrior commanded straight at
+	# the canoe must path toward the shore and settle — never walk onto water, never
+	# hang. Pick a grass cell a few tiles inland so it starts out of attack range.
+	var inland := Vector2i(999999, 999999)
+	for r in range(3, 12):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if absi(dx) != r and absi(dy) != r: continue
+				var c := land_cell + Vector2i(dx, dy)
+				if w.occupied.has(c) or w.get_biome(c) != Constants.Biome.GRASS: continue
+				inland = c; break
+			if inland.x != 999999: break
+		if inland.x != 999999: break
+	var pathed_gracefully := false
+	if inland.x != 999999:
+		var scout: UnitBase = _spawn_unit("warrior", ai.ENEMY_ID, inland)
+		await get_tree().process_frame
+		scout.command_attack(canoe)
+		for _i in range(90):
+			await get_tree().process_frame
+		# Graceful degradation, stated exactly as asserted: after being sent at the
+		# unreachable water canoe the warrior stays VALID and only ever occupies a
+		# cell LEGAL for its land domain — it is never lured onto deep water and the
+		# request never crashes or hangs. (is_walkable_for(..., water=false) permits
+		# grass/forest/shallow but excludes WATER_DEEP — the exact land-domain
+		# invariant.) This does NOT assert it reached the shore: a unit that ignored
+		# the order and stood on its spawn cell would also pass, which is itself a
+		# valid "ignore the unreachable target" degradation.
+		var scout_cell: Vector2i = Constants.world_to_grid(scout.global_position) if is_instance_valid(scout) else Vector2i.ZERO
+		pathed_gracefully = is_instance_valid(scout) \
+			and w.is_walkable_for(scout_cell, ai.ENEMY_ID, false)
+		print("[test-ai-water] graceful-water-path: %s (state=%s cell=%s biome=%s)" % [
+			"OK" if pathed_gracefully else "FAILED",
+			scout.current_state if is_instance_valid(scout) else -1,
+			scout_cell, w.get_biome(scout_cell)])
+	else:
+		print("[test-ai-water] graceful-water-path: FAILED (no inland grass cell)")
+
+	# ticks-safe (the KEY assertion): drive the AI's real tick several times with the
+	# player canoe visible; it must complete every tick with no script error and keep
+	# its own units valid — the land AI is unbroken by water play.
+	var units_valid := true
+	for _i in range(6):
+		ai._tick()
+		await get_tree().process_frame
+		for wr: UnitBase in ai_warriors:
+			if not is_instance_valid(wr):
+				units_valid = false
+		if not is_instance_valid(canoe):
+			units_valid = false
+	print("[test-ai-water] ticks-safe: %s" % ("OK" if units_valid else "FAILED"))
+	get_tree().quit()
+
+# Visual capture (Task 4): the whole water feature in one shot — a Dock on the
+# shore, a couple of War Canoes on the adjacent water, and a land army (warriors)
+# by the coast — so the coordinator can eyeball dock + canoes + army together.
+# Movie-writer mode (like the other --capture-* harnesses); self-quits after save.
+func _run_capture_water() -> void:
+	await get_tree().create_timer(0.5).timeout
+	var w: WorldData = GameManager.world
+
+	# A shore 2x2 for the dock (find_buildable_cell honors requires_adjacent_water).
+	var dock_cell: Vector2i = GameManager.find_buildable_cell(Vector2i.ZERO, "dock", 0)
+	if dock_cell.x == 9999:
+		print("[capture-water] setup: FAILED (no shore dock cell near origin)")
+		get_tree().quit(); return
+	var dock: Building = _place_building("dock", 0, dock_cell, true)
+	var footprint: Array = dock.footprint_cells
+
+	# Collect navigable water cells and grass cells around the dock footprint,
+	# nearest first, so both canoes and the shore army frame tightly with the dock.
+	var water_cells: Array[Vector2i] = []
+	var grass_cells: Array[Vector2i] = []
+	for r in range(1, 12):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if absi(dx) != r and absi(dy) != r: continue
+				var c := dock_cell + Vector2i(dx, dy)
+				if w.occupied.has(c) or footprint.has(c): continue
+				var biome: int = w.get_biome(c)
+				if biome == Constants.Biome.WATER_DEEP and not water_cells.has(c):
+					water_cells.append(c)
+				elif biome == Constants.Biome.GRASS and not grass_cells.has(c):
+					grass_cells.append(c)
+		if water_cells.size() >= 2 and grass_cells.size() >= 3:
+			break
+
+	# Two war canoes on the water beside the dock.
+	for i in range(mini(2, water_cells.size())):
+		_spawn_unit("war_canoe", 0, water_cells[i])
+	# A small land army on the shore.
+	for i in range(mini(3, grass_cells.size())):
+		_spawn_unit("warrior", 0, grass_cells[i])
+
+	# Frame the shore.
+	camera.global_position = Constants.grid_to_world(dock_cell.x, dock_cell.y)
+	camera.target_zoom = 1.7
+	camera.zoom = Vector2(1.7, 1.7)
+	fog.force_update()
+	for _i in range(10):
+		await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var img: Image = get_viewport().get_texture().get_image()
+	var path: String = "user://water_capture.png"
+	img.save_png(path)
+	print("[capture-water] saved ", ProjectSettings.globalize_path(path),
+		" canoes=", mini(2, water_cells.size()), " warriors=", mini(3, grass_cells.size()))
 	get_tree().quit()
 
 # Renders a couple of animals up close so the procedural art can be reviewed.

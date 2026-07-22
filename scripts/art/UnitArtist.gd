@@ -309,7 +309,6 @@ func build_war_canoe_frames(player_color: Color) -> Array[ImageTexture]:
 		"O": Color8(24, 18, 14),
 		"H": Color8(38, 28, 20),
 		"S": Color8(196, 144, 100),
-		"s": Color8(164, 116, 78),
 		"T": player_color,
 		"t": player_color.darkened(0.35),
 		"W": Color8(122, 86, 48),      # carved hull wood
