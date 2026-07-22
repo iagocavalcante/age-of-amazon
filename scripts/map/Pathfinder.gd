@@ -21,20 +21,20 @@ func is_walkable(cell: Vector2i) -> bool:
 # World-space waypoints (tile centers). Empty if start has no walkable spot.
 # player_id threads owner-aware walkability (own palisade gates are passable);
 # the default WorldData.NO_OWNER means "no owner context" -> base walkability.
-func find_path_world(from_world: Vector2, to_world: Vector2, player_id: int = WorldData.NO_OWNER) -> PackedVector2Array:
-	var from_cell: Vector2i = _nearest_walkable(Constants.world_to_grid(from_world), player_id)
-	var to_cell: Vector2i = _nearest_walkable(Constants.world_to_grid(to_world), player_id)
+func find_path_world(from_world: Vector2, to_world: Vector2, player_id: int = WorldData.NO_OWNER, water: bool = false) -> PackedVector2Array:
+	var from_cell: Vector2i = _nearest_walkable(Constants.world_to_grid(from_world), player_id, water)
+	var to_cell: Vector2i = _nearest_walkable(Constants.world_to_grid(to_world), player_id, water)
 
 	var result: PackedVector2Array = PackedVector2Array()
 	if from_cell == Vector2i(2147483647, 2147483647) or to_cell == Vector2i(2147483647, 2147483647):
 		return result
 
-	var cells: Array[Vector2i] = _astar(from_cell, to_cell, player_id)
+	var cells: Array[Vector2i] = _astar(from_cell, to_cell, player_id, water)
 	for cell: Vector2i in cells:
 		result.append(Constants.grid_to_world(cell.x, cell.y))
 	return result
 
-func _astar(start: Vector2i, goal: Vector2i, player_id: int = WorldData.NO_OWNER) -> Array[Vector2i]:
+func _astar(start: Vector2i, goal: Vector2i, player_id: int = WorldData.NO_OWNER, water: bool = false) -> Array[Vector2i]:
 	if start == goal:
 		return [start]
 
@@ -67,13 +67,13 @@ func _astar(start: Vector2i, goal: Vector2i, player_id: int = WorldData.NO_OWNER
 			best_h = h_current
 			best_cell = current
 
-		for neighbor_info: Array in _neighbors(current, player_id):
+		for neighbor_info: Array in _neighbors(current, player_id, water):
 			var neighbor: Vector2i = neighbor_info[0]
 			var step_mult: float = neighbor_info[1]
 			if closed.has(neighbor):
 				continue
 
-			var step_cost: float = _world.movement_cost_for(neighbor, player_id) * step_mult
+			var step_cost: float = _world.movement_cost_for(neighbor, player_id, water) * step_mult
 			if is_inf(step_cost):
 				continue
 
@@ -91,24 +91,24 @@ func _astar(start: Vector2i, goal: Vector2i, player_id: int = WorldData.NO_OWNER
 
 # 8-connected neighbors; diagonals only when both orthogonals are walkable
 # (no corner cutting). Each entry: [cell, distance multiplier].
-func _neighbors(cell: Vector2i, player_id: int = WorldData.NO_OWNER) -> Array:
+func _neighbors(cell: Vector2i, player_id: int = WorldData.NO_OWNER, water: bool = false) -> Array:
 	var result: Array = []
-	var n: bool = _world.is_walkable_for(cell + Vector2i(0, -1), player_id)
-	var s: bool = _world.is_walkable_for(cell + Vector2i(0, 1), player_id)
-	var w: bool = _world.is_walkable_for(cell + Vector2i(-1, 0), player_id)
-	var e: bool = _world.is_walkable_for(cell + Vector2i(1, 0), player_id)
+	var n: bool = _world.is_walkable_for(cell + Vector2i(0, -1), player_id, water)
+	var s: bool = _world.is_walkable_for(cell + Vector2i(0, 1), player_id, water)
+	var w: bool = _world.is_walkable_for(cell + Vector2i(-1, 0), player_id, water)
+	var e: bool = _world.is_walkable_for(cell + Vector2i(1, 0), player_id, water)
 
 	if n: result.append([cell + Vector2i(0, -1), 1.0])
 	if s: result.append([cell + Vector2i(0, 1), 1.0])
 	if w: result.append([cell + Vector2i(-1, 0), 1.0])
 	if e: result.append([cell + Vector2i(1, 0), 1.0])
-	if n and w and _world.is_walkable_for(cell + Vector2i(-1, -1), player_id):
+	if n and w and _world.is_walkable_for(cell + Vector2i(-1, -1), player_id, water):
 		result.append([cell + Vector2i(-1, -1), SQRT2])
-	if n and e and _world.is_walkable_for(cell + Vector2i(1, -1), player_id):
+	if n and e and _world.is_walkable_for(cell + Vector2i(1, -1), player_id, water):
 		result.append([cell + Vector2i(1, -1), SQRT2])
-	if s and w and _world.is_walkable_for(cell + Vector2i(-1, 1), player_id):
+	if s and w and _world.is_walkable_for(cell + Vector2i(-1, 1), player_id, water):
 		result.append([cell + Vector2i(-1, 1), SQRT2])
-	if s and e and _world.is_walkable_for(cell + Vector2i(1, 1), player_id):
+	if s and e and _world.is_walkable_for(cell + Vector2i(1, 1), player_id, water):
 		result.append([cell + Vector2i(1, 1), SQRT2])
 	return result
 
@@ -185,7 +185,7 @@ func formation_cells(target_world: Vector2, count: int) -> Array[Vector2i]:
 	return cells
 
 # Nearest walkable cell adjacent to any of the given footprint cells.
-func adjacent_walkable(footprint: Array[Vector2i], near_cell: Vector2i) -> Dictionary:
+func adjacent_walkable(footprint: Array[Vector2i], near_cell: Vector2i, water: bool = false) -> Dictionary:
 	var best: Vector2i = Vector2i.ZERO
 	var best_dist: float = INF
 	var found: bool = false
@@ -193,7 +193,8 @@ func adjacent_walkable(footprint: Array[Vector2i], near_cell: Vector2i) -> Dicti
 		for dy in range(-1, 2):
 			for dx in range(-1, 2):
 				var candidate: Vector2i = cell + Vector2i(dx, dy)
-				if candidate in footprint or not is_walkable(candidate):
+				if candidate in footprint \
+						or not _world.is_walkable_for(candidate, WorldData.NO_OWNER, water):
 					continue
 				var dist: float = Vector2(candidate - near_cell).length()
 				if dist < best_dist:
@@ -215,12 +216,12 @@ func _ring_offsets(radius: int) -> Array[Vector2i]:
 
 # Sentinel Vector2i(2147483647, 2147483647) when nothing found nearby.
 # player_id threads owner-aware walkability (NO_OWNER -> base is_walkable).
-func _nearest_walkable(cell: Vector2i, player_id: int = WorldData.NO_OWNER) -> Vector2i:
-	if _world.is_walkable_for(cell, player_id):
+func _nearest_walkable(cell: Vector2i, player_id: int = WorldData.NO_OWNER, water: bool = false) -> Vector2i:
+	if _world.is_walkable_for(cell, player_id, water):
 		return cell
 	for radius in range(1, 16):
 		for offset: Vector2i in _ring_offsets(radius):
 			var candidate: Vector2i = cell + offset
-			if _world.is_walkable_for(candidate, player_id):
+			if _world.is_walkable_for(candidate, player_id, water):
 				return candidate
 	return Vector2i(2147483647, 2147483647)

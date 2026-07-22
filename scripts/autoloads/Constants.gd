@@ -342,6 +342,13 @@ const MONUMENT_VICTORY_SECS: float = 90.0
 var MOVEMENT_COST: Dictionary = {}
 var WALKABLE: Dictionary = {}
 var BUILDABLE: Dictionary = {}
+# The water domain's inverse of WALKABLE: which biomes a WATER unit (canoe) can
+# travel. Built in _ready alongside WALKABLE.
+var NAVIGABLE: Dictionary = {}
+
+# Flat cost a water unit pays per navigable cell — canoes glide, so open water is
+# cheaper for them than the land MOVEMENT_COST treats shallow water for walkers.
+const WATER_MOVE_COST: float = 1.0
 
 # Per-biome color ramps: [shadow, dark, base, light, highlight]
 var BIOME_RAMPS: Dictionary = {}
@@ -386,6 +393,13 @@ func _ready() -> void:
 	BUILDABLE = WALKABLE.duplicate()
 	BUILDABLE[Biome.VARZEA] = false
 	BUILDABLE[Biome.WATER_SHALLOW] = false
+
+	# Which biomes a WATER unit can travel — the inverse domain of WALKABLE.
+	# Only open water (deep + shallow); everything else is not navigable.
+	NAVIGABLE = {
+		Biome.WATER_DEEP: true,
+		Biome.WATER_SHALLOW: true,
+	}
 
 	BIOME_RAMPS = {
 		Biome.GRASS: [

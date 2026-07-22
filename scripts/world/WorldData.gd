@@ -52,7 +52,15 @@ func movement_cost(cell: Vector2i) -> float:
 # Is this cell walkable FOR a specific player's pathing? Same as is_walkable,
 # except the player's OWN constructed palisade gate is passable to them (enemies
 # and neutral pathing still see it as blocked). NO_OWNER -> base behavior.
-func is_walkable_for(cell: Vector2i, player_id: int) -> bool:
+func is_walkable_for(cell: Vector2i, player_id: int, water: bool = false) -> bool:
+	if water:
+		# Water domain: canoes travel the NAVIGABLE biomes (open water). Buildings
+		# still block — there are no water buildings yet, so any occupied cell is
+		# impassable regardless of owner (gates are a land-wall concept).
+		if occupied.has(cell):
+			return false
+		return Constants.NAVIGABLE.get(get_biome(cell), false)
+	# --- land domain (existing logic, unchanged) ---
 	if occupied.has(cell):
 		if player_id != NO_OWNER and _is_own_gate(occupied[cell], player_id):
 			return true
@@ -62,7 +70,14 @@ func is_walkable_for(cell: Vector2i, player_id: int) -> bool:
 # Movement cost variant of is_walkable_for: the caller's own constructed gate
 # costs the underlying biome (as if unoccupied); everything else matches
 # movement_cost. NO_OWNER -> base behavior.
-func movement_cost_for(cell: Vector2i, player_id: int) -> float:
+func movement_cost_for(cell: Vector2i, player_id: int, water: bool = false) -> float:
+	if water:
+		# Water domain: flat WATER_MOVE_COST on navigable cells, INF elsewhere.
+		# Buildings block (INF) — see is_walkable_for's water branch.
+		if occupied.has(cell):
+			return INF
+		return Constants.WATER_MOVE_COST if Constants.NAVIGABLE.get(get_biome(cell), false) else INF
+	# --- land domain (existing logic, unchanged) ---
 	if occupied.has(cell):
 		if player_id != NO_OWNER and _is_own_gate(occupied[cell], player_id):
 			return Constants.MOVEMENT_COST.get(get_biome(cell), INF)

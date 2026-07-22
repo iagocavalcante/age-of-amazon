@@ -19,6 +19,10 @@ const WORLD_TEST_SEED: int = 3
 # so the live random seed can't be relied on to place one near origin; this
 # seed is verified to yield at least one ruin within the ±160 claim scan.
 const POI_TEST_SEED: int = 3
+# Fixed seed for --test-water. The live map_seed defaults to 0 (randomized), so
+# the water-domain assertions need a world verified to place deep water (and
+# grass) within the ±140 scan around origin; this seed does.
+const WATER_TEST_SEED: int = 3
 
 func _ready() -> void:
 	var args: PackedStringArray = OS.get_cmdline_user_args()
@@ -96,6 +100,9 @@ func _ready() -> void:
 	if "--test-palisade-gate" in args:
 		_run_palisade_gate_test()
 		return
+	if "--test-water" in args:
+		_run_water_test()
+		return
 	if "--test-ai-era" in args:
 		_run_ai_era_test()
 		return
@@ -144,6 +151,8 @@ func _boot_offline(args: PackedStringArray) -> void:
 	# scan (same seed --test-poi asserts against) before the world is built.
 	if "--test-poi-claim" in args or "--capture-ruins" in args:
 		GameManager.map_seed = POI_TEST_SEED
+	if "--test-water" in args:
+		GameManager.map_seed = WATER_TEST_SEED
 	var resume: Dictionary = {}
 	if SaveGame.pending_resume:
 		SaveGame.pending_resume = false
@@ -1450,6 +1459,31 @@ func _run_palisade_gate_test() -> void:
 	print("[test-palisade-gate] enemy-path-avoids-gate: %s (owner=%.1f enemy=%.1f)"
 		% ["OK" if (p1_avoids and p1_len > p0_len) else "FAILED", p0_len, p1_len])
 
+	get_tree().quit()
+
+# Prove the water movement domain: the SAME walkability query, with water=false
+# vs water=true, gives inverse answers — land walks grass and is blocked by deep
+# water; a canoe navigates deep water and is blocked by grass.
+func _run_water_test() -> void:
+	var w: WorldData = GameManager.world
+	var water_cell := Vector2i(999999, 999999)
+	var land_cell := Vector2i(999999, 999999)
+	for r in range(1, 140):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if absi(dx) != r and absi(dy) != r: continue  # ring only
+				var c := Vector2i(dx, dy)
+				if w.occupied.has(c): continue  # skip the base footprint near origin
+				var b := w.get_biome(c)
+				if water_cell.x == 999999 and b == Constants.Biome.WATER_DEEP: water_cell = c
+				if land_cell.x == 999999 and b == Constants.Biome.GRASS: land_cell = c
+		if water_cell.x != 999999 and land_cell.x != 999999: break
+	if water_cell.x == 999999 or land_cell.x == 999999:
+		print("[test-water] setup: FAILED (no water/land near origin)"); get_tree().quit(); return
+	print("[test-water] land-blocks-deepwater: %s" % ("OK" if not w.is_walkable_for(water_cell, WorldData.NO_OWNER, false) else "FAILED"))
+	print("[test-water] land-walks-grass: %s" % ("OK" if w.is_walkable_for(land_cell, WorldData.NO_OWNER, false) else "FAILED"))
+	print("[test-water] water-navigates-deepwater: %s" % ("OK" if w.is_walkable_for(water_cell, WorldData.NO_OWNER, true) else "FAILED"))
+	print("[test-water] water-blocks-grass: %s" % ("OK" if not w.is_walkable_for(land_cell, WorldData.NO_OWNER, true) else "FAILED"))
 	get_tree().quit()
 
 # Total world-space length of a path (sum of waypoint-to-waypoint distances).

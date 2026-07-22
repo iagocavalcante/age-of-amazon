@@ -33,6 +33,10 @@ var attack_cooldown: float = 1.0
 var vision_range: float = 200.0
 var aggressive: bool = false
 var can_gather: bool = false
+# Movement domain: a water unit (canoe) paths the NAVIGABLE (open-water) table
+# instead of WALKABLE. Derived from the def's "water" flag in _ready; no current
+# unit sets it, so every land unit stays land (is_water_unit == false).
+var is_water_unit: bool = false
 
 var current_state: State = State.IDLE
 var is_selected: bool = false
@@ -89,6 +93,7 @@ func _ready() -> void:
 	vision_range = def["vision_range"]
 	aggressive = def["aggressive"]
 	can_gather = def["can_gather"]
+	is_water_unit = def.get("water", false)
 
 	add_to_group("units")
 	add_to_group("player_%d" % player_id)
@@ -338,7 +343,7 @@ func _process_building(delta: float) -> void:
 func _start_path_to(target: Vector2) -> bool:
 	if GameManager.pathfinder == null:
 		return false
-	var path: PackedVector2Array = GameManager.pathfinder.find_path_world(global_position, target, player_id)
+	var path: PackedVector2Array = GameManager.pathfinder.find_path_world(global_position, target, player_id, is_water_unit)
 	if path.is_empty():
 		return false
 	_path = path
