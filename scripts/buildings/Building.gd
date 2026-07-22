@@ -116,7 +116,7 @@ func queue_train(unit_type: String) -> bool:
 	if not (unit_type in Constants.BUILDING_DEFS[building_type]["trains"]):
 		return false
 	if not Constants.UNIT_DEFS.has(unit_type):
-		return false  # unit not defined yet (e.g. a forward-referenced unit like war_canoe)
+		return false  # defensive: skip a `trains` entry with no matching UNIT_DEFS (guards against a building listing an undefined unit type)
 	var def: Dictionary = Constants.UNIT_DEFS[unit_type]
 	if not GameManager.is_unlocked(player_id, def):
 		return false  # unit not unlocked in this era

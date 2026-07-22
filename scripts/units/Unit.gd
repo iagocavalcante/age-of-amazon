@@ -34,8 +34,8 @@ var vision_range: float = 200.0
 var aggressive: bool = false
 var can_gather: bool = false
 # Movement domain: a water unit (canoe) paths the NAVIGABLE (open-water) table
-# instead of WALKABLE. Derived from the def's "water" flag in _ready; no current
-# unit sets it, so every land unit stays land (is_water_unit == false).
+# instead of WALKABLE. Data-derived from the def's "water" flag in _ready — true
+# for the War Canoe / water units, false or absent for land units.
 var is_water_unit: bool = false
 
 var current_state: State = State.IDLE

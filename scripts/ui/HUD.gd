@@ -517,7 +517,7 @@ func _populate_train_buttons(building_type: String) -> void:
 		child.queue_free()
 	for unit_type: String in Constants.BUILDING_DEFS[building_type]["trains"]:
 		if not Constants.UNIT_DEFS.has(unit_type):
-			continue  # unit not defined yet (forward-referenced, e.g. war_canoe) — no button
+			continue  # defensive: skip a `trains` entry with no matching UNIT_DEFS (guards against a building listing an undefined unit type) — no button
 		var def: Dictionary = Constants.UNIT_DEFS[unit_type]
 		var button: Button = Button.new()
 		button.text = "%s · %s  [%s]" % [unit_type.capitalize(),
