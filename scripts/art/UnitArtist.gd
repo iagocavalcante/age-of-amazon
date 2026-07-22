@@ -135,6 +135,72 @@ const WARRIOR_WALK_B_ROWS: Array[String] = [
 	"..............",
 ]
 
+# War canoe: a dugout hull seen broadside with a seated paddler, NOT a walking
+# silhouette — it reads unmistakably as a boat. The gunwale stripe carries the
+# player color (T/t); the hull is carved wood (W/w). Across the three frames the
+# paddle sweeps from rest (idle) to a forward recovery (walk A) to a dipped power
+# stroke (walk B), so the canoe animates like it's being rowed.
+#
+# Palette keys:
+#   O outline   H hair   S skin   T trim (player color)   t trim shadow
+#   W hull wood   w hull shadow   P paddle shaft   V paddle blade
+const CANOE_IDLE_ROWS: Array[String] = [
+	"..................",
+	".......OHHO.......",
+	"......OHSSHO......",
+	"......OSSSSO......",
+	".......OSSO.......",
+	".....OTtTTtTO..VV.",
+	".....OTtTTtTO..P..",
+	".....OTtTTtTO.P...",
+	"OTTTTTTTTTTTTTTTTO",
+	"OWWWWWWWWWWWWWWWWO",
+	"OwwwwwwwwwwwwwwwwO",
+	".OwwwwwwwwwwwwwwO.",
+	"..OWWWWWWWWWWWWO..",
+	"....OOOOOOOOOO....",
+	"..................",
+	"..................",
+]
+
+const CANOE_WALK_A_ROWS: Array[String] = [
+	"..................",
+	".......OHHO.......",
+	"......OHSSHO......",
+	"......OSSSSO...VV.",
+	".......OSSO....P..",
+	".....OTtTTtTO.P...",
+	".....OTtTTtTOP....",
+	".....OTtTTtTO.....",
+	"OTTTTTTTTTTTTTTTTO",
+	"OWWWWWWWWWWWWWWWWO",
+	"OwwwwwwwwwwwwwwwwO",
+	".OwwwwwwwwwwwwwwO.",
+	"..OWWWWWWWWWWWWO..",
+	"....OOOOOOOOOO....",
+	"..................",
+	"..................",
+]
+
+const CANOE_WALK_B_ROWS: Array[String] = [
+	"..................",
+	".......OHHO.......",
+	"......OHSSHO......",
+	"......OSSSSO......",
+	".......OSSO.......",
+	".....OTtTTtTOP....",
+	".....OTtTTtTO.P...",
+	".....OTtTTtTO.PV..",
+	"OTTTTTTTTTTTTTTTTO",
+	"OWWWWWWWWWWWWWWWWO",
+	"OwwwwwwwwwwwwwwwwO",
+	".OwwwwwwwwwwwwwwO.",
+	"..OWWWWWWWWWWWWO..",
+	"....OOOOOOOOOO....",
+	"..................",
+	"..................",
+]
+
 func build_villager_frames(player_color: Color) -> Array[ImageTexture]:
 	var palette: Dictionary = {
 		"O": Color8(24, 18, 14),
@@ -233,6 +299,28 @@ func build_shaman_frames(player_color: Color) -> Array[ImageTexture]:
 	var frames: Array[ImageTexture] = []
 	for source: Array in [IDLE_ROWS, WALK_A_ROWS, WALK_B_ROWS]:
 		frames.append(PixelArt.sprite_from_rows(_with_staff(source), palette))
+	return frames
+
+# War canoe: a dedicated dugout-with-paddler sprite (see CANOE_*_ROWS) rather than
+# an overlay on the villager gait — it's a boat, not a person, so it needs its own
+# silhouette. The gunwale trim takes the player color.
+func build_war_canoe_frames(player_color: Color) -> Array[ImageTexture]:
+	var palette: Dictionary = {
+		"O": Color8(24, 18, 14),
+		"H": Color8(38, 28, 20),
+		"S": Color8(196, 144, 100),
+		"s": Color8(164, 116, 78),
+		"T": player_color,
+		"t": player_color.darkened(0.35),
+		"W": Color8(122, 86, 48),      # carved hull wood
+		"w": Color8(92, 62, 34),       # hull shadow
+		"P": Color8(110, 78, 44),      # paddle shaft
+		"V": Color8(150, 108, 66),     # paddle blade
+	}
+	var frames: Array[ImageTexture] = []
+	var sources: Array = [CANOE_IDLE_ROWS, CANOE_WALK_A_ROWS, CANOE_WALK_B_ROWS]
+	for source in sources:
+		frames.append(PixelArt.sprite_from_rows(source, palette))
 	return frames
 
 # Widens each row and draws a ritual staff (shaft) topped with a 2px glowing

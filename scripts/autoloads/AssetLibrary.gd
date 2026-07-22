@@ -79,6 +79,7 @@ func _ready() -> void:
 			"archer": unit_artist.build_archer_frames(color),
 			"hunter": unit_artist.build_hunter_frames(color),
 			"shaman": unit_artist.build_shaman_frames(color),
+			"war_canoe": unit_artist.build_war_canoe_frames(color),
 		}
 		var frame_set: Dictionary = {}
 		for unit_type: String in procedural:

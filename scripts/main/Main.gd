@@ -121,6 +121,9 @@ func _ready() -> void:
 	if "--test-dock" in args:
 		_run_dock_test()
 		return
+	if "--test-canoe" in args:
+		_run_canoe_test()
+		return
 	if "--capture-help" in args:
 		_run_capture_help()
 	if "--capture-animals" in args:
@@ -154,8 +157,8 @@ func _boot_offline(args: PackedStringArray) -> void:
 	# scan (same seed --test-poi asserts against) before the world is built.
 	if "--test-poi-claim" in args or "--capture-ruins" in args:
 		GameManager.map_seed = POI_TEST_SEED
-	if "--test-water" in args or "--test-dock" in args:
-		# Both need water near origin; seed 3 is verified to place it (Task 1).
+	if "--test-water" in args or "--test-dock" in args or "--test-canoe" in args:
+		# All need water near origin; seed 3 is verified to place it (Task 1).
 		GameManager.map_seed = WATER_TEST_SEED
 	var resume: Dictionary = {}
 	if SaveGame.pending_resume:
@@ -1995,15 +1998,113 @@ func _run_dock_test() -> void:
 	print("[test-dock] launch-cell-is-water: %s" % ("OK"
 		if launch_ok else "FAILED (found=%s cell=%s)" % [launch.get("found"), launch.get("cell")]))
 
-	# undefined-train-safe: war_canoe is in the dock's trains but not defined until
-	# Task 3. queue_train must GUARD the undefined unit (return false, no crash, queue
-	# unchanged) rather than bare-access UNIT_DEFS["war_canoe"] and error out. The HUD's
-	# _populate_train_buttons carries the symmetric guard (skips the undefined unit),
-	# so selecting a dock no longer script-errors on every selection.
+	# trains-canoe: war_canoe is now DEFINED (Task 3), so the dock actually trains it —
+	# queue_train's forward-reference guard no longer skips it. A fresh placement is
+	# still a build site, so force it constructed to enable training, then queue a real
+	# canoe (funded richly above; unlocked at Chiefdom; pop room free).
+	dock.current_hp = dock.max_hp
+	dock.is_constructed = true
 	var q_before: int = dock.train_queue.size()
-	var canoe_refused: bool = not dock.queue_train("war_canoe")
-	print("[test-dock] undefined-train-safe: %s" % ("OK"
-		if canoe_refused and dock.train_queue.size() == q_before else "FAILED"))
+	var canoe_queued: bool = dock.queue_train("war_canoe")
+	print("[test-dock] trains-canoe: %s" % ("OK"
+		if canoe_queued and dock.train_queue.size() == q_before + 1 else "FAILED"))
+
+	# canoe-launches-on-water: the trained canoe is a water unit, so the dock spawns it
+	# onto an adjacent NAVIGABLE cell rather than onto land. Drive the spawn directly
+	# (offline authority) and assert the new war_canoe sits on a water cell.
+	dock._spawn_unit("war_canoe")
+	await get_tree().process_frame
+	var canoe: UnitBase = null
+	for node: Node in get_tree().get_nodes_in_group("player_0"):
+		var u := node as UnitBase
+		if u != null and u.unit_type == "war_canoe":
+			canoe = u
+	var launched_wet: bool = canoe != null and w.is_water(Constants.world_to_grid(canoe.global_position))
+	print("[test-dock] canoe-launches-on-water: %s" % ("OK"
+		if launched_wet else "FAILED (canoe=%s)" % [canoe != null]))
+	get_tree().quit()
+
+# War canoe (Task 3): the ranged Chiefdom water raider. Seed 3 (WATER_TEST_SEED,
+# pinned in _boot_offline) guarantees deep water beside land near origin. Proves the
+# canoe is a water unit (paths on water, blocked on land) and — being ranged
+# (attack_range 110, distance-based combat) — bombards a land enemy on the shore
+# WITHOUT ever leaving the water.
+func _run_canoe_test() -> void:
+	await get_tree().create_timer(0.5).timeout
+	var w: WorldData = GameManager.world
+
+	# Find an unoccupied deep-water cell that has an unoccupied GRASS shore cell
+	# beside it. The shore cell doubles as the enemy's stand: an orthogonally
+	# adjacent tile is ~36px away, well within the canoe's 110px reach, so the
+	# canoe can fire from the water without closing onto land.
+	var water_cell := Vector2i(999999, 999999)
+	var land_cell := Vector2i(999999, 999999)
+	for r in range(1, 140):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if absi(dx) != r and absi(dy) != r: continue  # ring only
+				var c := Vector2i(dx, dy)
+				if w.occupied.has(c): continue
+				if w.get_biome(c) != Constants.Biome.WATER_DEEP: continue
+				for off: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+					var n := c + off
+					if w.occupied.has(n): continue
+					if w.get_biome(n) == Constants.Biome.GRASS:
+						water_cell = c; land_cell = n; break
+				if water_cell.x != 999999: break
+			if water_cell.x != 999999: break
+		if water_cell.x != 999999: break
+	if water_cell.x == 999999 or land_cell.x == 999999:
+		print("[test-canoe] setup: FAILED (no shore water/land near origin)"); get_tree().quit(); return
+
+	# Spawn a war canoe for player 0 on the water cell.
+	var canoe: UnitBase = _spawn_unit("war_canoe", 0, water_cell)
+	await get_tree().process_frame
+	print("[test-canoe] is-water-unit: %s" % ("OK" if canoe.is_water_unit else "FAILED"))
+
+	# (a) moves-on-water: a path to another open-water cell stays on navigable cells
+	# the whole way. Scan outward for the nearest reachable deep-water target.
+	var far_water := Vector2i(999999, 999999)
+	var path: PackedVector2Array = PackedVector2Array()
+	for r in range(1, 40):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if absi(dx) != r and absi(dy) != r: continue
+				var c := water_cell + Vector2i(dx, dy)
+				if w.occupied.has(c) or c == water_cell: continue
+				if w.get_biome(c) != Constants.Biome.WATER_DEEP: continue
+				var p: PackedVector2Array = GameManager.pathfinder.find_path_world(
+					Constants.grid_to_world(water_cell.x, water_cell.y),
+					Constants.grid_to_world(c.x, c.y), 0, true)
+				if p.size() > 0:
+					far_water = c; path = p; break
+			if far_water.x != 999999: break
+		if far_water.x != 999999: break
+	var all_water := path.size() > 0
+	for pt: Vector2 in path:
+		if not w.is_water(Constants.world_to_grid(pt)): all_water = false
+	print("[test-canoe] moves-on-water: %s" % ("OK" if all_water else "FAILED"))
+
+	# (b) blocked-on-land: the canoe (water domain) cannot traverse a land cell.
+	print("[test-canoe] blocked-on-land: %s" % ("OK" if not w.is_walkable_for(land_cell, 0, true) else "FAILED"))
+
+	# (c) ranged-attack: an enemy warrior on the shore, within the canoe's 110px
+	# reach, takes damage while the canoe stays on its water cell — proving it
+	# bombards land from the water without ever pathing onto it.
+	var enemy: UnitBase = _spawn_unit("warrior", 1, land_cell)
+	await get_tree().process_frame
+	var ehp0: int = enemy.current_hp
+	canoe.command_attack(enemy)
+	for _i in range(60):
+		await get_tree().process_frame
+	var dealt: bool = enemy.current_hp < ehp0
+	var stayed_wet: bool = w.is_water(Constants.world_to_grid(canoe.global_position))
+	print("[test-canoe] ranged-attack: %s" % ("OK"
+		if dealt and stayed_wet else "FAILED (dealt=%s wet=%s)" % [dealt, stayed_wet]))
+
+	# (d) era-2 gate: the canoe is Chiefdom-tier.
+	print("[test-canoe] era-2: %s" % ("OK"
+		if Constants.UNIT_DEFS["war_canoe"]["era"] == Constants.ERA_CHIEFDOM else "FAILED"))
 	get_tree().quit()
 
 # Renders a couple of animals up close so the procedural art can be reviewed.

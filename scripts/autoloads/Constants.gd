@@ -135,6 +135,28 @@ const UNIT_DEFS: Dictionary = {
 		# wounded non-shaman allies.
 		"heal_aura": { "radius": 96.0, "heal": 3, "interval": 1.0 },
 	},
+	# Chiefdom water raider: a fast, ranged dugout that rules the rivers. `water`
+	# makes it a water unit — it paths on NAVIGABLE biomes only (blocked on land)
+	# and launches from the Dock onto an adjacent water cell (see Unit.is_water_unit
+	# / Building._spawn_unit). Being ranged (attack_range 110, distance-based combat)
+	# it bombards land units on the shore and other canoes WITHOUT ever pathing onto
+	# land. `military` earns it the Chiefdom armor buff, like the warrior/archer.
+	"war_canoe": {
+		"era": 2,
+		"water": true,
+		"max_hp": 90,
+		"move_speed": 110.0,
+		"attack_power": 10,
+		"armor": 1,
+		"attack_range": 110.0,
+		"attack_cooldown": 1.6,
+		"vision_range": 300.0,
+		"aggressive": true,
+		"can_gather": false,
+		"military": true,  # combat unit: eligible for the Chiefdom armor buff
+		"cost": { ResourceType.WOOD: 60, ResourceType.FOOD: 20 },
+		"train_time": 14.0,
+	},
 }
 
 # Neutral wildlife. `food` is the one-time bounty paid to whoever lands the
