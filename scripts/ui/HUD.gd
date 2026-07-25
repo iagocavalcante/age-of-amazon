@@ -8,11 +8,17 @@ extends Control
 const MINIMAP_TILES: int = 120      # world window shown on the minimap
 const MINIMAP_DISPLAY: int = 144    # on-screen pixels
 const REFRESH_INTERVAL: float = 0.5
+const ERA_GOLD: Color = Color(0.89, 0.71, 0.36)
+const ERA_TEXT: Color = Color(0.84, 0.88, 0.80)
+const ERA_BLOCKED: Color = Color(0.94, 0.66, 0.30)
+const ERA_READY: Color = Color(0.48, 0.82, 0.43)
+const ERA_SURFACE: Color = Color(0.10, 0.15, 0.10, 0.94)
 
 var _resource_labels: Dictionary = {}  # ResourceType -> Label
 var _pop_label: Label
 var _daily_label: Label
 var _era_label: Label
+var _era_status_label: Label
 var _advance_button: Button
 var _pause_button: Button
 
@@ -165,13 +171,27 @@ func _build_top_bar() -> void:
 	# Era indicator + the button that drives progression. Both read from live
 	# era state (see _refresh_era_ui); the label is gold like the daily clock so
 	# "what age am I in" reads at a glance beside the stats.
+	var era_stack: VBoxContainer = VBoxContainer.new()
+	era_stack.add_theme_constant_override("separation", -2)
+	era_stack.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(era_stack)
+
 	_era_label = Label.new()
-	_era_label.add_theme_color_override("font_color", Color(0.89, 0.71, 0.36))
+	_era_label.add_theme_color_override("font_color", ERA_GOLD)
+	_era_label.add_theme_font_size_override("font_size", 15)
 	_era_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(_era_label)
+	era_stack.add_child(_era_label)
+
+	_era_status_label = Label.new()
+	_era_status_label.add_theme_font_size_override("font_size", 11)
+	_era_status_label.add_theme_color_override("font_color", ERA_TEXT)
+	_era_status_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	era_stack.add_child(_era_status_label)
 
 	_advance_button = Button.new()
 	_advance_button.focus_mode = Control.FOCUS_NONE
+	_advance_button.custom_minimum_size = Vector2(104, 36)
+	_advance_button.add_theme_font_size_override("font_size", 13)
 	_advance_button.pressed.connect(func() -> void:
 		CommandRouter.submit({"type": "advance_era",
 			"player_id": GameManager.local_player_id}))
@@ -256,29 +276,92 @@ func _refresh_era_ui() -> void:
 	var pid: int = GameManager.local_player_id
 	_era_label.text = Constants.ERA_DEFS[GameManager.player_era(pid)]["name"]
 	if not GameManager.has_next_era(pid):
+		_era_status_label.text = "✓ Maximum age reached"
+		_era_status_label.add_theme_color_override("font_color", ERA_READY)
+		_era_status_label.tooltip_text = ""
 		_advance_button.disabled = true
-		_advance_button.text = "Chiefdom Age (max)"
+		_advance_button.visible = false
 		_advance_button.tooltip_text = ""
 		return
+	_advance_button.visible = true
 	var next: int = GameManager.player_era(pid) + 1
 	var next_def: Dictionary = Constants.ERA_DEFS[next]
 	var cost: Dictionary = next_def["advance_cost"]
+	var required_buildings: Dictionary = next_def["requires_buildings"]
 	var missing: Dictionary = GameManager.missing_era_requirements(pid)
 	var affordable: bool = GameManager.can_afford(pid, cost)
-	_advance_button.text = "Advance to %s (%s)" % [next_def["name"], _cost_text(cost)]
-	_advance_button.disabled = not (missing.is_empty() and affordable)
-	if _advance_button.disabled:
-		var reasons: Array[String] = []
-		for bt: String in missing:
-			reasons.append("%d more %s" % [int(missing[bt]),
-				bt.capitalize().replace("_", " ")])
-		for res_type: int in cost:
-			var short: int = int(cost[res_type]) - GameManager.get_resource(pid, res_type)
-			if short > 0:
-				reasons.append("%d more %s" % [short, Constants.RESOURCE_NAMES[res_type]])
-		_advance_button.tooltip_text = "Need " + " and ".join(reasons)
-	else:
-		_advance_button.tooltip_text = ""
+	var ready: bool = missing.is_empty() and affordable
+	var status_parts: Array[String] = []
+	var reasons: Array[String] = []
+	for building_type: String in required_buildings:
+		var required: int = int(required_buildings[building_type])
+		var still_needed: int = int(missing.get(building_type, 0))
+		var have: int = required - still_needed
+		var singular_name: String = building_type.capitalize().replace("_", " ")
+		var plural_name: String = singular_name \
+			if singular_name.ends_with("s") else singular_name + "s"
+		var building_name: String = singular_name if required == 1 else plural_name
+		status_parts.append("%s %s %d/%d" % [
+			"✓" if still_needed == 0 else "○",
+			building_name, have, required])
+		if still_needed > 0:
+			reasons.append("%d more %s" % [still_needed,
+				singular_name if still_needed == 1 else plural_name])
+	for res_type: int in cost:
+		var current: int = GameManager.get_resource(pid, res_type)
+		var required: int = int(cost[res_type])
+		var enough: bool = current >= required
+		status_parts.append("%s %s %d/%d" % [
+			"✓" if enough else "○",
+			Constants.RESOURCE_NAMES[res_type].capitalize(), current, required])
+		if not enough:
+			reasons.append("%d more %s" % [
+				required - current, Constants.RESOURCE_NAMES[res_type]])
+
+	_era_status_label.text = "%s: %s" % [
+		next_def["name"], "  ".join(status_parts)]
+	_era_status_label.add_theme_color_override(
+		"font_color", ERA_READY if ready else ERA_BLOCKED)
+	_advance_button.disabled = not ready
+	_advance_button.text = "Advance now" if ready else "Advance locked"
+	_advance_button.tooltip_text = "" if ready else "Need " + " and ".join(reasons)
+	_era_status_label.tooltip_text = _advance_button.tooltip_text
+	_style_advance_button(ready)
+
+func _style_advance_button(ready: bool) -> void:
+	var border: Color = ERA_READY if ready else ERA_BLOCKED
+	var normal: StyleBoxFlat = _compact_button_style(
+		Color(0.18, 0.31, 0.16, 0.96) if ready else ERA_SURFACE, border)
+	var hover: StyleBoxFlat = _compact_button_style(
+		Color(0.23, 0.39, 0.20, 0.98), ERA_READY.lightened(0.12))
+	var pressed: StyleBoxFlat = _compact_button_style(
+		Color(0.14, 0.25, 0.13, 0.98), ERA_READY.darkened(0.08))
+	var disabled: StyleBoxFlat = _compact_button_style(
+		ERA_SURFACE, Color(ERA_BLOCKED, 0.66))
+	_advance_button.add_theme_stylebox_override("normal", normal)
+	_advance_button.add_theme_stylebox_override("hover", hover)
+	_advance_button.add_theme_stylebox_override("pressed", pressed)
+	_advance_button.add_theme_stylebox_override("disabled", disabled)
+	_advance_button.add_theme_color_override(
+		"font_color", Color(0.88, 0.96, 0.82))
+	_advance_button.add_theme_color_override(
+		"font_hover_color", Color(0.93, 1.0, 0.88))
+	_advance_button.add_theme_color_override(
+		"font_pressed_color", Color(0.84, 0.94, 0.78))
+	_advance_button.add_theme_color_override(
+		"font_disabled_color", Color(1.0, 0.78, 0.43))
+
+func _compact_button_style(background: Color, border: Color) -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = background
+	style.border_color = border
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(3)
+	style.content_margin_left = 10
+	style.content_margin_right = 10
+	style.content_margin_top = 6
+	style.content_margin_bottom = 6
+	return style
 
 # A real era transition (the signal now fires only on those): refresh the label
 # and menu for everyone, and give the local tribe a subtle cue.

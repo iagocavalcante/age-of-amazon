@@ -143,6 +143,8 @@ func _ready() -> void:
 		_run_capture_ruins()
 	if "--capture-era" in args:
 		_run_capture_era()
+	if "--capture-age-progress" in args:
+		_run_capture_age_progress()
 
 func _is_harness(args: PackedStringArray) -> bool:
 	for arg: String in args:
@@ -682,8 +684,13 @@ func _run_hud_test() -> void:
 		and not barracks_btn.disabled else "FAILED")
 	# The Advance button now points at Chiefdom (the next era) and is disabled
 	# (no barracks yet) — proving the indicator + reason reach the top bar.
-	print("[test-hud] advance-next-chiefdom ", "OK" if hud._advance_button.text.contains(
-		"Chiefdom") and hud._advance_button.disabled else "FAILED text=%s" % hud._advance_button.text)
+	print("[test-hud] advance-next-chiefdom ", "OK"
+		if hud._era_status_label.text.contains("Chiefdom")
+			and hud._era_status_label.text.contains("○ Barracks 0/1")
+			and hud._advance_button.text == "Advance locked"
+			and hud._advance_button.disabled
+		else "FAILED status=%s button=%s" % [
+			hud._era_status_label.text, hud._advance_button.text])
 	print("[test-hud] era-label-village ", "OK" if hud._era_label.text.contains(
 		"Village") else "FAILED text=%s" % hud._era_label.text)
 	get_tree().quit()
@@ -1218,8 +1225,14 @@ func _run_era_test() -> void:
 	# --- advance_era ---
 	# Give the world a moment to settle so find_buildable_cell has scouted cells.
 	await get_tree().create_timer(0.5).timeout
+	var hud: Control = $UILayer/HUD
 	# Fresh player 0 has no houses → cannot advance to Village.
 	print("[test-era] advance-requires-houses: %s" % ("OK" if not GameManager.can_advance_era(0) else "FAILED"))
+	print("[test-era] hud-shows-house-progress: %s" % (
+		"OK" if "○ Houses 0/2" in hud._era_status_label.text
+			and hud._advance_button.disabled
+			and hud._advance_button.text == "Advance locked"
+		else "FAILED"))
 	# Place the two finished houses the Village era requires. _place_building
 	# constructs the building finished (is_constructed defaults true); use
 	# find_buildable_cell so the two footprints don't collide.
@@ -1227,12 +1240,26 @@ func _run_era_test() -> void:
 	_place_building("house", 0, house_a)
 	var house_b: Vector2i = GameManager.find_buildable_cell(Vector2i.ZERO, "house", 0)
 	_place_building("house", 0, house_b)
-	await get_tree().process_frame
+	# Direct harness placement bypasses the normal construction duration; allow
+	# the HUD's regular refresh tick to observe both finished buildings.
+	await get_tree().create_timer(0.6).timeout
 	print("[test-era] requirements-met: %s" % ("OK" if GameManager.can_advance_era(0) else "FAILED"))
+	print("[test-era] hud-shows-resource-block: %s" % (
+		"OK" if "✓ Houses 2/2" in hud._era_status_label.text
+			and "○ Food" in hud._era_status_label.text
+			and hud._advance_button.disabled
+		else "FAILED"))
 	# Grant enough resources and advance via the COMMAND path (not by calling
 	# advance_era directly — exercise CommandRouter).
 	GameManager.add_resource(0, Constants.ResourceType.FOOD, 500)
 	GameManager.add_resource(0, Constants.ResourceType.WOOD, 300)
+	await get_tree().process_frame
+	print("[test-era] hud-ready-state: %s" % (
+		"OK" if "✓ Food" in hud._era_status_label.text
+			and "✓ Wood" in hud._era_status_label.text
+			and not hud._advance_button.disabled
+			and hud._advance_button.text == "Advance now"
+		else "FAILED"))
 	var food_before: int = GameManager.get_resource(0, Constants.ResourceType.FOOD)
 	CommandRouter.submit({"type": "advance_era", "player_id": 0})
 	await get_tree().process_frame
@@ -2388,6 +2415,31 @@ func _run_capture_placement() -> void:
 	img.save_png(path)
 	print("[capture-placement] saved ", ProjectSettings.globalize_path(path),
 		" cell=", cell)
+	get_tree().quit()
+
+# Reproduces the common Forest-Age state from player reports: the resource
+# cost is met but only one of the two required houses is finished. The capture
+# verifies that the missing requirement is visible without hovering.
+func _run_capture_age_progress() -> void:
+	await get_tree().create_timer(0.4).timeout
+	_place_building("house", 0,
+		GameManager.find_buildable_cell(Vector2i.ZERO, "house", 0))
+	GameManager.add_resource(0, Constants.ResourceType.FOOD, 200)
+	GameManager.add_resource(0, Constants.ResourceType.WOOD, 250)
+	camera.center_on(Constants.grid_to_world(0, 0))
+	camera.target_zoom = 1.4
+	camera.zoom = Vector2(1.4, 1.4)
+	fog.force_update()
+	for _i in range(8):
+		await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var img: Image = get_viewport().get_texture().get_image()
+	var path: String = "user://age_progress_capture.png"
+	img.save_png(path)
+	var hud: Control = $UILayer/HUD
+	print("[capture-age-progress] saved ",
+		ProjectSettings.globalize_path(path),
+		" status=", hud._era_status_label.text)
 	get_tree().quit()
 
 func _run_capture_world() -> void:
