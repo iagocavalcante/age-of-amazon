@@ -13,6 +13,14 @@ const CHIP_COLORS: Dictionary = {
 }
 const DUST: Array = [Color8(180, 152, 80), Color8(146, 112, 80)]
 
+static func reduced_motion() -> bool:
+	if not OS.has_feature("web"):
+		return false
+	var value: Variant = JavaScriptBridge.eval(
+		"window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches",
+		true)
+	return value is bool and value
+
 static func chips_for_resource(parent: Node, pos: Vector2, resource_type: int) -> void:
 	chips(parent, pos, CHIP_COLORS.get(resource_type, DUST))
 

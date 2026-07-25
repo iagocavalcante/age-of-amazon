@@ -13,12 +13,13 @@ extends RefCounted
 # Create ONE instance and reuse it: the per-biome variant tiles are built
 # once and cached.
 
-const VARIANTS_PER_BIOME: int = 4
+const VARIANTS_PER_BIOME: int = 8
 
 var _tile_w: int = Constants.TILE_WIDTH
 var _tile_h: int = Constants.TILE_HEIGHT
 var _variants: Dictionary = {}  # biome -> Array[Image]
 var _foam_edges: Array[Image] = []  # NE, SE, SW, NW diamond edges
+var _transition_edges: Dictionary = {}  # biome -> four soft land-edge overlays
 var _water_mask_tiles: Dictionary = {}
 
 var _detail: FastNoiseLite
@@ -30,6 +31,7 @@ func _init(p_seed: int) -> void:
 	_detail.frequency = 0.11
 
 	_build_all_variants()
+	_build_transition_edges()
 	_build_foam_edges()
 	_build_water_mask_tiles()
 
@@ -69,6 +71,21 @@ func render_chunk(gen: WorldGen, chunk: ChunkData) -> Dictionary:
 			var variants: Array = _variants[biome]
 			ground.blend_rect(variants[variant_idx], tile_rect, dst)
 
+			# Land-biome borders blend through a dithered inner fringe instead
+			# of reading as hard alternating diamonds. The pattern is still
+			# deterministic and uses only the neighboring biome's own ramp.
+			var neighbors: Array[Vector2i] = [
+				Vector2i(x, y - 1), Vector2i(x + 1, y),
+				Vector2i(x, y + 1), Vector2i(x - 1, y),
+			]
+			if not _is_water(biome):
+				for i in range(4):
+					var neighbor_biome: int = gen.biome_at(
+						neighbors[i].x, neighbors[i].y)
+					if neighbor_biome != biome and not _is_water(neighbor_biome):
+						var neighbor_edges: Array = _transition_edges[neighbor_biome]
+						ground.blend_rect(neighbor_edges[i], tile_rect, dst)
+
 			if _is_water(biome):
 				# The animated mask only covers in-chunk tiles: adjacent
 				# chunks' water sprites would otherwise double-draw overlaps.
@@ -79,9 +96,6 @@ func render_chunk(gen: WorldGen, chunk: ChunkData) -> Dictionary:
 
 				# Shore foam on the water side of land/water edges.
 				# Neighbor order: -y -> NE, +x -> SE, +y -> SW, -x -> NW.
-				var neighbors: Array[Vector2i] = [
-					Vector2i(x, y - 1), Vector2i(x + 1, y), Vector2i(x, y + 1), Vector2i(x - 1, y),
-				]
 				for i in range(4):
 					var n: Vector2i = neighbors[i]
 					if not _is_water(gen.biome_at(n.x, n.y)):
@@ -130,10 +144,47 @@ func _build_tile(biome: int, variant: int) -> Image:
 
 	return img
 
+func _build_transition_edges() -> void:
+	_transition_edges.clear()
+	for biome: int in Constants.BIOME_RAMPS:
+		var edges: Array[Image] = []
+		var ramp: Array = Constants.BIOME_RAMPS[biome]
+		for edge in range(4):
+			var img: Image = Image.create(
+				_tile_w, _tile_h, false, Image.FORMAT_RGBA8)
+			var cx: float = _tile_w / 2.0
+			var cy: float = _tile_h / 2.0
+			for y in range(_tile_h):
+				for x in range(_tile_w):
+					var fx: float = float(x) + 0.5 - cx
+					var fy: float = float(y) + 0.5 - cy
+					var dx: float = absf(fx) / cx
+					var dy: float = absf(fy) / cy
+					var diamond: float = dx + dy
+					if diamond <= 0.70 or diamond > 1.0:
+						continue
+					var on_edge: bool = false
+					match edge:
+						0: on_edge = fx >= 0.0 and fy < 0.0
+						1: on_edge = fx >= 0.0 and fy >= 0.0
+						2: on_edge = fx < 0.0 and fy >= 0.0
+						3: on_edge = fx < 0.0 and fy < 0.0
+					if not on_edge:
+						continue
+					var speckle: float = PixelArt.hash2(
+						x, y, biome * 487 + edge * 83)
+					var depth: float = inverse_lerp(0.70, 1.0, diamond)
+					if speckle < lerpf(0.18, 0.78, depth):
+						var color: Color = ramp[1] if speckle < 0.48 else ramp[2]
+						color.a = lerpf(0.24, 0.56, depth)
+						img.set_pixel(x, y, color)
+			edges.append(img)
+		_transition_edges[biome] = edges
+
 func _build_foam_edges() -> void:
 	_foam_edges.clear()
-	var foam: Color = Color(0.92, 0.97, 0.98, 0.85)
-	var foam_soft: Color = Color(0.85, 0.94, 0.96, 0.45)
+	var foam: Color = Color(0.78, 0.91, 0.91, 0.72)
+	var foam_soft: Color = Color(0.65, 0.84, 0.83, 0.34)
 
 	for edge in range(4):
 		var img: Image = Image.create(_tile_w, _tile_h, false, Image.FORMAT_RGBA8)

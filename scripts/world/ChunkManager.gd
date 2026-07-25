@@ -140,7 +140,19 @@ func _build_visual(chunk: ChunkData) -> void:
 		chunk.resource_sprites[cell] = sprite
 
 	for cell: Vector2i in chunk.decor:
-		var texture: Texture2D = AssetLibrary.reeds_texture if chunk.decor[cell] == "reeds" else AssetLibrary.rock_texture
+		var texture: Texture2D
+		match String(chunk.decor[cell]):
+			"reeds", "wet_undergrowth":
+				texture = AssetLibrary.reeds_texture
+			"undergrowth":
+				var idx: int = int(PixelArt.hash2(
+					cell.x, cell.y, 719) * AssetLibrary.undergrowth_textures.size())
+				texture = AssetLibrary.undergrowth_textures[
+					idx % AssetLibrary.undergrowth_textures.size()]
+			"fallen_log":
+				texture = AssetLibrary.fallen_log_texture
+			_:
+				texture = AssetLibrary.rock_texture
 		doodads.add_child(_doodad_sprite(texture, cell))
 
 	# POI landmarks: unclaimed ruins render as a fog-gated sprite (an already

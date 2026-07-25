@@ -133,6 +133,10 @@ func _ready() -> void:
 		_run_capture_help()
 	if "--capture-animals" in args:
 		_run_capture_animals()
+	if "--capture-civilizations" in args:
+		_run_capture_civilizations()
+	if "--capture-placement" in args:
+		_run_capture_placement()
 	if "--capture-world" in args:
 		_run_capture_world()
 	if "--capture-ruins" in args:
@@ -2323,6 +2327,67 @@ func _run_capture_animals() -> void:
 	var path: String = "user://animals_capture.png"
 	img.save_png(path)
 	print("[capture-animals] saved ", ProjectSettings.globalize_path(path), " size=", img.get_size())
+	get_tree().quit()
+
+# Side-by-side silhouette check for the civilization-specific town centers:
+# Amazon River maloca, Aztec twin shrines, Andean kancha, and Maya temple.
+func _run_capture_civilizations() -> void:
+	await get_tree().process_frame
+	var existing: Building = _find_tc(0)
+	if existing != null:
+		existing.queue_free()
+	await get_tree().process_frame
+	var cells: Array[Vector2i] = [
+		Vector2i(-7, -6), Vector2i(1, -6),
+		Vector2i(-7, 2), Vector2i(1, 2),
+	]
+	for player_id in range(4):
+		_place_building("town_center", player_id, cells[player_id])
+	_spawn_unit("villager", 0, Vector2i(-3, 0))
+	camera.center_on(Constants.grid_to_world(-1, 0))
+	camera.target_zoom = 1.25
+	camera.zoom = Vector2(1.25, 1.25)
+	fog.force_update()
+	for _i in range(10):
+		await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var img: Image = get_viewport().get_texture().get_image()
+	var path: String = "user://civilizations_capture.png"
+	img.save_png(path)
+	print("[capture-civilizations] saved ",
+		ProjectSettings.globalize_path(path))
+	get_tree().quit()
+
+# Shows the footprint overlay at a valid build location. The diamond grid
+# communicates exact occupied cells; invalid placement additionally uses
+# red X marks, so it never relies on color alone.
+func _run_capture_placement() -> void:
+	await get_tree().create_timer(0.4).timeout
+	GameManager.add_resource(0, Constants.ResourceType.WOOD, 300)
+	var villagers: Array = get_tree().get_nodes_in_group("player_0").filter(
+		func(n: Node) -> bool: return n is UnitBase and (n as UnitBase).can_gather)
+	if not villagers.is_empty():
+		SelectionManager.select_only(villagers[0])
+	camera.center_on(Constants.grid_to_world(0, 0))
+	camera.target_zoom = 1.4
+	camera.zoom = Vector2(1.4, 1.4)
+	fog.force_update()
+	for _i in range(4):
+		await get_tree().process_frame
+	var cell: Vector2i = GameManager.find_buildable_cell(
+		Vector2i(5, -2), "barracks", 0)
+	var world_pos: Vector2 = Constants.grid_to_world(cell.x, cell.y)
+	var screen_pos: Vector2 = get_viewport().get_canvas_transform() * world_pos
+	SelectionManager.start_placement("barracks")
+	SelectionManager._update_ghost(screen_pos)
+	for _i in range(6):
+		await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var img: Image = get_viewport().get_texture().get_image()
+	var path: String = "user://placement_capture.png"
+	img.save_png(path)
+	print("[capture-placement] saved ", ProjectSettings.globalize_path(path),
+		" cell=", cell)
 	get_tree().quit()
 
 func _run_capture_world() -> void:

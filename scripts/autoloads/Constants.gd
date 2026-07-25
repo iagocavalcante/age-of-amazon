@@ -438,24 +438,24 @@ func _ready() -> void:
 
 	BIOME_RAMPS = {
 		Biome.GRASS: [
-			Color8(74, 120, 44), Color8(96, 148, 54),
-			Color8(118, 172, 62), Color8(138, 190, 74), Color8(160, 206, 92),
+			Color8(55, 92, 38), Color8(75, 122, 46),
+			Color8(96, 150, 54), Color8(118, 170, 66), Color8(142, 188, 82),
 		],
 		Biome.FOREST_LIGHT: [
-			Color8(44, 92, 38), Color8(60, 114, 44),
-			Color8(78, 134, 52), Color8(96, 152, 60), Color8(116, 168, 72),
+			Color8(28, 67, 31), Color8(42, 88, 37),
+			Color8(57, 108, 43), Color8(73, 127, 51), Color8(91, 145, 61),
 		],
 		Biome.FOREST_DENSE: [
-			Color8(22, 56, 28), Color8(32, 72, 34),
-			Color8(42, 88, 40), Color8(54, 102, 48), Color8(68, 116, 56),
+			Color8(12, 35, 22), Color8(20, 50, 27),
+			Color8(29, 65, 32), Color8(40, 82, 39), Color8(54, 100, 48),
 		],
 		Biome.WATER_SHALLOW: [
-			Color8(52, 128, 158), Color8(66, 148, 176),
-			Color8(84, 168, 192), Color8(104, 186, 204), Color8(130, 202, 214),
+			Color8(34, 104, 128), Color8(47, 125, 148),
+			Color8(62, 146, 168), Color8(82, 165, 184), Color8(108, 184, 198),
 		],
 		Biome.WATER_DEEP: [
-			Color8(18, 54, 96), Color8(24, 68, 114),
-			Color8(30, 82, 130), Color8(38, 96, 144), Color8(48, 110, 156),
+			Color8(13, 39, 72), Color8(18, 51, 88),
+			Color8(24, 65, 104), Color8(31, 79, 120), Color8(40, 95, 136),
 		],
 		Biome.SWAMP: [
 			Color8(58, 66, 36), Color8(74, 84, 44),
@@ -470,8 +470,8 @@ func _ready() -> void:
 			Color8(150, 136, 88), Color8(166, 152, 102), Color8(182, 168, 118),
 		],
 		Biome.VARZEA: [
-			Color8(40, 70, 58), Color8(52, 88, 70),
-			Color8(64, 104, 82), Color8(80, 120, 96), Color8(98, 138, 112),
+			Color8(24, 49, 43), Color8(35, 65, 54),
+			Color8(47, 82, 66), Color8(62, 100, 80), Color8(80, 119, 96),
 		],
 	}
 

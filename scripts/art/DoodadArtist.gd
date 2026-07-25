@@ -259,3 +259,62 @@ func build_reeds() -> ImageTexture:
 			img.set_pixel(x, y, c)
 
 	return ImageTexture.create_from_image(img)
+
+# Non-blocking forest floor plants. Distinct silhouettes keep the understory
+# organic without competing with harvestable trees or unit selection rings.
+func build_undergrowth_variants() -> Array[ImageTexture]:
+	var textures: Array[ImageTexture] = []
+	for variant in range(4):
+		var w: int = 26
+		var h: int = 18
+		var img: Image = Image.create(w, h, false, Image.FORMAT_RGBA8)
+		var dark: Color = Color8(18, 55, 29)
+		var mid: Color = Color8(34, 84, 39)
+		var light: Color = Color8(58, 112, 50)
+		PixelArt.draw_ellipse(img, w / 2.0, h - 2.0, 10.0, 3.0,
+			Color(0.0, 0.0, 0.0, 0.22), true)
+		var fronds: int = 5 + variant
+		for i in range(fronds):
+			var base_x: int = 5 + int(PixelArt.hash2(
+				i, variant, 901) * float(w - 10))
+			var length: int = 7 + int(PixelArt.hash2(
+				i, variant, 902) * 7.0)
+			var lean: float = lerpf(-0.75, 0.75,
+				PixelArt.hash2(i, variant, 903))
+			for step in range(length):
+				var t: float = float(step) / float(length)
+				var x: int = clampi(base_x + int(lean * step), 0, w - 1)
+				var y: int = h - 3 - step
+				if y < 0:
+					break
+				img.set_pixel(x, y, light if t > 0.62 else mid)
+				if step > 2 and step % 2 == 0:
+					var spread: int = maxi(1, int((1.0 - t) * 4.0))
+					for side in [-1, 1]:
+						var lx: int = clampi(x + side * spread, 0, w - 1)
+						img.set_pixel(lx, y + 1, dark if side < 0 else mid)
+		textures.append(ImageTexture.create_from_image(img))
+	return textures
+
+func build_fallen_log() -> ImageTexture:
+	var w: int = 34
+	var h: int = 18
+	var img: Image = Image.create(w, h, false, Image.FORMAT_RGBA8)
+	var bark_dark: Color = Color8(48, 36, 24)
+	var bark_mid: Color = Color8(78, 55, 31)
+	var bark_light: Color = Color8(112, 80, 42)
+	var moss: Color = Color8(54, 98, 43)
+	PixelArt.draw_ellipse(img, w / 2.0, h - 2.0, 14.0, 3.0,
+		Color(0.0, 0.0, 0.0, 0.24), true)
+	for y in range(7, 14):
+		for x in range(4, 30):
+			var edge: bool = y == 7 or y == 13 or x == 4 or x == 29
+			var speckle: float = PixelArt.hash2(x, y, 441)
+			img.set_pixel(x, y, bark_dark if edge else (
+				bark_light if speckle > 0.78 else bark_mid))
+	for x in range(7, 28):
+		if PixelArt.hash2(x, 3, 442) > 0.58:
+			img.set_pixel(x, 7, moss)
+			if x % 3 == 0:
+				img.set_pixel(x, 6, moss)
+	return ImageTexture.create_from_image(img)

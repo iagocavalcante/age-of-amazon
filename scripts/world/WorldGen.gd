@@ -210,13 +210,27 @@ func poi_at(x: int, y: int, biome: int) -> Dictionary:
 			"loot": Constants.POI_DEFS[Constants.POI_ANCIENT_RUINS]["loot"] }
 	return {}
 
-# Pure decoration (not harvestable): reeds on swamp, rocks on cliffs.
+# Pure decoration (not harvestable): understory makes the forest read as a
+# biome even where there is no harvestable tree. It never affects pathfinding.
 # Returns "" or a decor id.
 func decor_at(x: int, y: int, biome: int) -> String:
 	var h: float = PixelArt.hash2(x, y, seed_val + 7)
 	match biome:
+		Constants.Biome.FOREST_DENSE:
+			if h < 0.07:
+				return "fallen_log"
+			if h < 0.52:
+				return "undergrowth"
+		Constants.Biome.FOREST_LIGHT:
+			if h < 0.035:
+				return "fallen_log"
+			if h < 0.27:
+				return "undergrowth"
+		Constants.Biome.VARZEA:
+			if h < 0.32:
+				return "wet_undergrowth"
 		Constants.Biome.SWAMP:
-			if h < 0.14:
+			if h < 0.24:
 				return "reeds"
 		Constants.Biome.CLIFF:
 			if h < 0.12:

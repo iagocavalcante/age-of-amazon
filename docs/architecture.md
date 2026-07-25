@@ -374,13 +374,16 @@ identity, but generation is external, occasional, and must never become a
 build dependency.
 
 **Decision.** `AssetLibrary` prefers a painted sprite when every frame of a
-unit exists under `assets/sprites/` (magenta masters, remapped to the tribe
-color at load), and silently falls back to the procedural builders
-otherwise. The procedural system remains canonical: deleting every PNG
-yields a fully working game.
+unit exists under `assets/sprites/` (magenta masters, remapped to the player
+color at load), and silently falls back to the procedural builders otherwise.
+Buildings follow the same rule: a per-civilization
+`building_<type>_t<player>.png` wins over a shared `building_<type>.png`, which
+wins over procedural art. The procedural system remains canonical: deleting
+every PNG yields a fully working game.
 
 **Consequences.** Art can improve piecemeal (the warrior shipped first)
 without a flag day; the repo carries small PNGs; painted and procedural
 sprites coexist at different sizes, which is accepted — bigger units read
-as more dangerous. First shipped asset: the tribal warrior (idle + 2 walk
-frames), generated with gpt-image-1 and chained via image edits.
+as more dangerous. The first environment set adds distinct Amazon River,
+Aztec, Andean, and Maya town-center silhouettes while retaining shared
+mechanics and player-color remapping.

@@ -20,6 +20,8 @@ var berry_texture: ImageTexture
 var jade_texture: ImageTexture
 var fish_texture: ImageTexture
 var ruins_texture: ImageTexture
+var undergrowth_textures: Array[ImageTexture] = []
+var fallen_log_texture: ImageTexture
 
 var icons: Dictionary = {}  # "food"/"wood"/"jade"/"pop" -> ImageTexture
 
@@ -100,8 +102,8 @@ func _ready() -> void:
 		}
 		var building_set: Dictionary = {}
 		for building_type: String in proc_buildings:
-			var override: ImageTexture = _override_texture(
-				"building_%s" % building_type, color)
+			var override: ImageTexture = _override_building_texture(
+				building_type, color, player_id)
 			building_set[building_type] = override if override != null \
 				else proc_buildings[building_type]
 		town_center_textures.append(building_set["town_center"])
@@ -128,7 +130,11 @@ func _ready() -> void:
 	berry_texture = doodad_artist.build_berry_bush()
 	jade_texture = doodad_artist.build_jade_deposit()
 	fish_texture = doodad_artist.build_fish_school()
-	ruins_texture = doodad_artist.build_ruins()
+	ruins_texture = _override_neutral("poi_ancient_ruins")
+	if ruins_texture == null:
+		ruins_texture = doodad_artist.build_ruins()
+	undergrowth_textures = doodad_artist.build_undergrowth_variants()
+	fallen_log_texture = doodad_artist.build_fallen_log()
 
 	var animal_artist: AnimalArtist = AnimalArtist.new()
 	animal_frames["capybara"] = animal_artist.build_capybara_frames()
@@ -193,6 +199,18 @@ func _override_texture(name: String, player_color: Color) -> ImageTexture:
 	if not ResourceLoader.exists(path):
 		return null
 	return _load_tinted(path, player_color)
+
+# A per-civilization building master wins over the shared sprite. Player
+# slots currently map to Amazon River, Aztec, Andean, and Maya art sets.
+# Other building types keep using their shared master until their dedicated
+# silhouettes are painted, so the visual upgrade remains incremental.
+func _override_building_texture(building_type: String, player_color: Color,
+		player_id: int) -> ImageTexture:
+	var civilization_path: String = SPRITE_DIR + "building_%s_t%d.png" % [
+		building_type, player_id]
+	if ResourceLoader.exists(civilization_path):
+		return _load_tinted(civilization_path, player_color)
+	return _override_texture("building_%s" % building_type, player_color)
 
 # Untinted override for neutral world art (trees, doodads) — no magenta
 # remap, the file is used as painted.

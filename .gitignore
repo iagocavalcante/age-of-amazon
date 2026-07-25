@@ -5,6 +5,7 @@
 .DS_Store
 .token
 .sprite_raws/
+tmp/imagegen/
 .admin_credentials
 build/*
 !build/.gdignore
