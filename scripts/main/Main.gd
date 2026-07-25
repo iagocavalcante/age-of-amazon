@@ -686,7 +686,7 @@ func _run_hud_test() -> void:
 	# (no barracks yet) — proving the indicator + reason reach the top bar.
 	print("[test-hud] advance-next-chiefdom ", "OK"
 		if hud._era_status_label.text.contains("Chiefdom")
-			and hud._era_status_label.text.contains("○ Barracks 0/1")
+			and hud._era_status_label.text.contains("NEED Barracks 0/1")
 			and hud._advance_button.text == "Advance locked"
 			and hud._advance_button.disabled
 		else "FAILED status=%s button=%s" % [
@@ -1229,7 +1229,7 @@ func _run_era_test() -> void:
 	# Fresh player 0 has no houses → cannot advance to Village.
 	print("[test-era] advance-requires-houses: %s" % ("OK" if not GameManager.can_advance_era(0) else "FAILED"))
 	print("[test-era] hud-shows-house-progress: %s" % (
-		"OK" if "○ Houses 0/2" in hud._era_status_label.text
+		"OK" if "NEED Houses 0/2" in hud._era_status_label.text
 			and hud._advance_button.disabled
 			and hud._advance_button.text == "Advance locked"
 		else "FAILED"))
@@ -1245,8 +1245,8 @@ func _run_era_test() -> void:
 	await get_tree().create_timer(0.6).timeout
 	print("[test-era] requirements-met: %s" % ("OK" if GameManager.can_advance_era(0) else "FAILED"))
 	print("[test-era] hud-shows-resource-block: %s" % (
-		"OK" if "✓ Houses 2/2" in hud._era_status_label.text
-			and "○ Food" in hud._era_status_label.text
+		"OK" if "OK Houses 2/2" in hud._era_status_label.text
+			and "NEED Food" in hud._era_status_label.text
 			and hud._advance_button.disabled
 		else "FAILED"))
 	# Grant enough resources and advance via the COMMAND path (not by calling
@@ -1255,8 +1255,8 @@ func _run_era_test() -> void:
 	GameManager.add_resource(0, Constants.ResourceType.WOOD, 300)
 	await get_tree().process_frame
 	print("[test-era] hud-ready-state: %s" % (
-		"OK" if "✓ Food" in hud._era_status_label.text
-			and "✓ Wood" in hud._era_status_label.text
+		"OK" if "OK Food" in hud._era_status_label.text
+			and "OK Wood" in hud._era_status_label.text
 			and not hud._advance_button.disabled
 			and hud._advance_button.text == "Advance now"
 		else "FAILED"))

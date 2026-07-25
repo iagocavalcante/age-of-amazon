@@ -276,7 +276,7 @@ func _refresh_era_ui() -> void:
 	var pid: int = GameManager.local_player_id
 	_era_label.text = Constants.ERA_DEFS[GameManager.player_era(pid)]["name"]
 	if not GameManager.has_next_era(pid):
-		_era_status_label.text = "✓ Maximum age reached"
+		_era_status_label.text = "MAXIMUM AGE"
 		_era_status_label.add_theme_color_override("font_color", ERA_READY)
 		_era_status_label.tooltip_text = ""
 		_advance_button.disabled = true
@@ -302,7 +302,7 @@ func _refresh_era_ui() -> void:
 			if singular_name.ends_with("s") else singular_name + "s"
 		var building_name: String = singular_name if required == 1 else plural_name
 		status_parts.append("%s %s %d/%d" % [
-			"✓" if still_needed == 0 else "○",
+			"OK" if still_needed == 0 else "NEED",
 			building_name, have, required])
 		if still_needed > 0:
 			reasons.append("%d more %s" % [still_needed,
@@ -312,7 +312,7 @@ func _refresh_era_ui() -> void:
 		var required: int = int(cost[res_type])
 		var enough: bool = current >= required
 		status_parts.append("%s %s %d/%d" % [
-			"✓" if enough else "○",
+			"OK" if enough else "NEED",
 			Constants.RESOURCE_NAMES[res_type].capitalize(), current, required])
 		if not enough:
 			reasons.append("%d more %s" % [
